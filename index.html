@@ -151,7 +151,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 @keyframes pinRing{0%{transform:scale(.6);opacity:1}100%{transform:scale(3);opacity:0}}
 @media (prefers-reduced-motion:reduce){#pinMk .ring{animation:none;opacity:.6}}
 /* boot cover: hides the warm-up (shader compile, dial bakes, a silent practice backswing); the loader only appears if it's slow */
-#boot{--tile:104px;--boardW:calc(3 * var(--tile) + 2 * 7px + 2 * 7px + 8px);position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(8vh,calc(env(safe-area-inset-top,0px) + 34px));padding-bottom:calc(3vh + env(safe-area-inset-bottom,0px));gap:clamp(10px,2.2vh,26px);background:#bfe6ff;overflow:hidden;transition:opacity .35s,visibility 0s .35s;touch-action:none}
+#boot{--tile:104px;--boardW:calc(3 * var(--tile) + 2 * 7px + 2 * 7px + 8px);position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(8vh,calc(env(safe-area-inset-top,0px) + 34px));padding-bottom:calc(1.8vh + env(safe-area-inset-bottom,0px));gap:clamp(10px,2.2vh,26px);background:#bfe6ff;overflow:hidden;transition:opacity .35s,visibility 0s .35s;touch-action:none}
 #boot.done{opacity:0;visibility:hidden;pointer-events:none}
 #boot .bscene{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
 #boot .bt{position:relative;font:clamp(48px,15.5vw,62px)/1 var(--font-display);color:var(--sun);letter-spacing:.02em;text-shadow:3px 0 0 var(--ink),-3px 0 0 var(--ink),0 3px 0 var(--ink),0 -3px 0 var(--ink),2.2px 2.2px 0 var(--ink),-2.2px -2.2px 0 var(--ink),2.2px -2.2px 0 var(--ink),-2.2px 2.2px 0 var(--ink),4px 6px 0 var(--ink);transform:rotate(-3deg)}
@@ -248,7 +248,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #boot .stats .pips i.on{background:var(--sun)}
 #boot .stats .pips.l2 i.on{background:var(--pink)}
 #boot .stats .shape{grid-column:1/-1;text-align:center;font:14px/1 var(--font-display);letter-spacing:.03em;margin-top:2px}
-#boot .courses{margin-top:auto;margin-bottom:clamp(8px,2.4vh,22px);display:flex;gap:10px;justify-content:center;opacity:0;transform:translateY(8px);transition:opacity .35s .1s,transform .35s .1s}
+#boot .courses{margin-top:auto;margin-bottom:calc(clamp(8px,2.4vh,22px) + 1.2vh);display:flex;gap:10px;justify-content:center;opacity:0;transform:translateY(8px);transition:opacity .35s .1s,transform .35s .1s}
 #boot.home .courses{opacity:1;transform:none}
 #boot .course{appearance:none;position:relative;display:flex;align-items:center;gap:12px;padding:13px 22px 13px 12px;font:inherit;color:var(--ink);background:var(--paper);border:3px solid var(--ink);border-radius:16px 13px 17px 12px;box-shadow:3px 4px 0 var(--ink);transform:rotate(.4deg);cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:left}
 #boot .course.sel{box-shadow:0 0 0 3.5px var(--pink),3px 4px 0 3.5px var(--ink)} /* ring drawn on top of the drop shadow, so it goes all the way round */
@@ -1326,8 +1326,8 @@ const flag = (() => {
       x.beginPath(); x.ellipse(cx, cy, lw / 2 + 9, lh / 2 + 9, 0, 0, 7); x.fillStyle = '#fffaf0'; x.fill(); x.lineWidth = 7; x.strokeStyle = I; x.stroke();
       x.drawImage(HUNT_IMG, cx - lw / 2, cy - lh / 2, lw, lh); }
     // hole number
-    x.font = `${Math.round(H * .44)}px "Luckiest Guy", Impact, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; const nx = X(W * .87), ny = H * .55;
-    x.lineWidth = 15; x.strokeStyle = I; x.strokeText('1', nx, ny); x.lineWidth = 8; x.strokeStyle = '#fffaf0'; x.strokeText('1', nx, ny); x.fillStyle = '#0a3255'; x.fillText('1', nx, ny); }; // the club's navy
+    x.font = `${Math.round(H * .26)}px "Luckiest Guy", Impact, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; const nx = X(W * .905), ny = H * .76; /* small, tucked into the bottom corner */
+    x.lineWidth = 10; x.strokeStyle = I; x.strokeText('1', nx, ny); x.lineWidth = 5; x.strokeStyle = '#fffaf0'; x.strokeText('1', nx, ny); x.fillStyle = '#0a3255'; x.fillText('1', nx, ny); }; // the club's navy
   const fc = document.createElement('canvas'), fcB = document.createElement('canvas'); fc.width = fcB.width = 512; fc.height = fcB.height = 320; paintFlag(fc); paintFlag(fcB, true);
   const ft = new THREE.CanvasTexture(fc); ft.anisotropy = 4; const ftB = new THREE.CanvasTexture(fcB); ftB.anisotropy = 4; ftB.wrapS = THREE.RepeatWrapping; ftB.repeat.x = -1; ftB.offset.x = 1; // back face: flipped so the number reads the right way from behind
   const fg = new THREE.PlaneGeometry(1.6, 1, 12, 3); fg.translate(.8, 0, 0);
