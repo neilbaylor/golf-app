@@ -3714,7 +3714,7 @@ function setHome(on) {
 }
 // the picked golfer on the home screen blinks, glances about and chats now and then (their own lines, their own mouth shapes)
 const HOMEAV = (() => {
-  let f = null, who = null, T = null, blinkT = -1, nextBlink = 1.2, look = { x: 0, y: 0 }, lookT = { x: 0, y: 0 }, nextLook = .8, talk = null, nextTalk = 1.1, lastM = '';
+  let f = null, who = null, T = null, blinkT = -1, nextBlink = 1.2, look = { x: 0, y: 0 }, lookT = { x: 0, y: 0 }, nextLook = .8, talk = null, nextTalk = 1.1, lastM = '', idleM = 'rest', idleT = 3;
   const vis = c => /[ae]/i.test(c) ? 'wide' : /[ou]/i.test(c) ? 'o' : /[iy]/i.test(c) ? 'ee' : /[mbp\s.,!?…'’-]/i.test(c) ? 'closed' : 'small';
   const homeLine = (w, k) => { const set = (VOICE[w] && VOICE[w][k]) || VOICE.neil[k]; return set[Math.floor(Math.random() * set.length)].replace(/\{name\}/g, CHARS[w].name); };
   function lookAtPick(tile) { const b = $('#bunch'); if (!b) return; const r0 = tile.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
@@ -3732,7 +3732,8 @@ const HOMEAV = (() => {
     let mKey = 'rest';
     if (talk) { if (talk.n < talk.text.length) { talk.acc += dt * 28; while (talk.acc >= 1 && talk.n < talk.text.length) { talk.acc--; talk.n++; } const hb = $('#hbub'); if (hb.childNodes.length === 2) { hb.firstChild.textContent = talk.text.slice(0, talk.n); hb.lastChild.textContent = talk.text.slice(talk.n); } else hb.textContent = talk.text.slice(0, talk.n); place(hb); talk.vt -= dt; if (talk.vt <= 0) { talk.vis = vis(talk.text[talk.n - 1] || ' '); talk.vt = .06 + Math.random() * .05; } mKey = talk.vis; }
       else { talk.hold += dt; if (talk.hold > 2.8 + talk.text.length * .06) { talk = null; hideBub(); nextTalk = 5 + Math.random() * 5; } /* longer lines stay up longer; never under ~3 s */ } }
-    else { nextTalk -= dt; if (nextTalk <= 0) say(homeLine(who, 'home')); }
+    else { nextTalk -= dt; if (nextTalk <= 0) say(homeLine(who, 'home'));
+      idleT -= dt; if (idleT <= 0) { const P = ['rest', 'rest', 'closed', 'grin', 'small']; idleM = P[Math.floor(Math.random() * P.length)]; idleT = idleM === 'rest' ? 3 + Math.random() * 3 : 1.4 + Math.random() * 1.6; } mKey = idleM; } // between lines the face changes a little (never the oo/ee shapes)
     nextBlink -= dt; if (nextBlink <= 0 && blinkT < 0) { blinkT = 0; nextBlink = 2 + Math.random() * 3; }
     let lid = 1; if (blinkT >= 0) { blinkT += dt; const d = .16; lid = Math.abs(Math.cos(Math.min(1, blinkT / d) * Math.PI)); if (blinkT > d) blinkT = -1; }
     nextLook -= dt; if (nextLook <= 0) { lookT = Math.random() < .4 ? { x: 0, y: 0 } : { x: (Math.random() * 2 - 1) * .9, y: (Math.random() * 2 - 1) * .5 }; nextLook = .9 + Math.random() * 2.2; }
