@@ -3012,7 +3012,7 @@ let READ_ZS = 1; const _gc = new THREE.Vector3(), RC0 = new THREE.Color(0xffffff
 const READ = (() => {
   const U0 = FRINGE.c[0] - 34, U1 = FRINGE.c[0] + 34, V0 = FRINGE.c[1] - 34, V1 = FRINGE.c[1] + 34, step = 1.5, inside = (u, v) => greenGap(u, v) <= 10, lift = .045;
   const GS = .5, GW = Math.round((U1 - U0) / GS) + 1, GH = Math.round((V1 - V0) / GS) + 1, gH = new Float32Array(GW * GH), gU = new Float32Array(GW * GH), gV = new Float32Array(GW * GH), gIn = new Uint8Array(GW * GH);
-  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const u = U0 + i * GS, v = V0 + j * GS, k = j * GW + i, g = gradUV(u, v); gH[k] = groundHeight(u, v); gU[k] = g.u; gV[k] = g.v; gIn[k] = greenGap(u, v) <= 10 ? 1 : 0; }
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const u = U0 + i * GS, v = V0 + j * GS, k = j * GW + i, g = gradUV(u, v); gH[k] = groundHeight(u, v); gU[k] = g.u; gV[k] = g.v; gIn[k] = greenGap(u, v) <= 10 && lieAt(u, v) !== 'sand' ? 1 : 0; } /* no slope arrows in the bunkers */
   const look = (u, v) => { const fx = clamp((u - U0) / GS, 0, GW - 1.001), fy = clamp((v - V0) / GS, 0, GH - 1.001), i = fx | 0, j = fy | 0, a = fx - i, b = fy - j, k = j * GW + i;
     const L = (A) => (A[k] * (1 - a) + A[k + 1] * a) * (1 - b) + (A[k + GW] * (1 - a) + A[k + GW + 1] * a) * b; return { h: L(gH), u: L(gU), v: L(gV), inside: gIn[Math.round(fy) * GW + Math.round(fx)] === 1 }; };
   const segs = [];
