@@ -3831,7 +3831,7 @@ async function runIntro() {
       mid.innerHTML = `<div class="cred"><small>${n === 0 ? 'starring' : n === faces.length - 1 && faces.length > 1 ? 'with' : 'and'}</small>${name}</div>`; await wait(1300); }
     if (stop) return; const crest = C.find(c => c.classList.contains('p-crest'));
     C.forEach(c => c.classList.toggle('hl', c === crest)); faces.forEach(o => crest && lookAt(o, +crest.dataset.k));
-    mid.innerHTML = `<div class="cred"><small>live from</small>Toronto Hunt</div>`; await wait(1100);
+    mid.innerHTML = `<div class="cred"><small>all live from the</small>Toronto Hunt</div>`; await wait(1100);
     end();
   })();
   await fin; clearInterval(blinkT); clearInterval(moodT);
