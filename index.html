@@ -278,6 +278,13 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 .dlbl{position:absolute;left:0;top:0;z-index:8;pointer-events:none;font:12px/1 var(--font-display);letter-spacing:.04em;color:var(--ink);background:var(--paper);border:2px solid var(--ink);border-radius:8px;padding:4px 7px 2px;white-space:nowrap;box-shadow:2px 2px 0 var(--ink)}
 .dlbl.x{background:#ff6a55;color:#fffaf0}
 #app.dropping :is(#bottom,#mid,#aimLbl,#aimTip,#ballView,#pinMk,#coach,#trTop,#slopeKey,#ffTip){visibility:hidden!important}
+#boot .appBtns{position:absolute;top:calc(env(safe-area-inset-top,0px) + 6px);right:max(10px,env(safe-area-inset-right,0px));display:flex;gap:6px;z-index:3;opacity:0;transition:opacity .35s .2s;pointer-events:none}
+#boot.home .appBtns{opacity:1;pointer-events:auto}
+#boot .appBtn{appearance:none;display:flex;align-items:center;gap:5px;font:13px/1 var(--font-hand);color:var(--ink);background:var(--paper);border:2.5px solid var(--ink);border-radius:10px;box-shadow:2px 2px 0 var(--ink);padding:5px 9px 5px 7px;cursor:pointer}
+#boot .appBtn svg{width:15px;height:15px}
+#boot .appBtn.ic{padding:6px}
+#boot .appBtn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+[hidden]{display:none!important} /* the game's own rule, so hidden panels stay hidden on any host */
 #app.atHome :is(#perf,#top,#say,#pinMk,#aimLbl,#mid,#aimTip,#ballView,#bottom,#coach,#stamp,#slopeKey,#ffTip,#ffwd,#trail,#trTop,#vig){visibility:hidden!important} /* !important: the tracer overlay sets its own inline visibility */
 @media (prefers-reduced-motion:reduce){#boot.home .bt span,#boot.home .face.sel svg.avHeadL{animation:none}}
 #boot.slow .ldr{opacity:1}
@@ -460,7 +467,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 
 <div id="app">
   <div id="intro" hidden><div class="ibg"></div><div class="ig" id="introGrid"></div><button class="iskip" id="introSkip" type="button">Skip ›</button></div>
-  <div id="boot" aria-live="polite"><svg class="bscene" viewBox="0 0 400 860" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="bSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc8f5"/><stop offset=".55" stop-color="#bfe6ff"/></linearGradient></defs><rect width="400" height="860" fill="url(#bSky)"/><g fill="#fff" stroke="#1d2a1a" stroke-width="3" stroke-linejoin="round"><path d="M38 120 q6 -22 28 -18 q10 -20 34 -10 q22 -6 26 16 q18 4 12 20 H40 q-14 -2 -2 -8z"/><path d="M262 70 q4 -18 24 -16 q10 -18 30 -8 q20 -4 22 14 q16 4 10 18 H264 q-12 -2 -2 -8z"/><path d="M300 200 q4 -14 18 -12 q8 -14 24 -6 q16 -2 16 12 q12 4 6 14 H302 q-10 -2 -2 -8z" opacity=".9"/></g><path d="M-10 520 Q90 440 200 486 T410 456 V860 H-10Z" fill="#7cc35a" stroke="#1d2a1a" stroke-width="3.5"/><path d="M-10 590 Q120 530 230 560 T410 540 V860 H-10Z" fill="#5fae3c" stroke="#1d2a1a" stroke-width="3.5"/><g stroke="#1d2a1a" stroke-width="3"><circle cx="40" cy="508" r="17" fill="#3f8f34"/><circle cx="66" cy="498" r="22" fill="#4f9d39"/><circle cx="352" cy="478" r="19" fill="#4f9d39"/><circle cx="378" cy="486" r="15" fill="#3f8f34"/></g><path d="M150 860 C170 760 250 720 238 640 C232 600 262 586 292 584" fill="none" stroke="#93d556" stroke-width="64" stroke-linecap="round"/><path d="M150 860 C170 760 250 720 238 640 C232 600 262 586 292 584" fill="none" stroke="#86c94b" stroke-width="64" stroke-linecap="round" stroke-dasharray="14 14" opacity=".55"/><ellipse cx="296" cy="582" rx="46" ry="16" fill="#a9ea6d" stroke="#1d2a1a" stroke-width="3"/><ellipse cx="306" cy="583" rx="5" ry="2.2" fill="#1d2a1a"/><path d="M306 583 V528" stroke="#1d2a1a" stroke-width="5.6" stroke-linecap="round"/><path d="M306 583 V528" stroke="#ffd23f" stroke-width="2.6" stroke-linecap="round"/><path d="M307 529 L332 536 L307 545Z" fill="#ffd23f" stroke="#1d2a1a" stroke-width="2.6" stroke-linejoin="round"/><circle cx="306" cy="527" r="3.4" fill="#ff4f9a" stroke="#1d2a1a" stroke-width="2"/><ellipse cx="118" cy="700" rx="34" ry="12" fill="#f5dc93" stroke="#1d2a1a" stroke-width="3"/><g stroke="#1d2a1a" stroke-width="2" fill="none" stroke-linecap="round" opacity=".55"><path d="M30 760 l4 -12 l4 12 M60 800 l4 -12 l4 12 M330 760 l4 -12 l4 12 M360 820 l4 -12 l4 12 M80 680 l3 -9 l3 9 M352 660 l3 -9 l3 9 M20 840 l4 -12 l4 12 M300 830 l4 -12 l4 12"/></g></svg><div class="bt" id="bootTitle">Tee Party</div><div class="bunchW"><div class="bunch" id="bunch" role="radiogroup" aria-label="Pick your golfer"></div><div class="hbub card" id="hbub" hidden></div></div><div class="stats" id="stats" aria-live="polite"></div><div class="courses" id="courses" role="radiogroup" aria-label="Pick a course"></div><div class="homeFade" id="homeFade"></div><div class="ldr"><div class="ball"></div><div class="sh"></div><div class="bcap">Warming up…</div></div><button class="playBtn" id="playBtn" type="button">Play</button></div>
+  <div id="boot" aria-live="polite"><svg class="bscene" viewBox="0 0 400 860" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="bSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc8f5"/><stop offset=".55" stop-color="#bfe6ff"/></linearGradient></defs><rect width="400" height="860" fill="url(#bSky)"/><g fill="#fff" stroke="#1d2a1a" stroke-width="3" stroke-linejoin="round"><path d="M38 120 q6 -22 28 -18 q10 -20 34 -10 q22 -6 26 16 q18 4 12 20 H40 q-14 -2 -2 -8z"/><path d="M262 70 q4 -18 24 -16 q10 -18 30 -8 q20 -4 22 14 q16 4 10 18 H264 q-12 -2 -2 -8z"/><path d="M300 200 q4 -14 18 -12 q8 -14 24 -6 q16 -2 16 12 q12 4 6 14 H302 q-10 -2 -2 -8z" opacity=".9"/></g><path d="M-10 520 Q90 440 200 486 T410 456 V860 H-10Z" fill="#7cc35a" stroke="#1d2a1a" stroke-width="3.5"/><path d="M-10 590 Q120 530 230 560 T410 540 V860 H-10Z" fill="#5fae3c" stroke="#1d2a1a" stroke-width="3.5"/><g stroke="#1d2a1a" stroke-width="3"><circle cx="40" cy="508" r="17" fill="#3f8f34"/><circle cx="66" cy="498" r="22" fill="#4f9d39"/><circle cx="352" cy="478" r="19" fill="#4f9d39"/><circle cx="378" cy="486" r="15" fill="#3f8f34"/></g><path d="M150 860 C170 760 250 720 238 640 C232 600 262 586 292 584" fill="none" stroke="#93d556" stroke-width="64" stroke-linecap="round"/><path d="M150 860 C170 760 250 720 238 640 C232 600 262 586 292 584" fill="none" stroke="#86c94b" stroke-width="64" stroke-linecap="round" stroke-dasharray="14 14" opacity=".55"/><ellipse cx="296" cy="582" rx="46" ry="16" fill="#a9ea6d" stroke="#1d2a1a" stroke-width="3"/><ellipse cx="306" cy="583" rx="5" ry="2.2" fill="#1d2a1a"/><path d="M306 583 V528" stroke="#1d2a1a" stroke-width="5.6" stroke-linecap="round"/><path d="M306 583 V528" stroke="#ffd23f" stroke-width="2.6" stroke-linecap="round"/><path d="M307 529 L332 536 L307 545Z" fill="#ffd23f" stroke="#1d2a1a" stroke-width="2.6" stroke-linejoin="round"/><circle cx="306" cy="527" r="3.4" fill="#ff4f9a" stroke="#1d2a1a" stroke-width="2"/><ellipse cx="118" cy="700" rx="34" ry="12" fill="#f5dc93" stroke="#1d2a1a" stroke-width="3"/><g stroke="#1d2a1a" stroke-width="2" fill="none" stroke-linecap="round" opacity=".55"><path d="M30 760 l4 -12 l4 12 M60 800 l4 -12 l4 12 M330 760 l4 -12 l4 12 M360 820 l4 -12 l4 12 M80 680 l3 -9 l3 9 M352 660 l3 -9 l3 9 M20 840 l4 -12 l4 12 M300 830 l4 -12 l4 12"/></g></svg><div class="bt" id="bootTitle">Tee Party</div><div class="bunchW"><div class="bunch" id="bunch" role="radiogroup" aria-label="Pick your golfer"></div><div class="hbub card" id="hbub" hidden></div></div><div class="stats" id="stats" aria-live="polite"></div><div class="courses" id="courses" role="radiogroup" aria-label="Pick a course"></div><div class="homeFade" id="homeFade"></div><div class="ldr"><div class="ball"></div><div class="sh"></div><div class="bcap">Warming up…</div></div><button class="playBtn" id="playBtn" type="button">Play</button><div class="appBtns"><button type="button" class="appBtn" id="installBtn" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 17v3h14v-3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Add to home screen</button><button type="button" class="appBtn ic" id="fsBtn" aria-label="Full screen" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span hidden>Full screen</span></button></div></div>
   <canvas id="gl"></canvas>
   <div id="lens"></div>
   <div id="vig"></div>
@@ -626,19 +633,23 @@ const FW = (() => { const L = [], R = []; for (let v = 92; v <= 362; v += 2) { c
 const GREEN = { c: [-28, 388], rx: 15, ry: 19, rot: 0.15, s: 1.3 };
 const FRINGE = { c: [-28, 388], rx: 17.6, ry: 21.8, rot: 0.15, s: 1.3 };
 const BUNKERS = [
-  { c: [17, 238], rx: 10, ry: 5.5, rot: 0.35, s: 2 }, { c: [-37, 270], rx: 8, ry: 6.5, rot: -0.3, s: 3.1 },
-  { c: [-9, 381], rx: 4.5, ry: 8, rot: 0.2, s: 4.2 }, { c: [-47, 396], rx: 4.5, ry: 7.5, rot: -0.25, s: 5.3 },
-  { c: [-12, 342], rx: 6, ry: 4, rot: 0.5, s: 6.4 }];
+  { c: [17, 238], rx: 14, ry: 6.6, rot: 0.35, s: 2, f: [[1.55, .62, .4], [2.6, .38, .3]] }, { c: [-37, 270], rx: 11, ry: 7.8, rot: -0.3, s: 3.1, f: [[-1.6, .62, .42]] },
+  { c: [-9, 381], rx: 5.8, ry: 10, rot: 0.2, s: 4.2, f: [[3.14, .6, .4]] }, { c: [-47, 396], rx: 5.8, ry: 9.6, rot: -0.25, s: 5.3, f: [[0, .6, .4]] },
+  { c: [-12, 342], rx: 8.6, ry: 5.2, rot: 0.5, s: 6.4, f: [[1.57, .6, .42]] }]; /* f: grass tongues [angle, depth, width] — Toronto Hunt style */
 const WATER = { c: [-60, 195], rx: 20, ry: 32, rot: 0.1, s: 7 };
 const PIN = { u: -25, v: 393 };
+const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
 const shapeR = (th, s) => 1 + 0.09 * Math.sin(3 * th + s) + 0.05 * Math.sin(5 * th + s * 2.3) + 0.03 * Math.sin(7 * th + s * .7);
+// a bunker with tongues: big soft scallops, and grass fingers pushing into the sand
+function shR(th, e) { if (!e.f) return shapeR(th, e.s); let r = 1 + .1 * Math.sin(2 * th + e.s) + .06 * Math.sin(3 * th + e.s * 1.7);
+  for (const [a, d, w] of e.f) { const x = wrapA(th - a) / w; r -= d * Math.exp(-x * x); } return r; }
 function inEl(u, v, e, pad = 1) {
   const du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot);
   const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry;
-  return Math.hypot(x, y) < shapeR(Math.atan2(y, x), e.s) * pad;
+  return Math.hypot(x, y) < shR(Math.atan2(y, x), e) * pad;
 }
 function elPts(e, n = 72, pad = 1) {
-  const out = []; for (let i = 0; i < n; i++) { const th = i / n * Math.PI * 2, r = shapeR(th, e.s) * pad; const x = Math.cos(th) * r * e.rx, y = Math.sin(th) * r * e.ry; out.push([e.c[0] + x * Math.cos(e.rot) - y * Math.sin(e.rot), e.c[1] + x * Math.sin(e.rot) + y * Math.cos(e.rot)]); } return out;
+  const out = []; for (let i = 0; i < n; i++) { const th = i / n * Math.PI * 2, r = shR(th, e) * pad; const x = Math.cos(th) * r * e.rx, y = Math.sin(th) * r * e.ry; out.push([e.c[0] + x * Math.cos(e.rot) - y * Math.sin(e.rot), e.c[1] + x * Math.sin(e.rot) + y * Math.cos(e.rot)]); } return out;
 }
 function inPoly(u, v, P) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a[1] > v) !== (b[1] > v) && u < (b[0] - a[0]) * (v - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
 const _ss = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -669,7 +680,7 @@ const TREES = (() => {
     const n = 0.5 + 0.5 * Math.sin(u * 0.05 + v * 0.03) * Math.cos(v * 0.021 - u * 0.03);
     if (R() > n * 0.85 + 0.12) continue;
     if (out.some(t => Math.hypot(t.u - u, t.v - v) < 6.5)) continue;
-    out.push({ u, v, h: (9 + R() * 8) * 1.15 /* grown to suit the lifted ball flight */, r: 3.2 + R() * 2.6, pine: R() < .32, k: R() });
+    out.push({ u, v, h: (9 + R() * 8) * 1.15 /* grown to suit the lifted ball flight */, r: 3.2 + R() * 2.6, pine: R() < .14, k: R() });
   }
   return out;
 })();
@@ -861,12 +872,12 @@ let glPR = PR; renderer.setPixelRatio(glPR); renderer.info.autoReset = false;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, 1, 0.3, 2600);
-scene.fog = new THREE.Fog(0xd6f0ff, 240, 1050);
+scene.fog = new THREE.Fog(0xece9dc, 240, 1050);
 const W = (u, v, y = 0) => new THREE.Vector3(u, y, -v);
 const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
 // sky
-(() => { const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#6fc0f5'); gr.addColorStop(.55, '#aadcfb'); gr.addColorStop(1, '#e4f6ff'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); scene.background = new THREE.CanvasTexture(c); })();
+(() => { const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#8fc6ec'); gr.addColorStop(.5, '#c9e2ef'); gr.addColorStop(.85, '#ece9dc'); gr.addColorStop(1, '#f7eedb'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); scene.background = new THREE.CanvasTexture(c); })();
 
 const gradMap = new THREE.DataTexture(new Uint8Array([95, 95, 95, 175, 175, 175, 255, 255, 255]), 3, 1, THREE.RGBFormat);
 gradMap.minFilter = gradMap.magFilter = THREE.NearestFilter; gradMap.generateMipmaps = false; gradMap.needsUpdate = true;
@@ -881,8 +892,8 @@ function tuftMat(map) {
   };
   return m;
 }
-scene.add(new THREE.HemisphereLight(0xeaf7ff, 0x4f7d35, 0.55));
-const sun = new THREE.DirectionalLight(0xfff2d6, 0.95); sun.position.set(-55, 110, -60); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xfff3dc, 0x4f7d35, 0.55));
+const sun = new THREE.DirectionalLight(0xffe4b8, 1.0); sun.position.set(-55, 110, -60); scene.add(sun);
 
 /* ---- painted course texture ---- */
 const MAP = { U0: -140, U1: 140, V0: -40, V1: 450, W: 1536 };
@@ -900,7 +911,7 @@ function paintCourse(real = false) {
     }
   };
   // rough
-  g.fillStyle = real ? '#4f8a35' : '#5fa23d'; g.fillRect(0, 0, MAP.W, MAP.H);
+  g.fillStyle = real ? '#4f8a35' : '#5c9c3a'; g.fillRect(0, 0, MAP.W, MAP.H);
   for (let i = 0; i < 900; i++) { g.fillStyle = real ? (R() < .5 ? `rgba(30,70,25,${.06 + R() * .08})` : `rgba(140,170,70,${.05 + R() * .07})`) : R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 10 + R() * 60, 0, 7); g.fill(); }
   const hatch = (n, col, lw) => { g.beginPath(); for (let i = 0; i < n; i++) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
   if (real) { const sp = (n, col, r) => { g.fillStyle = col; for (let i = 0; i < n; i++) g.fillRect(R() * MAP.W, R() * MAP.H, r, r); }; sp(90000, 'rgba(20,55,20,.22)', 1.2); sp(60000, 'rgba(150,190,90,.18)', 1); sp(400, 'rgba(110,85,50,.25)', 2.2); }
@@ -922,7 +933,7 @@ function paintCourse(real = false) {
   // fairway
   path(FW); g.lineWidth = 3.4 * ppy; g.strokeStyle = real ? 'rgba(98,150,58,.8)' : '#7dbb48'; g.lineJoin = 'round'; if (real) { g.filter = 'blur(3px)'; } g.stroke(); g.filter = 'none';
   g.save(); path(FW); g.clip();
-  for (let v = 80, k = 0; v < 372; v += 7, k++) { g.fillStyle = real ? (k % 2 ? '#6aa646' : '#62a03f') : (k % 2 ? '#93d556' : '#86c94b'); g.fillRect(0, Y(v + 7), MAP.W, 7 * ppy + 1); }
+  for (let v = 80, k = 0; v < 372; v += 7, k++) { g.fillStyle = real ? (k % 2 ? '#6aa646' : '#62a03f') : (k % 2 ? '#a4d75a' : '#95cb4f'); g.fillRect(0, Y(v + 7), MAP.W, 7 * ppy + 1); }
   if (real) { g.fillStyle = 'rgba(30,70,25,.12)'; for (let i = 0; i < 26000; i++) g.fillRect(R() * MAP.W, Y(90 + R() * 275), 1, 1); }
   g.beginPath(); for (let i = 0; i < 2600; i++) { const x = R() * MAP.W, y = Y(90 + R() * 275), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = real ? 'rgba(40,90,30,.08)' : 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
   g.restore(); sketch(FW, 2.6, .8);
@@ -935,10 +946,10 @@ function paintCourse(real = false) {
   g.save(); path(gp); g.clip(); for (let k = 9; k > 0; k--) { path(elPts(Object.assign({}, GREEN, { rx: GREEN.rx * k / 9, ry: GREEN.ry * k / 9 }), 64)); g.fillStyle = k % 2 ? 'rgba(255,255,255,.07)' : 'rgba(40,120,40,.05)'; g.fill(); } g.restore(); sketch(gp, 2.6, .85);
   // bunkers
   BUNKERS.forEach(b => {
-    const bp = elPts(b, 64); path(elPts(b, 64, 1.12)); g.fillStyle = real ? '#5f9a3e' : '#8fcf55'; g.fill();
-    path(bp); g.fillStyle = real ? '#e3cf9c' : '#f5dc93'; g.fill(); g.save(); path(bp); g.clip();
-    g.fillStyle = 'rgba(190,150,70,.55)'; for (let i = 0; i < 160; i++) { g.beginPath(); g.arc(X(b.c[0] + (R() - .5) * b.rx * 2.4), Y(b.c[1] + (R() - .5) * b.ry * 2.4), .6 + R() * .9, 0, 7); g.fill(); }
-    g.lineWidth = .9 * ppy; g.strokeStyle = 'rgba(200,160,70,.55)'; g.translate(1.5, 2); path(bp); g.stroke(); g.restore();
+    const bp = elPts(b, 180); path(elPts(b, 180, 1.3)); g.fillStyle = real ? '#5f9a3e' : 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = real ? '#5f9a3e' : '#8fcf55'; g.fill(); /* the raised grass lip, with a shadow falling off it */
+    path(bp); g.fillStyle = real ? '#e3cf9c' : '#f6ecd4'; g.fill(); g.save(); path(bp); g.clip();
+    g.fillStyle = 'rgba(205,180,130,.45)'; for (let i = 0; i < 160; i++) { g.beginPath(); g.arc(X(b.c[0] + (R() - .5) * b.rx * 2.4), Y(b.c[1] + (R() - .5) * b.ry * 2.4), .6 + R() * .9, 0, 7); g.fill(); }
+    g.lineWidth = 2.4 * ppy; g.strokeStyle = 'rgba(176,146,96,.42)'; g.translate(0, 2.2 * ppy); path(bp); g.stroke(); g.restore(); /* the shaded face under the far lip */
     sketch(bp, 3, .9);
   });
   // tree shadows (hatched)
@@ -1092,17 +1103,17 @@ function updateCull() {
   const R = rng(11);
   TREES.forEach((t, ti) => {
     const gy = groundHeight(t.u, t.v), tw = W(t.u, t.v, gy);
-    trunks.push({ p: tw.clone(), s: [1, t.pine ? t.h * .3 : t.h * .55, 1], tid: ti });
+    trunks.push({ p: tw.clone(), s: [t.pine ? 1 : .85, t.pine ? t.h * .3 : t.h * .64, t.pine ? 1 : .85], tid: ti });
     if (t.pine) {
       cones.push({ p: tw.clone().setY(gy + t.h * .22), s: [t.r * .95, t.h * .55, t.r * .95], tid: ti });
       cones.push({ p: tw.clone().setY(gy + t.h * .5), s: [t.r * .7, t.h * .5, t.r * .7], tid: ti });
     } else {
-      blobs.push({ p: tw.clone().setY(gy + t.h * .66), s: t.r, r: R(), tid: ti }); t.blobs = [[0, t.h * .66, 0, t.r]]; // the hit-box uses the same blobs that are drawn
-      for (let k = 0; k < 2; k++) { const a = R() * 6.28, bx = Math.cos(a) * t.r * .6, by = t.h * (.45 + R() * .2), bz = Math.sin(a) * t.r * .6, bs = t.r * (.55 + R() * .2); blobs.push({ p: tw.clone().add(new THREE.Vector3(bx, by, bz)), s: bs, r: R(), tid: ti }); t.blobs.push([bx, by, -bz, bs]); }
+      blobs.push({ p: tw.clone().setY(gy + t.h * .74), s: t.r * .9, r: R(), tid: ti }); t.blobs = [[0, t.h * .74, 0, t.r * .9]]; // the hit-box uses the same blobs that are drawn
+      const a0 = R() * 6.28; for (let k = 0; k < 2; k++) { const a = a0 + k * 3.14 + (R() - .5) * .8, bx = Math.cos(a) * t.r * .9, by = t.h * (.6 + R() * .14), bz = Math.sin(a) * t.r * .9, bs = t.r * (.6 + R() * .14); blobs.push({ p: tw.clone().add(new THREE.Vector3(bx, by, bz)), s: bs, r: R(), tid: ti }); t.blobs.push([bx, by, -bz, bs]); } /* a broad, spreading crown */
     }
   });
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), col = new THREE.Color();
-  const greens = ['#4f9d39', '#5cae45', '#3f8a35', '#6dba4c', '#4a9440'];
+  const greens = ['#5a9a35', '#6aa83c', '#4c8a30', '#7cb446', '#55923a'];
   function inst(geo, mat, list, scaleFn, colorFn, off) { return cullInst(geo, mat, list.map((o, i) => { scaleFn(o, sc); return { p: o.p, m: new THREE.Matrix4().compose(o.p, q, sc), c: colorFn ? new THREE.Color(colorFn(o, i)) : null, r: Math.max(sc.x, sc.y, sc.z) * 1.25 + .5, tid: o.tid }; }), { off }); }
   inst(blobGeo, toon(0xffffff), blobs, (o, s) => s.setScalar(o.s), o => greens[Math.floor(o.r * greens.length)]);
   inst(blobGeo, inkMat, blobs, (o, s) => s.setScalar(o.s + .3));
@@ -1112,14 +1123,18 @@ function updateCull() {
   inst(trunkGeo, inkMat, trunks, (o, s) => s.set(o.s[0] * 1.45, o.s[1], o.s[2] * 1.45));
 })();
 
+/* ---- Lake Ontario past the bluff behind the green ---- */
+(() => { const lake = new THREE.Mesh(new THREE.PlaneGeometry(5200, 2600), new THREE.MeshBasicMaterial({ color: 0xc4d9df, fog: true }));
+  lake.rotation.x = -Math.PI / 2; lake.position.set(0, -0.55, -470 - 1300); lake.userData.ink = false; lake.renderOrder = -2; scene.add(lake); /* drawn first so the ground under it fails the depth test instead of shading twice */
+  const shore = new THREE.Mesh(new THREE.PlaneGeometry(5200, 6), new THREE.MeshBasicMaterial({ color: 0xe9dcc0, fog: true })); shore.rotation.x = -Math.PI / 2; shore.position.set(0, -0.5, -473); shore.userData.ink = false; scene.add(shore); })();
 /* ---- hills, tufts, clouds, flag, tee markers ---- */
 (() => {
   const geo = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2); const R = rng(5);
-  const cols = ['#7fb86d', '#8cc37b', '#6ea862', '#97c98a'];
+  const cols = ['#5d9a45', '#68a54e', '#548f40', '#72ad55'];
   const hills = [];
   // background hills must never overlap the playable area (+ room for the cameras), or a camera can end up inside one
   const clearOf = (x, z, r) => { const dx = Math.max(-170 - x, 0, x - 170), dz = Math.max(-480 - z, 0, z - 70); return Math.hypot(dx, dz) > r + 6; };
-  for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(Math.cos(a) * d, -200 + Math.sin(a) * d, r)) d += 15; hills.push({ p: new THREE.Vector3(Math.cos(a) * d, -2, -200 + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
+  for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(Math.cos(a) * d, -200 + Math.sin(a) * d, r)) d += 15; if (-200 + Math.sin(a) * d - r < -470) continue; hills.push({ p: new THREE.Vector3(Math.cos(a) * d, -2, -200 + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
   [[-10, 432, 16], [-46, 425, 13], [-62, 380, 10]].forEach(([u, v, r]) => hills.push({ p: W(u, v, groundHeight(u, v) - .3), s: new THREE.Vector3(r, r * .28, r), c: '#5aa743', ink: false }));
   const hm = new THREE.InstancedMesh(geo, toon(0xffffff), hills.length), inked = hills.filter(h => h.ink), ho = new THREE.InstancedMesh(geo, inkMat, inked.length);
   const M4 = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), C0 = new THREE.Color(), S0 = new THREE.Vector3();
@@ -2308,7 +2323,7 @@ function launchPutt(sw) {
 /* ================= SHOT ================= */
 // does a point (yards, world height) touch this tree? Matches what's drawn: trunk, then a round canopy (or two stacked cones for pines)
 function treeHit(t, u, v, y) {
-  const d = Math.hypot(t.u - u, t.v - v); if (d > t.r * 1.4 + .3) return false;
+  const d = Math.hypot(t.u - u, t.v - v); if (d > t.r * 1.6 + .3) return false;
   const rel = y - (t.gy ?? (t.gy = groundHeight(t.u, t.v))), h = t.h;
   if (rel < 0) return false;
   if (d < .48 + BALL_R && rel < h * (t.pine ? .3 : .55)) return true;                          // trunk (as drawn, plus the ball)
@@ -2855,7 +2870,7 @@ function firstTreeHit(pts) {
   for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / .3));
     for (let j = 1; j <= n; j++) { const k = j / n, x = a.x + (b.x - a.x) * k, z = a.z + (b.z - a.z) * k; if (Math.hypot(x - p0.x, z - p0.z) < 1.5) continue;
       const y = a.y + (b.y - a.y) * k, u = x, v = -z;
-      for (const t of near) if (Math.abs(t.u - u) < t.r * 1.4 + .3 && Math.abs(t.v - v) < t.r * 1.4 + .3 && treeHit(t, u, v, y)) return { i, t: a.t + (b.t - a.t) * k, x, y, z }; } }
+      for (const t of near) if (Math.abs(t.u - u) < t.r * 1.6 + .3 && Math.abs(t.v - v) < t.r * 1.6 + .3 && treeHit(t, u, v, y)) return { i, t: a.t + (b.t - a.t) * k, x, y, z }; } }
   return null;
 }
 // shots LOOK higher than they physically fly: every height above the ground under the ball is stretched by SHOT_LIFT for the
@@ -3597,7 +3612,7 @@ const REAL = (() => {
     ballShadow.visible = !v; ball.castShadow = v; renderer.shadowMap.needsUpdate = true;
     sun.castShadow = v; sun.intensity = v ? 1.25 : .95; if (hemi) hemi.intensity = v ? .7 : .55;
     if (!sky0) sky0 = scene.background;
-    scene.background = v ? mats.sky : sky0; scene.fog.color.set(v ? 0xdfe9ee : 0xd6f0ff);
+    scene.background = v ? mats.sky : sky0; scene.fog.color.set(v ? 0xdfe9ee : 0xece9dc);
   }
   const off = new THREE.Vector3(-55, 110, -60).normalize().multiplyScalar(160), f = new THREE.Vector3();
   const lastF = new THREE.Vector3(1e9, 0, 0);
@@ -3862,6 +3877,17 @@ function pickGolfer(who) {
 }
 if (!AV.has(G.who)) G.who = 'neil'; G.lefty = handFor(G.who); if (G.who !== 'neil') AV.setChar(G.who);
 const ROSTER = () => Object.keys(CHARS).filter(w => AV.has(w)); // golfers whose art is in
+// Add to home screen (Android/Chrome gives us its own install prompt; iOS has none, so nothing nags there) and a full-screen toggle where the browser allows it
+(() => {
+  const inst = $('#installBtn'), fs = $('#fsBtn'), standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
+  let ask = null; window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ask = e; if (!standalone) inst.hidden = false; });
+  inst.addEventListener('click', async e => { e.stopPropagation(); if (!ask) return; ask.prompt(); try { await ask.userChoice; } catch (err) {} ask = null; inst.hidden = true; });
+  window.addEventListener('appinstalled', () => { inst.hidden = true; });
+  const root = document.documentElement, canFs = !standalone && document.fullscreenEnabled && root.requestFullscreen;
+  const sync = () => { const on = !!document.fullscreenElement; fs.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen'); fs.querySelector('path').setAttribute('d', on ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'); };
+  if (canFs) { fs.hidden = false; document.addEventListener('fullscreenchange', sync);
+    fs.addEventListener('click', e => { e.stopPropagation(); (document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen({ navigationUI: 'hide' })).catch(() => {}); }); }
+})();
 (async function boot() { // warm everything the first swing touches, behind the cover, then lift it
   const el = $('#boot');
   document.title = GAME_NAME; $('#bootTitle').setAttribute('aria-label', GAME_NAME); $('#bootTitle').innerHTML = [...GAME_NAME].map((ch, i) => ch === ' ' ? '<span class="gap"></span>' : `<span aria-hidden="true" style="--i:${i}">${ch}</span>`).join('');
