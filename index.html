@@ -2587,7 +2587,7 @@ function updateFlight(dt) {
     const mv = _ax.set(pos.x - _fwd.x, 0, pos.z - _fwd.z), sp = mv.length(); // rolling: turn about (up × travel); backing up spins it the other way
     if (sp > 1e-5) { mv.divideScalar(sp); ball.rotateOnWorldAxis(_fwd.crossVectors(_UP, mv).normalize(), sp / BALL_R * (S.putt ? 3.6 : 1.8)); } // the big cartoon ball turns quicker than true rolling so the roll reads as fast
     setDist(Math.hypot(pos.x - S.B.u, -pos.z - S.B.v));
-    if (S.callPending && S.rollT >= T - .45) { S.callPending = false; if (!S.holed) callLie(S, S.endLie, S.end); } /* just before it stops: where it ended up, not where it landed */
+    if (S.callPending && S.rollT >= T - .5 * 1.25) { S.callPending = false; if (!S.holed) callLie(S, S.endLie, S.end); } /* just before it stops: where it ended up, not where it landed */
     if (S.rollT >= T && S.phase !== 'done') { S.phase = 'done'; setTimeout(finishShot, 650); }
   }
   if (S.phase !== 'air') { const cm = comet.material, ci = cometInk.material; cm.opacity = ci.opacity = Math.max(0, (cm.opacity ?? 1) - dt * 2.2); cm.transparent = ci.transparent = true; if (cm.opacity <= 0) comet.visible = cometInk.visible = false; }
