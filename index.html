@@ -692,7 +692,7 @@ const LIES = {
 // the fairway trees whose trunks stand in the fairway, with a skirt of long grass round them (a Hunt feature)
 const TUFTED = [[-46.0, 198.5], [-48.2, 210.0]]; // on the left edge of the fairway
 const TREES = (() => {
-  const R = rng(42), out = [], add = (u, v, r, h, o = {}) => out.push(Object.assign({ u, v, h: h * 1.15, r, pine: false, k: R() }, o));
+  const R = rng(42), out = [], TK = 87 / 73, add = (u, v, r, h, o = {}) => out.push(Object.assign({ u, v, h: h * 1.15 * TK + (TK - 1) * r * .9 / .74, r, pine: false, k: R() }, o)); /* TK: canopy tops scaled so the tallest (the big one down the right) stands 87 ft */
   // by hand, from the aerial
   add(-11.5, 147.5, 7.2, 21);                                   // the big one down the right, at the front
   add(-20.0, 168.8, 4.4, 15); add(-20.5, 182.0, 4.8, 16); add(-13.4, 177.0, 4.2, 14); add(-16.5, 194.5, 4.6, 15); // the ones past it: annoying to be behind
@@ -704,7 +704,7 @@ const TREES = (() => {
   add(-63.9, 301.0, 7, 19); add(-49.1, 318.5, 6.2, 18); add(14.2, 334.5, 5.4, 17); // the few left of and behind the green
   const ok = (u, v, gap) => !out.some(t => Math.hypot(t.u - u, t.v - v) < gap);
   // the woods along the right, from the tree line out toward the bluff
-  for (let i = 0; i < 2500; i++) { const v = -35 + R() * 425, u = bluffU(v) + 3 + R() * 12.5; // trees growing down the face of the bluff: their tops sit below the edge
+  for (let i = 0; i < 2500; i++) { const v = -35 + R() * 425, u = bluffU(v) + 4 + R() * 11.5; // trees growing down the face of the bluff: their tops sit below the edge
     if (ok(u, v, 6.2)) add(u, v, 3.2 + R() * 2.2, 13 + R() * 8, { pine: R() < .15, face: true }); }
   // the other holes left of the cart path, and the trees round the clubhouse
   [[-146.0, 251.1, 6], [-132.1, 243.9, 5], [-123.5, 150.3, 5.6], [-101.0, 135.6, 5], [-75.2, 100.7, 5.4], [-140, 300, 6], [-128, 330, 5.4], [-150, 190, 5.6]].forEach(([u, v, r]) => add(u, v, r, 15 + r)); // a few over on the other holes
