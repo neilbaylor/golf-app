@@ -3720,7 +3720,7 @@ const HOMEAV = (() => {
       if (t !== tile) { const r = t.getBoundingClientRect(), dx = cx - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2), L = Math.hypot(dx, dy) || 1; ex = dx / L * 2.2; ey = dy / L * 1.6; }
       eL.setAttribute('cx', (42 + ex).toFixed(1)); eL.setAttribute('cy', (54 + ey).toFixed(1)); eR.setAttribute('cx', (58 + ex).toFixed(1)); eR.setAttribute('cy', (54 + ey).toFixed(1)); }); }
   function bind(tile, w) { lookAtPick(tile); const i = tile.dataset.i, q = id => tile.querySelector('#b' + i + id); f = { tile, eL: q('avEyeL'), eR: q('avEyeR'), mo: q('avMouth'), br: q('avBrows') }; who = w; T = AV.tables(w); lastM = ''; talk = null; hideBub(true); }
-  function say(text) { const b = $('#hbub'), bw = $('#bunch'); if (!f) return; b.textContent = ''; b.classList.remove('out'); b.hidden = false; b.style.left = (f.tile.offsetLeft + f.tile.offsetWidth / 2) + 'px'; b.style.bottom = (b.offsetParent ? b.offsetParent.offsetHeight - f.tile.offsetTop + 6 : 0) + 'px'; /* above the speaker's own tile, whichever row */ b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';  talk = { text, n: 0, acc: 0, hold: 0, vis: 'closed', vt: 0 }; }
+  function say(text) { const b = $('#hbub'), bw = $('#bunch'); if (!f) return; b.innerHTML = '<span></span><span style="opacity:0"></span>'; b.lastChild.textContent = text; /* sized to the whole line from the start; the words type into it */ b.classList.remove('out'); b.hidden = false; b.style.left = (f.tile.offsetLeft + f.tile.offsetWidth / 2) + 'px'; b.style.bottom = (b.offsetParent ? b.offsetParent.offsetHeight - f.tile.offsetTop + 6 : 0) + 'px'; /* above the speaker's own tile, whichever row */ b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';  talk = { text, n: 0, acc: 0, hold: 0, vis: 'closed', vt: 0 }; }
   function place(b) { // keep the bubble on screen; the tail still points at the face
     const bw = $('#bunch').getBoundingClientRect(), W = $('#boot').getBoundingClientRect(), cx = f.tile.offsetLeft + f.tile.offsetWidth / 2, w = b.offsetWidth;
     const lo = W.left - bw.left + w / 2 + 8, hi = W.right - bw.left - w / 2 - 8, x = Math.min(hi, Math.max(lo, cx)); b.style.left = x + 'px'; b.style.setProperty('--tx', (cx - x) + 'px'); }
@@ -3728,7 +3728,7 @@ const HOMEAV = (() => {
   function update(dt) {
     if (!f || !T || INTRO.on || performance.now() < (INTRO.calm || 0)) return; // quiet until the intro's hand-off has settled
     let mKey = 'rest';
-    if (talk) { if (talk.n < talk.text.length) { talk.acc += dt * 28; while (talk.acc >= 1 && talk.n < talk.text.length) { talk.acc--; talk.n++; } const hb = $('#hbub'); hb.textContent = talk.text.slice(0, talk.n); place(hb); talk.vt -= dt; if (talk.vt <= 0) { talk.vis = vis(talk.text[talk.n - 1] || ' '); talk.vt = .06 + Math.random() * .05; } mKey = talk.vis; }
+    if (talk) { if (talk.n < talk.text.length) { talk.acc += dt * 28; while (talk.acc >= 1 && talk.n < talk.text.length) { talk.acc--; talk.n++; } const hb = $('#hbub'); if (hb.childNodes.length === 2) { hb.firstChild.textContent = talk.text.slice(0, talk.n); hb.lastChild.textContent = talk.text.slice(talk.n); } else hb.textContent = talk.text.slice(0, talk.n); place(hb); talk.vt -= dt; if (talk.vt <= 0) { talk.vis = vis(talk.text[talk.n - 1] || ' '); talk.vt = .06 + Math.random() * .05; } mKey = talk.vis; }
       else { talk.hold += dt; if (talk.hold > 2.8 + talk.text.length * .06) { talk = null; hideBub(); nextTalk = 5 + Math.random() * 5; } /* longer lines stay up longer; never under ~3 s */ } }
     else { nextTalk -= dt; if (nextTalk <= 0) say(homeLine(who, 'home')); }
     nextBlink -= dt; if (nextBlink <= 0 && blinkT < 0) { blinkT = 0; nextBlink = 2 + Math.random() * 3; }
@@ -3814,12 +3814,13 @@ async function runIntro() {
   const blinkT = setInterval(() => { if (faces.length) blink(faces[Math.floor(Math.random() * faces.length)]); }, 700);
   (async () => {
     // 1. the board fills in, square by square, round the ring
-    for (const k of ring) { if (stop) return; C[k].classList.add('in'); await wait(55); }
+    for (const k of ring) { if (stop) return; C[k].classList.add('in'); await wait(45); }
     grid.classList.add('sweep'); hydrate(); await wait(140);
     // 2. everyone glances about — at each other, then all at the middle
     // the golfers size each other up: one looks at another, who looks back, then the third gets in on it
     const beats = faces.length > 1 ? faces.map((f, i) => [f, faces[(i + 1) % faces.length]]) : [];
-    for (const [a, b] of beats) { if (stop) return; lookAt(a, +b.dataset.k); await wait(220); lookAt(b, +a.dataset.k); faces.forEach(o => { if (o !== a && o !== b) lookAt(o, +a.dataset.k); }); await wait(320); }
+    const bt = Math.min(540, 1300 / Math.max(1, beats.length)); /* the whole size-up takes ~1.3 s however many golfers there are */
+    for (const [a, b] of beats) { if (stop) return; lookAt(a, +b.dataset.k); await wait(bt * .4); lookAt(b, +a.dataset.k); faces.forEach(o => { if (o !== a && o !== b) lookAt(o, +a.dataset.k); }); await wait(bt * .6); }
     if (stop) return; faces.forEach(f => lookAt(f, 4));
     // 3. the title lands in the middle
     mid.innerHTML = `<div class="cred tt">${[...GAME_NAME].map((ch, i) => ch === ' ' ? '<br>' : `<span style="--i:${i}">${ch}</span>`).join('')}</div>`; mid.classList.add('in');
@@ -3827,7 +3828,7 @@ async function runIntro() {
     // 4. credits: each golfer gets their moment, the rest of the board looks their way
     for (let n = 0; n < faces.length && !stop; n++) { const f = faces[n], name = f.querySelector('.nametag').textContent;
       C.forEach(c => c.classList.toggle('hl', c === f)); faces.forEach(o => lookAt(o, +f.dataset.k, o === f ? 1 : 1.15)); face(f, pick(['grin', 'rest'])); faces.forEach(o => { if (o !== f && Math.random() < .25) face(o, pick(['small', 'closed'])); }); // the star of the moment looks out at you; everyone else stares right at them
-      mid.innerHTML = `<div class="cred"><small>${n === 0 ? 'starring' : 'and'}</small>${name}</div>`; await wait(1300); }
+      mid.innerHTML = `<div class="cred"><small>${n === 0 ? 'starring' : n === faces.length - 1 && faces.length > 1 ? 'with' : 'and'}</small>${name}</div>`; await wait(1300); }
     if (stop) return; const crest = C.find(c => c.classList.contains('p-crest'));
     C.forEach(c => c.classList.toggle('hl', c === crest)); faces.forEach(o => crest && lookAt(o, +crest.dataset.k));
     mid.innerHTML = `<div class="cred"><small>live from</small>Toronto Hunt</div>`; await wait(1100);
