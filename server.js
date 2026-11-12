@@ -14,7 +14,8 @@ const HEAD = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 const page = Buffer.from(HEAD + fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8') + '</body></html>');
 const TYPES = { '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const files = { '/': [page, 'text/html; charset=utf-8'] };
-for (const f of ['manifest.webmanifest', ...fs.readdirSync(path.join(__dirname, 'icons')).map(n => 'icons/' + n)])
+const icons = fs.existsSync(path.join(__dirname, 'icons')) ? fs.readdirSync(path.join(__dirname, 'icons')).map(n => 'icons/' + n) : []; // missing extras never stop the game from serving
+for (const f of ['manifest.webmanifest', ...icons]) if (fs.existsSync(path.join(__dirname, f)))
   files['/' + f] = [fs.readFileSync(path.join(__dirname, f)), TYPES[path.extname(f)] || 'application/octet-stream'];
 files['/index.html'] = files['/'];
 const cache = {}; for (const [k, [buf, type]] of Object.entries(files)) cache[k] = { buf, type, gz: zlib.gzipSync(buf, { level: 9 }), br: zlib.brotliCompressSync(buf), etag: '"' + crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16) + '"' };
