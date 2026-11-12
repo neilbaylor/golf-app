@@ -2,6 +2,10 @@
 
 A mobile-web golf game in a hand-drawn, sticker-book style. The whole game is one file, `index.html`, using Three.js r128 from cdnjs. Open it in a browser to play.
 
+## Hosting
+
+Railway runs `node server.js` (no dependencies). It serves `index.html` compressed, with a `/healthz` check. Railway redeploys on every push to `main`.
+
 ## Layout
 
 | Path | What it is |
@@ -16,7 +20,7 @@ A mobile-web golf game in a hand-drawn, sticker-book style. The whole game is on
 
 ## Testing
 
-Tests use Playwright with headless Chromium on SwiftShader:
+Tests use Playwright (`cd tests && npm install`) with headless Chromium on SwiftShader:
 
 ```js
 chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
