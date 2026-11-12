@@ -48,7 +48,7 @@ R("function elPts(e, n = 72, pad = 1) {\n", "function elPts(e, n = 72, pad = 1) 
 # ---------------------------------------------------------------- 2. lies: lake past the bluff, out of bounds past the path, practice green, long grass round the fairway trees
 R("function lieAt(u, v) {\n  if (inEl(u, v, WATER)) return 'water';",
   """function lieAt(u, v) {
-  if (u > bluffU(v) + 1) return 'water';             // over the edge of the bluff: down the cliff to Lake Ontario
+  if (u > bluffU(v)) return 'water';                 // from the lip of the bluff on it is a hazard: down the cliff to Lake Ontario
   if (u < pathU(v)) return 'ob';                     // left of the cart path: other holes""")
 R("  if (Math.abs(u) <= 5 && v >= -7 && v <= 7) return 'tee';\n  if (inPoly(u, v, FW)) return 'fairway';",
   """  if (Math.abs(u) <= 5 && v >= -7 && v <= 7) return 'tee';
@@ -89,11 +89,15 @@ R("const MAP = { U0: -140, U1: 140, V0: -40, V1: 450, W: 1536 };", "const MAP = 
 RB("function terrainH(u, v) {", "  return edge * (TERRAIN_BASE + local * raw * TERRAIN_AMP);\n}", r"""const BLUFF_D = -66; // yards below the course
 function bunkerD(u, v, e) { if (e.sm) { if (u < e.box[0] - 6 || u > e.box[1] + 6 || v < e.box[2] - 6 || v > e.box[3] + 6) return 9; let d2 = 1e9; const P = e.sm; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const ax = P[j][0], ay = P[j][1], bx = P[i][0] - ax, by = P[i][1] - ay, t = clamp(((u - ax) * bx + (v - ay) * by) / (bx * bx + by * by || 1), 0, 1), dx = u - ax - bx * t, dy = v - ay - by * t; d2 = Math.min(d2, dx * dx + dy * dy); }
   const d = Math.sqrt(d2) / 6; return inPoly(u, v, P) ? 1 - d : 1 + d; } /* traced shape: 1 at the edge, 0.83 two yards in, 1.17 one yard out */ const du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shR(Math.atan2(y, x), e); }
+/* the bank behind and right of the green sits above it (~6 ft), so a miss long-right leaves a downhill chip */
+function greenBank(u, v) { const du = u - FRINGE.c[0], dv = v - FRINGE.c[1]; if (Math.abs(du) > 70 || Math.abs(dv) > 90) return 0; const fd = fringeD(u, v); if (fd < 1.02 || fd > 4.4) return 0;
+  const cs = Math.cos(-FRINGE.rot), sn = Math.sin(-FRINGE.rot), b = (du * cs - dv * sn) / FRINGE.rx, a = (du * sn + dv * cs) / FRINGE.ry, dir = (b * .8 + a * .6) / (Math.hypot(b, a) || 1);
+  return 3 * smooth(-.15, .55, dir) * smooth(1.0, 1.4, fd) * (1 - smooth(2.8, 4.2, fd)); }
 function terrainH(u, v) {
   const raw = 1.5 * Math.sin(u * .045 + v * .012) + 1.15 * Math.sin(v * .031 + 1.3) * Math.cos(u * .052) + .55 * Math.sin(u * .12 - v * .075 + 2) + .35 * Math.sin(v * .11 + u * .03);
   const local = smooth(8, 24, Math.hypot(u, v)) * smooth(1.05, 1.9, fringeD(u, v)) * .8;
   const edge = (1 - smooth(-148, -128, -u) * 0 - smooth(128, 148, -u)) * smooth(-38, -18, v) * (1 - smooth(368, 388, v));
-  let h = edge * (TERRAIN_BASE + local * raw * TERRAIN_AMP);
+  let h = edge * (TERRAIN_BASE + local * raw * TERRAIN_AMP) + greenBank(u, v);
   const bu = bluffU(v); if (u > bu) { const t = clamp((u - bu) / 16, 0, 1), k = 1 - (1 - t) * (1 - t) * (1 - .35 * t); h = h * (1 - k) + BLUFF_D * k; if (u > bu + 22) h = BLUFF_D - 3 * smooth(bu + 22, bu + 26, u); } // the bluff: a sheer drop of ~200 ft to a strip of beach, then the lake
   for (const b of BUNKERS) if (b.deep) { const d = bunkerD(u, v, b); if (d < 1.6) h += (-.9 * (1 - smooth(.7, 1.0, d)) + .45 * Math.exp(-(((d - 1.14) / .13) ** 2))) * smooth(1.0, 1.25, fringeD(u, v)); } /* never digs into the green */ // dug in, with a raised lip
   return h;
