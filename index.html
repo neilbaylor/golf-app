@@ -2737,10 +2737,12 @@ const DROP = (() => {
     quads(z, zoneMat, .04, 6); quads(ed, edgeMat, .05, 7);
     // back on the line: from the hole, through X, and on away from it (dashed, dry stretches only)
     const bu = -f.u, bv = -f.v, w = .32, dash = [], ink = [];
-    let L = 0; for (let d = 0; d <= 140; d += .3) { const u = X.u + bu * d, v = X.v + bv * d; if (Math.abs(u) > 160 || v < -30 || v > 470) break; if (!wet(u, v)) { c.push({ u, v, k: 'l', d }); L = d; } }
+    const onCourse = (u, v) => u > MAP.U0 + 4 && u < MAP.U1 - 4 && v > MAP.V0 + 4 && v < MAP.V1 - 4, lineOK = (u, v) => onCourse(u, v) && !wet(u, v) && lieAt(u, v) !== 'ob'; /* a real place to drop: dry, in bounds, on the course */
+    let L = 0; for (let d = 0; d <= 140; d += .3) { const u = X.u + bu * d, v = X.v + bv * d; if (!onCourse(u, v)) break; if (lineOK(u, v)) { c.push({ u, v, k: 'l', d }); L = d; } }
+    if (!c.some(q => q.k === 'l' && q.d > CL)) { for (let i = c.length - 1; i >= 0; i--) if (c[i].k === 'l') c.splice(i, 1); L = 0; } /* nothing dry beyond the patch: no line to offer */
     const nu = -bv, nv = bu, seg = (d0, d1, ww) => { const a = [X.u + bu * d0, X.v + bv * d0], b = [X.u + bu * d1, X.v + bv * d1]; return [[a[0] + nu * ww, a[1] + nv * ww], [b[0] + nu * ww, b[1] + nv * ww], [b[0] - nu * ww, b[1] - nv * ww], [a[0] - nu * ww, a[1] - nv * ww]]; };
     const wetD = [];
-    for (let d = 0; d < L; d += 2.2) { const d1 = Math.min(L, d + 1.4), m = d + .7; if (wet(X.u + bu * m, X.v + bv * m)) { wetD.push(seg(d, d1, w * .55)); continue; } dash.push(seg(d, d1, w)); ink.push(seg(d - .15, d1 + .15, w + .18)); } // over water: faint, so you can see where the line goes
+    for (let d = 0; d < L; d += 2.2) { const d1 = Math.min(L, d + 1.4), m = d + .7; if (!lineOK(X.u + bu * m, X.v + bv * m)) { if (wet(X.u + bu * m, X.v + bv * m)) wetD.push(seg(d, d1, w * .55)); continue; } dash.push(seg(d, d1, w)); ink.push(seg(d - .15, d1 + .15, w + .18)); } // over water: faint, so you can see where the line goes
     quads(ink, lineInk, .06, 7); quads(dash, lineMat, .07, 8);
     quads(wetD, wetMat, .06, 7);
     st.cands = c; st.L = L; { let d1 = 1e9; for (const q of c) if (q.k === 'l' && q.d < d1) d1 = q.d; st.d1 = d1 < 1e9 ? d1 : null; } // nearest legal spot on the line (can be across the water)
@@ -2757,6 +2759,7 @@ const DROP = (() => {
     grp.visible = true; app.classList.add('dropping'); tracer.visible = tracerInk.visible = trShadow.visible = false; rings.visible = false; treeMk.visible = false; straightRef.visible = false;
     aimFrame = null; G.view = 'aim'; G.aimGoal = 1; startCamTween(1.1);
     $('#dropUI').hidden = false; ['#dLblZ', '#dLblL', '#dLblX'].forEach(q => $(q).hidden = false);
+    $('#dropUI .dg').innerHTML = st.d1 != null ? 'Drag the ball into the <em class="z">pink patch</em> or <em class="l">back on the line</em>.' : 'Drag the ball anywhere in the <em class="z">pink patch</em>.'; /* no dry spot back on the line: don\'t offer it */
     { const m = $('#mini'); miniHome = [m.parentNode, m.nextSibling]; $('#dropUI .dmini').appendChild(m); } tracerDirty = true;
     AV.say('Penalty drop. Pick your spot.');
   }
