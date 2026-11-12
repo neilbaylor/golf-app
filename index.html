@@ -3757,7 +3757,7 @@ function holeCard(L) {
     const what = s.conceded ? 'Putter' : s.putt ? 'Putter' : `${s.club}${s.mode && s.mode !== 'full' ? ' ' + MODES[s.mode].name : ''}`, dist = s.putt || s.conceded ? '' : `${s.total} yds`;
     return `<li class="${s.holed ? 'in' : ''}${s.pen ? ' pen' : ''}"><i>${s.n}</i><span>${what}</span><em>${dist}</em><b>${res}${s.pen ? ' +1' : ''}</b></li>`; }).join('');
   const st = (k, v, good) => `<div class="st${good ? ' good' : ''}"><small>${k}</small><b>${v}</b></div>`;
-  return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - 4 > 0 ? '+' : ''}${strokes - 4 || 'E'})</small>`, strokes <= 4)}${st('Putts', putts, putts <= 2)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${st('Drive', drive ? drive + ' yds' : '—', long)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
+  return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - 4 > 0 ? '+' : ''}${strokes - 4 || 'E'})</small>`, strokes <= 4)}${st('Putts', putts, putts <= 2)}${st('Drive', drive ? drive + ' yds' : '—', long)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
 }
 // ---- opening titles: a 3×3 board of golfers and course bits that pop in, glance at each other, then roll credits (tap or Skip to jump to the menu)
 const INTRO = { on: false };
