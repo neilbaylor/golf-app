@@ -112,7 +112,8 @@ function greenH(u, v) {
   const back = smooth(.2, .85, a), front = 1 - smooth(-.6, .3, a), left = smooth(.35, -.75, b);
   const tilt = .1 + .07 * front * left - back * (.04 + .04 * left); // breaks right everywhere, most on the front-left, least on the back-left; never severe
   const crown = .06 * (1 - Math.min(1, d / .95) ** 2);
-  return m * Math.max(0, 1.05 + crown + .06 * (1 - smooth(-1, -.45, a)) - .3 * smooth(-.4, .55, a) - tilt * b * (1 + .12 * Math.sin(a * 2.1)) + .025 * Math.sin(a * 4.3 + b * 2.2));
+  const toSand = d > .74 ? .4 * smooth(.76, 1.08, d) * (1 - smooth(1.9, 3.0, bunkerD(u, v, BUNKERS[0]))) : 0; /* the fringe beside the deep bunker (front-left) falls away into it */
+  return m * Math.max(0, 1.05 + crown - toSand + .06 * (1 - smooth(-1, -.45, a)) - .3 * smooth(-.4, .55, a) - tilt * b * (1 + .12 * Math.sin(a * 2.1)) + .025 * Math.sin(a * 4.3 + b * 2.2));
 }""")
 R("function fringeD(u, v) { const e = FRINGE,", "function fringeD(u, v) { const e = FRINGE,")
 # green-reading grid bounds follow the green
