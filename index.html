@@ -199,8 +199,9 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #intro.exit .c:not(.face){opacity:0;transform:scale(.7);transition:opacity .3s,transform .35s}
 #intro .c.face.fly{transition:transform .75s cubic-bezier(.6,0,.2,1),border-radius .75s,box-shadow .5s;transform-origin:0 0;z-index:6}
 #intro .iskip{transition:opacity .3s;position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:max(14px,env(safe-area-inset-right,0px));font:17px/1 var(--font-hand);color:var(--ink);background:var(--paper);border:2.5px solid var(--ink);border-radius:999px;padding:7px 20px 8px;box-shadow:2px 3px 0 var(--ink);cursor:pointer}
-#boot .bunchW{position:relative;margin-top:24px}
-#boot.many{--tile:86px;padding-top:max(5vh,calc(env(safe-area-inset-top,0px) + 26px))} /* two rows of golfers: smaller tiles so everything still fits */ /* room above the tiles for the golfer's speech bubble */
+#boot .bunchW{position:relative;z-index:2;margin-top:24px}
+#boot.many{--tile:94px;padding-top:max(4vh,calc(env(safe-area-inset-top,0px) + 22px))}
+#boot.many .bunchW{margin-top:12px} /* two rows of golfers: smaller tiles so everything still fits */ /* room above the tiles for the golfer's speech bubble */
 #boot .hbub{position:absolute;bottom:calc(100% + 8px);left:0;z-index:2;white-space:nowrap;font:16px/1.15 var(--font-hand);padding:6px 11px 7px;pointer-events:none;transform:translateX(-50%);animation:sayIn .28s cubic-bezier(.3,1.7,.5,1)}
 #boot .hbub{transition:opacity .25s,translate .25s}
 #boot .hbub.out{opacity:0;translate:0 -6px}
@@ -238,15 +239,15 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #boot .homeFade.on{opacity:1}
 #boot::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 30%,rgba(255,255,255,0) 70%,rgba(20,40,20,.18));opacity:0;transition:opacity .9s}
 #boot.home::after{opacity:1}
-#boot .stats{display:grid;grid-template-columns:auto 1fr;width:236px;box-sizing:border-box;gap:4px 14px;align-items:center;background:var(--paper);border:3px solid var(--ink);border-radius:15px 12px 16px 11px;box-shadow:3px 4px 0 var(--ink);padding:8px 14px 5px;transform:rotate(-.6deg);opacity:0;transition:opacity .35s .05s}
+#boot .stats{position:relative;z-index:1;display:grid;grid-template-columns:auto 1fr;width:calc(var(--boardW) - 56px);box-sizing:border-box;gap:1px 14px;align-items:center;background:var(--paper);border:3px solid var(--ink);border-top:0;border-radius:0 0 14px 14px;box-shadow:3px 4px 0 var(--ink);padding:12px 18px 5px 20px;justify-content:center;margin-top:calc(-1 * clamp(10px,2.2vh,26px) - 4px);opacity:0;transition:opacity .35s .05s} /* hangs from the bottom of the golfer board, tucked under its edge */
 #boot.home .stats{opacity:1}
-#boot .stats .k{font:14px/1 var(--font-hand)}
+#boot .stats .k{font:14px/1.05 var(--font-hand)}
 #boot .stats .v{display:flex;align-items:center;gap:6px;font:12px/1 var(--font-hand);opacity:.85}
 #boot .stats .pips{display:flex;gap:3px}
 #boot .stats .pips i{width:13px;height:9px;border-radius:3px;border:2px solid var(--ink);background:transparent}
 #boot .stats .pips i.on{background:var(--sun)}
 #boot .stats .pips.l2 i.on{background:var(--pink)}
-#boot .stats .shape{grid-column:1/-1;text-align:center;font:15px/1 var(--font-display);letter-spacing:.03em;margin-top:3px}
+#boot .stats .shape{grid-column:1/-1;text-align:center;font:14px/1 var(--font-display);letter-spacing:.03em;margin-top:2px}
 #boot .courses{margin-top:auto;margin-bottom:clamp(8px,2.4vh,22px);display:flex;gap:10px;justify-content:center;opacity:0;transform:translateY(8px);transition:opacity .35s .1s,transform .35s .1s}
 #boot.home .courses{opacity:1;transform:none}
 #boot .course{appearance:none;position:relative;display:flex;align-items:center;gap:12px;padding:13px 22px 13px 12px;font:inherit;color:var(--ink);background:var(--paper);border:3px solid var(--ink);border-radius:16px 13px 17px 12px;box-shadow:3px 4px 0 var(--ink);transform:rotate(.4deg);cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:left}
