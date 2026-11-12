@@ -2662,7 +2662,7 @@ const DROP = (() => {
   }
   function frame() { // straight down over the drop zone, hole up-screen; the line runs back down toward the card
     const { X, f } = st, fw = new THREE.Vector3(f.u, 0, -f.v), far = st.d1 != null && st.d1 > 9 ? st.d1 + 4 : 0, H = far ? clamp(far * 1.15 + 14, 36, 110) : 36, M = new THREE.Vector3(X.u, gy(X.u, X.v), -X.v).addScaledVector(fw, far ? -far * .55 : -6.5);
-    return { bpos: M.clone().addScaledVector(fw, -H * .18).setY(M.y + H), blook: M, pos: new THREE.Vector3(), look: new THREE.Vector3(), zoom: 1, pan: new THREE.Vector3(), F: 40 };
+    return { bpos: M.clone().addScaledVector(fw, -H * .18).setY(M.y + H), blook: M, pos: new THREE.Vector3(), look: new THREE.Vector3(), zoom: 1, pan: new THREE.Vector3(), F: 110 };
   }
   const _q = new THREE.Vector3();
   function label(el, u, v, dx, dy) { _q.set(u, gy(u, v), -v); const p = project(_q), r = RECT.canvas, a = RECT.app; el.style.transform = `translate(${(p.x + r.left - a.left + dx).toFixed(1)}px,${(p.y + r.top - a.top + dy).toFixed(1)}px) translate(-50%,-50%)`; }
@@ -2768,7 +2768,7 @@ function aimPose() {
 const ZOOM_MIN = .45, ZOOM_MAX = 1.3;
 function clampPan(A) { const lim = A.F * .9 + 40, L = Math.hypot(A.pan.x, A.pan.z); if (L > lim) { A.pan.x *= lim / L; A.pan.z *= lim / L; } }
 function zoomAim(k, cx, cy) {
-  const A = aimPose(), nz = clamp(A.zoom * k, ZOOM_MIN, ZOOM_MAX), ratio = nz / A.zoom; if (ratio === 1) return;
+  const A = aimPose(), nz = clamp(A.zoom * k, ZOOM_MIN, G.drop ? 3.6 : ZOOM_MAX), ratio = nz / A.zoom; if (ratio === 1) return; /* the drop view can pull right back to find a spot along the line */
   const g = groundAt(cx, cy);
   if (g) { const gx = g.u, gz = -g.v, lx = A.blook.x + A.pan.x, lz = A.blook.z + A.pan.z; A.pan.x = gx + (lx - gx) * ratio - A.blook.x; A.pan.z = gz + (lz - gz) * ratio - A.blook.z; }
   A.zoom = nz; clampPan(A);
