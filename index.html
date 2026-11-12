@@ -2577,14 +2577,7 @@ function updateFlight(dt) {
       else if (S.lieLand === 'sand') { for (let i = 0; i < 8; i++) puff(pos.clone().setY(pos.y + .15), .6 + Math.random() * .6, .8, 0xf5dc93, new THREE.Vector3((Math.random() - .5) * 2.5, 1.5 + Math.random() * 2, (Math.random() - .5) * 2.5)); sfx('plop'); }
       else if (S.lieLand === 'trees') { for (let i = 0; i < 10; i++) puff(pos.clone(), .8 + Math.random() * .8, 1, 0x6cbf48, new THREE.Vector3((Math.random() - .5) * 4, Math.random() * 2, (Math.random() - .5) * 4)); sfx('plop'); }
       else { puff(pos.clone().setY(pos.y + .1), 1.2, .6, 0xffffff); sfx('plop'); }
-      const L = S.lieLand, pinD = Math.hypot(PIN.u - S.land.u, PIN.v - S.land.v);
-      if (L === 'water') AV.say(line('water'), { mood: 'sad', force: true });
-      else if (L === 'trees') AV.say(line('trees'), { mood: 'oops', force: true });
-      else if (L === 'sand') AV.say(line('sand'), { mood: 'sad', force: true });
-      else if (L === 'green') AV.say(line(pinD < 4 ? 'stiff' : 'green'), { mood: 'happy', force: true });
-      else if (L === 'fairway' || L === 'fringe') AV.say(line(S.tq === 'perfect' ? 'pured' : 'fairway'), { mood: 'happy', force: true });
-      else AV.say(line('rough'), { mood: 'sad', force: true });
-      showStamp(S.lieLand === 'water' ? 'SPLASH!' : S.lieLand === 'trees' ? 'TIMBER!' : LIES[S.lieLand].name.toUpperCase() + '!', '');
+      if (S.lieLand === 'water' || S.lieLand === 'trees') callLie(S, S.lieLand, S.land); else S.callPending = true; /* splash / timber right away; anything else is called where it stops */
     }
   } else {
     const gp = S.gnd.pts, T = gp[gp.length - 1].t; S.rollT += dt * (S.putt ? 2.7 : 1.25); // putts play back quick so the greens feel fast
@@ -2594,6 +2587,7 @@ function updateFlight(dt) {
     const mv = _ax.set(pos.x - _fwd.x, 0, pos.z - _fwd.z), sp = mv.length(); // rolling: turn about (up × travel); backing up spins it the other way
     if (sp > 1e-5) { mv.divideScalar(sp); ball.rotateOnWorldAxis(_fwd.crossVectors(_UP, mv).normalize(), sp / BALL_R * (S.putt ? 3.6 : 1.8)); } // the big cartoon ball turns quicker than true rolling so the roll reads as fast
     setDist(Math.hypot(pos.x - S.B.u, -pos.z - S.B.v));
+    if (S.callPending && S.rollT >= T - .45) { S.callPending = false; if (!S.holed) callLie(S, S.endLie, S.end); } /* just before it stops: where it ended up, not where it landed */
     if (S.rollT >= T && S.phase !== 'done') { S.phase = 'done'; setTimeout(finishShot, 650); }
   }
   if (S.phase !== 'air') { const cm = comet.material, ci = cometInk.material; cm.opacity = ci.opacity = Math.max(0, (cm.opacity ?? 1) - dt * 2.2); cm.transparent = ci.transparent = true; if (cm.opacity <= 0) comet.visible = cometInk.visible = false; }
@@ -3295,6 +3289,16 @@ window.addEventListener('pointerup', e => {
 
 /* ================= STAMP / SOUND ================= */
 let stampTO;
+function callLie(S, L, at) { /* the caddie's call and the big stamp for where the ball is */
+  const pinD = Math.hypot(PIN.u - at.u, PIN.v - at.v);
+  if (L === 'water') AV.say(line('water'), { mood: 'sad', force: true });
+  else if (L === 'trees') AV.say(line('trees'), { mood: 'oops', force: true });
+  else if (L === 'sand') AV.say(line('sand'), { mood: 'sad', force: true });
+  else if (L === 'green') AV.say(line(pinD < 4 ? 'stiff' : 'green'), { mood: 'happy', force: true });
+  else if (L === 'fairway' || L === 'fringe') AV.say(line(S.tq === 'perfect' ? 'pured' : 'fairway'), { mood: 'happy', force: true });
+  else AV.say(line('rough'), { mood: 'sad', force: true });
+  showStamp(L === 'water' ? 'SPLASH!' : L === 'trees' ? 'TIMBER!' : (LIES[L] ? LIES[L].name : L).toUpperCase() + '!', '');
+}
 function showStamp(big, small) { const s = $('#stamp'); s.innerHTML = big + (small ? `<small>${small}</small>` : ''); s.classList.remove('go'); void s.offsetWidth; s.classList.add('go'); clearTimeout(stampTO); stampTO = setTimeout(() => s.classList.remove('go'), 1600); }
 let AC = null, NB = null;
 function audioInit() { if (AC) return; try { AC = new (window.AudioContext || window.webkitAudioContext)(); NB = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const d = NB.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } catch (e) { AC = null; } }
