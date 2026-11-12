@@ -1517,7 +1517,7 @@ const MODES = {
   punch: { name: 'Punch', rate: 2.0,  tempo: 4.0,  perf: 0.094 },
   pitch: { name: 'Pitch', rate: 1.55, tempo: 3.4,  perf: 0.1034 },
   chip:  { name: 'Chip',  rate: 1.35, tempo: 3.2,  perf: 0.1128 },
-  flop:  { name: 'Flop',  rate: 1.45, tempo: 3.4,  perf: 0.0611, tight: .8 },
+  flop:  { name: 'Flop',  rate: 1.45, tempo: 3.4,  perf: 0.0611, tight: .8, risk: 1.7 }, /* risk: swing flaws cost more, and a bad tempo blades or chunks it */
   sand:  { name: 'Sand',  rate: 1.5,  tempo: 3.4,  perf: 0.1034 },
   putt:  { name: 'Putt',  rate: 1.25, tempo: 3.1,  perf: .6, tight: 3 } };
 const MODE_ORDER = ['power', 'full', 'punch', 'pitch', 'flop', 'sand', 'putt'];
@@ -2319,16 +2319,16 @@ function treeHit(t, u, v, y) {
 }
 function launch(sw) {
   if (G.mode === 'putt') return launchPutt(sw);
-  const tight = MODES[G.mode].tight || 1;
+  const tight = MODES[G.mode].tight || 1, risk = MODES[G.mode].risk || 1;
   const cl = club(), F = G.Feff, D = G.D, ps = D / F, d = G.dir, r = right(d), h = G.height;
   let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= .009 * tight) { p = ps; pinHigh = true; }
   let carry = F * Math.min(p, 1) + F * Math.max(0, p - 1) * .6;
   const terr = Math.abs(Math.log(sw.ratio / TEMPO)); const tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .12 ? 'good' : 'off'; const quick = sw.ratio > TEMPO;
-  carry *= 1 - clamp((terr - PERFECT) * .275, 0, .155);
+  carry *= 1 - clamp((terr - PERFECT) * .275 * risk, 0, .155 * risk);
   { const L = LIES[G.lie]; if (L.r) { G.lieRoll = 1 - Math.random() * L.r / L.f; carry *= G.lieRoll; } else G.lieRoll = 1; } // bad lie: comes out anywhere in its range (shown number = top)
   const hs = G.lefty ? -1 : 1; let lat = 0;
-  if (terr > PERFECT) lat += (quick ? -1 : 1) * hs * Math.min(1, terr - PERFECT) * .078 / att('aim', 'acc') * D;
-  let th = sw.curveDeg; const pureW = 1.47 * tight * att('aim', 'acc'), pure = Math.abs(th) < pureW; th = pure ? 0 : clamp(th - Math.sign(th) * pureW, -25, 25);
+  if (terr > PERFECT) lat += (quick ? -1 : 1) * hs * Math.min(1, terr - PERFECT) * .078 * risk / att('aim', 'acc') * D;
+  let th = sw.curveDeg; const pureW = 1.47 * tight * att('aim', 'acc'), pure = Math.abs(th) < pureW; th = pure ? 0 : clamp((th - Math.sign(th) * pureW) * (1 + (risk - 1) * .6), -25, 25);
   // path physics (face square to target): ball starts a little along the path, then curves the OTHER way.
   // swipe right = in-to-out for a righty -> draw; swipe left = out-to-in -> fade/slice. Mirrored for lefties automatically.
   const pathStart = th * .00425 * D, pathCurve = -th * .016 * D; lat += pathStart + pathCurve;
@@ -2337,10 +2337,12 @@ function launch(sw) {
   const wob = G.lastSwing && G.lastSwing.wob ? G.lastSwing.wob.rms : 0;
   const q = clamp(1 - Math.min(1, terr / .3) * .45 - Math.min(1, Math.abs(th) / 15) * .3 - Math.min(1, wob / 3) * .12 - Math.max(0, p - 1) * 2.5, 0, 1);
   const plan = planShot(), part = clamp(D / F, .5, 1);
-  const spin = shotSpec(cl, G.mode, h, q, D, F).spin * (plan.spinMul || 1);
+  const flub = risk > 1 && tq === 'off' ? (quick ? 'blade' : 'chunk') : null; // a mistimed flop: quick catches it thin (low, hot, no spin), slow digs in (fat, way short)
+  const spin = shotSpec(cl, G.mode, h, q, D, F).spin * (plan.spinMul || 1) * (flub === 'blade' ? .35 : 1);
+  if (flub === 'blade') carry *= 1.18; else if (flub === 'chunk') carry *= .5;
   if (G.mode === 'chip') carry *= plan.cf || .45;                              // chip: meter = total, fly only the carry part
   if (G.mode === 'sand' && G.lieRoll < 1) carry /= G.lieRoll; // explosion shot: the sand is already priced in
-  let launchA = plan.launchL + (Math.random() - .5) * (1.2 + (1 - q) * 2.5); const startP = plan.p;
+  let launchA = plan.launchL + (Math.random() - .5) * (1.2 + (1 - q) * 2.5) * risk; if (flub === 'blade') launchA *= .4; const startP = plan.p;
   if ((LIES[G.lie].f || 1) < 1 && G.mode !== 'putt') { // off a less-than-perfect lie the ball comes out a bit higher or lower: a flush strike barely varies, a poor one a little more (never wild)
     const spread = .04 + .1 * (1 - q); launchA *= 1 + clamp((Math.random() * 2 - 1) * spread, -.13, .13); }
   const tilt = clamp(plan.tiltL - th * 1.6, -48, 48);                         // swing path: curve opposite the swipe
@@ -2376,7 +2378,8 @@ function launch(sw) {
   const msgs = []; if (pinHigh) msgs.push('PIN HIGH'); if (tq === 'perfect') msgs.push('PERFECT TEMPO'); if (pure) msgs.push('PURE');
   G.mood = (tq === 'perfect' && (pure || pinHigh)) ? 'perfect' : (tq === 'off' || Math.abs(th) > 10) ? 'bad' : null; G.moodT = 2.4;
   if (G.mood === 'perfect') AV.setMood('proud', 1.6); else if (G.mood === 'bad') AV.setMood('oops', 1.6);
-  if (msgs.length) showStamp(msgs[0], msgs.slice(1).join(' · '));
+  if (flub) showStamp(flub === 'blade' ? 'BLADED!' : 'CHUNKED!', `tempo ${sw.ratio.toFixed(1)} : 1`);
+  else if (msgs.length) showStamp(msgs[0], msgs.slice(1).join(' · '));
   else if (tq === 'off') showStamp(quick ? 'QUICK!' : 'TOO SLOW', `tempo ${sw.ratio.toFixed(1)} : 1`);
   setDistLbl(`Yards · ${(Math.round(spin / 10) * 10).toLocaleString()} rpm`); $('#distMode').hidden = true; $('#distNum').classList.add('live');
   ffTipMaybe();
