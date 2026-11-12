@@ -2568,7 +2568,7 @@ function finishShot() {
   if (holed) { G.ball = { u: PIN.u, v: PIN.v }; G.lie = 'green'; }
   else if (!water) { setupShot(endU, endV, S.lieLand === 'trees' ? lieAt(endU, endV) : lie); }
   else { restorePrev(); }
-  startCamTween(1.5); G.preview = null; if (!holed && G.mode === 'putt') { aimFrame = null; G.aimGoal = 1; } // next putt: stay overhead
+  startCamTween(1.5); G.preview = null; if (!holed && G.mode === 'putt') { aimFrame = null; G.aimGoal = 1; G.aimT = 1; } /* straight to the overhead putt view, no detour via the swing view */ // next putt: stay overhead
   if (!water && !holed) startPreview();
   if (!water && !holed && lie !== 'green' && !G.aimed) { G.coachAim = true; }
   // putts and chips (pitch/flop) don't stop for a result card: straight on to the next shot (holing out still shows the score)
@@ -2817,7 +2817,7 @@ function updateCamera(dt) {
   const ctl = _cc.copy(s.pos).lerp(a.pos, .18); ctl.y = lerp(s.pos.y, a.pos.y, .78);
   const u = 1 - e, pos = _cp.set(u * u * s.pos.x + 2 * u * e * ctl.x + e * e * a.pos.x, u * u * s.pos.y + 2 * u * e * ctl.y + e * e * a.pos.y, u * u * s.pos.z + 2 * u * e * ctl.z + e * e * a.pos.z);
   const look = _cl.copy(s.look).lerp(a.look, Math.pow(e, .8));
-  if (G.camTween) { const T = G.camTween; T.t += dt / T.dur; const k = easeIO(clamp(T.t, 0, 1)); pos.lerpVectors(T.from, pos, k).y += Math.sin(k * Math.PI) * 8; look.lerpVectors(T.fromLook, look, k); if (T.t >= 1) G.camTween = null; }
+  if (G.camTween) { const T = G.camTween; T.t += dt / T.dur; const k = easeIO(clamp(T.t, 0, 1)); const hop = Math.min(8, T.from.distanceTo(pos) * .3); pos.lerpVectors(T.from, pos, k).y += Math.sin(k * Math.PI) * hop; /* a little hop over long moves only: a short putt-to-putt move stays smooth instead of zooming out and back */ look.lerpVectors(T.fromLook, look, k); if (T.t >= 1) G.camTween = null; }
   if (G.preview) { const P = G.preview; P.t += dt;
     if (G.aimGoal || SW.phase === 'back' || SW.phase === 'down') P.cancel = true; // you're playing: get out of the way
     let w; if (P.cancel) { const X = P.cx || (P.cx = { w: P.w, v: (P.wv || 0) * .7, t: 0 }); X.t += dt; const s = Math.min(1, X.t / .7); /* Hermite exit: current weight + rate -> 0 in 0.7 s */
