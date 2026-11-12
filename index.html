@@ -400,11 +400,11 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #resCard:empty{display:none}
 #result.final{top:calc(208px + env(safe-area-inset-top,0px));bottom:auto;width:min(340px,calc(100% - 32px));padding:12px 14px 14px;transform:translateX(-50%) rotate(-1deg)}
 #result.final #resWord{font-size:44px;margin-top:2px}
-#result.final #resSub{font-size:14px;margin:6px 0 10px}
+#result.final #resSub{font-size:17px;margin:3px 0 7px}
 #result.final #resBody{display:none}
 #result.final .sc{list-style:none;margin:0 0 10px;padding:6px 8px;border:2px dashed rgba(29,42,26,.3);border-radius:12px;display:flex;flex-direction:column;gap:5px;max-height:34vh;overflow:auto}
 #result.final .sc li{display:grid;grid-template-columns:20px minmax(0,1fr) auto auto;align-items:center;gap:7px;font-size:14px;line-height:1.1}
-#result.final .sc li i{font:13px/20px var(--font-display);font-style:normal;text-align:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--paper)}
+#result.final .sc li i{font:13px/23px var(--font-display);font-style:normal;text-align:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--paper)}
 #result.final .sc li span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #result.final .sc li em{font-style:normal;opacity:.65;font-size:13px}
 #result.final .sc li b{font-weight:400;font-size:13px;text-align:right;white-space:nowrap}
@@ -446,6 +446,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #resBtns{gap:6px}
 #resBtns .btn{font-size:12px;padding:6px 4px 5px;border-width:2.5px;box-shadow:2px 2px 0 var(--ink)}
 .st.good{background:rgba(95,224,181,.3);border-style:solid;border-color:var(--ink)}
+.st.bad{background:rgba(255,106,85,.26);border-style:solid;border-color:var(--ink)}
 #resBtns{display:flex;gap:8px}
 #resBtns .btn{font-size:13px;padding:8px 5px 6px;box-shadow:2px 3px 0 var(--ink)}
 .btn{flex:1;font:18px/1 var(--font-display);letter-spacing:.04em;padding:12px 8px 9px;border:3px solid var(--ink);border-radius:var(--wob);background:var(--paper);box-shadow:3px 4px 0 var(--ink)}
@@ -2528,7 +2529,7 @@ function finishShot() {
     if (gimme) L.push({ n: G.stroke, club: 'Putter', putt: true, gimme: true, conceded: true, lie: 'green', pin: 0, holed: true }); }
   $('#result').classList.toggle('final', holed); $('#resCard').innerHTML = holed ? holeCard(G.log) : '';
   $('#resWord').textContent = word;
-  $('#resSub').textContent = holed ? `${COURSES.find(c => c.id === MENU.course)?.name || 'Toronto Hunt'} · Hole 1 · Par 4 · ${CHARS[G.who].name}` : `Shot ${G.stroke} · ${S.putt ? 'Putt' : S.shape + ' · ' + club().name + (G.mode !== 'full' ? ' ' + MODES[G.mode].name : '')}` + (S.lieLoss >= 1 ? ` · lie cost ${S.lieLoss} yds` : '');
+  $('#resSub').textContent = holed ? `${COURSES.find(c => c.id === MENU.course)?.name || 'Toronto Hunt'} · Hole 1 · Par 4` : `Shot ${G.stroke} · ${S.putt ? 'Putt' : S.shape + ' · ' + club().name + (G.mode !== 'full' ? ' ' + MODES[G.mode].name : '')}` + (S.lieLoss >= 1 ? ` · lie cost ${S.lieLoss} yds` : '');
   const pinTxt = lie === 'green' ? `${Math.round(toPin * 3)} ft` : `${Math.round(toPin)} yds`;
   const stats = [['Carry', Math.round(S.carry), S.pinHigh], ['Roll', S.roll < -.5 ? `${Math.round(S.roll)} ↩` : Math.round(S.roll), S.roll < -.5], ['Total', Math.round(total), false], ['To pin', water ? '—' : pinTxt, lie === 'green'], ['Spin rpm', (Math.round(S.spin / 10) * 10).toLocaleString(), false], ['Apex', `${Math.round(S.apex * 3)} ft`, false]];
   // tempo meter: where the downswing landed against the perfect window (log scale, quick on the left)
@@ -3769,8 +3770,8 @@ function holeCard(L) {
   const rows = L.map(s => { const res = s.conceded ? 'Gimme' : s.holed ? 'In the hole!' : s.putt ? `${(s.pin * 3).toFixed(s.pin * 3 < 10 ? 1 : 0)} ft left` : `${LIE[s.lie] || s.lie}${s.lie === 'green' || s.pin < 60 ? ` · ${s.lie === 'green' ? Math.round(s.pin * 3) + ' ft' : Math.round(s.pin) + ' yds'}` : ''}`;
     const what = s.conceded ? 'Putter' : s.putt ? 'Putter' : `${s.club}${s.mode && s.mode !== 'full' ? ' ' + MODES[s.mode].name : ''}`, dist = s.putt || s.conceded ? '' : `${s.total} yds`;
     return `<li class="${s.holed ? 'in' : ''}${s.pen ? ' pen' : ''}"><i>${s.n}</i><span>${what}</span><em>${dist}</em><b>${res}${s.pen ? ' +1' : ''}</b></li>`; }).join('');
-  const st = (k, v, good) => `<div class="st${good ? ' good' : ''}"><small>${k}</small><b>${v}</b></div>`;
-  return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - 4 > 0 ? '+' : ''}${strokes - 4 || 'E'})</small>`, strokes <= 4)}${st('Putts', putts, putts <= 2)}${st('Drive', drive ? drive + ' yds' : '—', long)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
+  const st = (k, v, good) => `<div class="st${good ? ' good' : good === false ? ' bad' : ''}"><small>${k}</small><b>${v}</b></div>`; /* true green · false red · null plain */
+  return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - 4 > 0 ? '+' : ''}${strokes - 4 || 'E'})</small>`, strokes <= 4)}${st('Putts', putts, putts <= 2)}${st('Drive', drive ? drive + ' yds' : '—', long || null)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', fw == null ? null : !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
 }
 // ---- opening titles: a 3×3 board of golfers and course bits that pop in, glance at each other, then roll credits (tap or Skip to jump to the menu)
 const INTRO = { on: false };
