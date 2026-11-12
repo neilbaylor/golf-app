@@ -623,66 +623,91 @@ function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let
 const store = { get(k, d) { try { const v = localStorage.getItem('sg_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('sg_' + k, JSON.stringify(v)); } catch (e) {} } };
 
 /* ================= COURSE (u = yards right, v = yards downrange) ================= */
-const CL = [[0, -10], [0, 70], [4, 150], [-6, 230], [-20, 300], [-28, 350], [-28, 430]];
+// Toronto Hunt #1, traced from the aerial: the fairway's left and right edges, the green, the deep bunker left of it, the practice area,
+// the cart path (out of bounds beyond it), the tree line down the right and the Lake Ontario bluff past it
+const FWL = [[-20.7, 92.9], [-26.5, 95.7], [-33.5, 105.4], [-37.5, 117.0], [-41.4, 128.6], [-45.4, 140.2], [-48.3, 152.4], [-49.2, 165.7], [-50.0, 179.1], [-48.8, 193.7], [-48.7, 200.7], [-46.5, 208.9], [-44.3, 217.1], [-42.2, 225.3], [-37.9, 234.7], [-33.7, 244.2], [-30.5, 253.0], [-26.2, 262.4], [-18.7, 270.9], [-10.9, 279.0]];
+const FWR = [[-16.6, 95.3], [-11.9, 104.1], [-8.6, 119.9], [-10.5, 132.7], [-15.5, 143.7], [-22.6, 153.4], [-28.6, 163.8], [-30.5, 176.6], [-32.4, 189.4], [-24.9, 207.6], [-21.7, 216.4], [-19.5, 224.6], [-17.4, 232.8], [-15.2, 241.0], [-12.0, 249.8], [-12.9, 256.2], [-13.9, 262.6], [-10.7, 271.4], [-6.6, 278.8]];
+const PATH = [[-22.4, 14.7], [-68.6, 98.9], [-114.1, 172.4], [-123.5, 236.3], [-112.2, 279.0], [-97.7, 320.8], [-84, 380]];   // cart path: out of bounds left of it
+const PATH2 = [[-43.0, 255.4], [-49.7, 276.5], [-47.8, 297.0], [-37.5, 312.7], [-24.8, 324.3], [-0.0, 324.8], [26.5, 322.2]]; // the path round the back of the green
+const TLINE = [[14, -30], [12.3, 26.6], [6.7, 64.9], [4.6, 97.1], [2.9, 123.9], [-4.6, 141.7], [-8.4, 167.2], [-7.7, 189.9], [-4.5, 208.4], [1.9, 226.0], [3.8, 246.5], [6.9, 265.0], [14.6, 280.5], [26.3, 298.5], [32.8, 316.1], [29.3, 336.3], [19.3, 358.3], [10, 400]]; // tree line down the right
+const PRACTICE = [[-115.3, 267.5], [-110.9, 274.2], [-101.2, 274.3], [-88.2, 273.5], [-85.0, 265.6], [-88.7, 255.2], [-86.4, 244.1], [-76.7, 227.5], [-70.1, 216.0], [-69.8, 203.7], [-73.7, 195.9], [-82.6, 192.1], [-89.9, 197.6], [-95.5, 209.6], [-95.7, 222.0], [-99.7, 233.5], [-103.6, 245.1], [-110.7, 254.9], [-113.9, 262.8]];
+const byV = (P, v) => { if (v <= P[0][1]) return P[0][0]; for (let i = 1; i < P.length; i++) if (v <= P[i][1]) { const a = P[i - 1], b = P[i]; return lerp(a[0], b[0], (v - a[1]) / (b[1] - a[1] || 1)); } return P[P.length - 1][0]; };
+const pathU = v => byV(PATH, v), treeU = v => byV(TLINE, v), bluffU = v => treeU(v) + 2; // the edge of the bluff: the aerial's woods all grow on the slope below it
+const FW_V0 = 92.9, FW_V1 = 279;
 function centerU(v) {
-  if (v <= CL[0][1]) return CL[0][0];
-  for (let i = 1; i < CL.length; i++) if (v <= CL[i][1]) { const a = CL[i - 1], b = CL[i]; const t = (v - a[1]) / (b[1] - a[1]); const s = t * t * (3 - 2 * t); return lerp(a[0], b[0], s); }
-  return CL[CL.length - 1][0];
+  if (v < FW_V0) return lerp(0, (byV(FWL, FW_V0) + byV(FWR, FW_V0)) / 2, Math.max(0, v) / FW_V0);
+  if (v > FW_V1) return lerp((byV(FWL, FW_V1) + byV(FWR, FW_V1)) / 2, 2, clamp((v - FW_V1) / 20, 0, 1));
+  return (byV(FWL, v) + byV(FWR, v)) / 2;
 }
-function fwHalf(v) { const base = 15 + 4 * Math.sin(v * 0.045 + 1) + 2 * Math.sin(v * 0.13); const a = clamp((v - 92) / 16, 0, 1), b = clamp((362 - v) / 14, 0, 1); return base * Math.sqrt(Math.min(a, b)); }
-const FW = (() => { const L = [], R = []; for (let v = 92; v <= 362; v += 2) { const c = centerU(v), h = fwHalf(v); L.push([c - h, v]); R.push([c + h, v]); } return L.concat(R.reverse()); })();
-const GREEN = { c: [-28, 388], rx: 15, ry: 19, rot: 0.15, s: 1.3 };
-const FRINGE = { c: [-28, 388], rx: 17.6, ry: 21.8, rot: 0.15, s: 1.3 };
+function fwHalf(v) { if (v < FW_V0 || v > FW_V1) return 0; return Math.max(0, (byV(FWR, v) - byV(FWL, v)) / 2); }
+const FW = FWL.concat(FWR.slice().reverse());
+const GREEN = { c: [0.2, 296.6], rx: 7.6, ry: 19.4, rot: -0.49, s: 1.3 };
+const FRINGE = { c: [0.2, 296.6], rx: 10.2, ry: 22, rot: -0.49, s: 1.3 };
 const BUNKERS = [
-  { c: [17, 238], rx: 14, ry: 6.6, rot: 0.35, s: 2, f: [[1.55, .62, .4], [2.6, .38, .3]] }, { c: [-37, 270], rx: 11, ry: 7.8, rot: -0.3, s: 3.1, f: [[-1.6, .62, .42]] },
-  { c: [-9, 381], rx: 5.8, ry: 10, rot: 0.2, s: 4.2, f: [[3.14, .6, .4]] }, { c: [-47, 396], rx: 5.8, ry: 9.6, rot: -0.25, s: 5.3, f: [[0, .6, .4]] },
-  { c: [-12, 342], rx: 8.6, ry: 5.2, rot: 0.5, s: 6.4, f: [[1.57, .6, .42]] }]; /* f: grass tongues [angle, depth, width] — Toronto Hunt style */
-const WATER = { c: [-60, 195], rx: 20, ry: 32, rot: 0.1, s: 7 };
-const PIN = { u: -25, v: 393 };
+  { deep: true, poly: [[-14.8, 302.9], [-15.8, 303.1], [-17.7, 302.1], [-18.0, 301.3], [-18.7, 300.9], [-19.0, 300.1], [-19.0, 299.1], [-18.6, 298.4], [-18.7, 297.3], [-19.7, 296.4], [-20.7, 296.4], [-21.4, 296.0], [-22.3, 293.3], [-22.8, 292.4], [-23.7, 291.9], [-25.0, 292.2], [-25.6, 293.3], [-26.5, 293.3], [-27.1, 294.4], [-26.5, 295.8], [-26.1, 296.0], [-24.9, 295.9], [-24.1, 296.4], [-24.0, 297.8], [-23.7, 298.6], [-24.7, 299.9], [-26.3, 300.7], [-27.4, 301.7], [-28.6, 301.8], [-29.8, 301.1], [-31.6, 297.8], [-32.2, 296.1], [-32.1, 294.5], [-30.5, 292.6], [-29.7, 292.3], [-28.8, 290.6], [-29.0, 289.6], [-29.8, 289.1], [-30.8, 289.4], [-31.4, 289.9], [-32.3, 289.9], [-32.8, 288.5], [-32.8, 287.4], [-30.6, 284.2], [-30.3, 282.8], [-30.7, 281.4], [-32.2, 280.3], [-34.0, 280.9], [-35.4, 280.9], [-36.0, 280.6], [-36.6, 279.7], [-36.9, 278.4], [-36.4, 277.5], [-34.6, 277.2], [-34.1, 276.4], [-34.3, 275.7], [-35.2, 275.5], [-35.7, 274.9], [-34.9, 273.4], [-34.2, 273.3], [-33.9, 272.6], [-33.0, 272.1], [-31.7, 271.7], [-29.7, 269.8], [-24.8, 269.9], [-21.7, 271.4], [-20.5, 271.6], [-19.7, 272.2], [-19.4, 273.6], [-17.7, 275.9], [-17.8, 278.9], [-19.4, 279.4], [-19.8, 280.0], [-19.7, 281.2], [-19.0, 281.5], [-18.3, 283.6], [-18.6, 284.6], [-20.4, 284.9], [-20.9, 284.6], [-21.7, 280.8], [-22.1, 280.6], [-24.3, 281.0], [-24.8, 282.4], [-24.5, 283.3], [-23.6, 284.1], [-23.9, 285.1], [-23.4, 287.1], [-22.8, 288.0], [-21.7, 288.6], [-18.9, 288.5], [-15.2, 290.7], [-14.8, 291.5], [-14.8, 292.9], [-14.0, 293.9], [-13.9, 295.6], [-12.2, 297.5], [-11.8, 298.2], [-11.6, 300.3], [-12.1, 301.1], [-12.8, 301.3], [-13.1, 301.9]] }, // the deep one left of the green, traced from the aerial
+  { poly: [[-112.0, 250.0], [-113.7, 247.1], [-115.4, 246.3], [-116.3, 245.0], [-116.3, 243.6], [-115.6, 241.8], [-114.3, 240.6], [-112.9, 240.6], [-111.6, 241.1], [-109.1, 240.6], [-108.7, 240.0], [-105.6, 237.6], [-104.4, 237.8], [-104.3, 238.1], [-103.0, 238.8], [-102.9, 239.5], [-103.2, 241.5], [-102.6, 243.3], [-103.6, 245.1], [-105.1, 246.2], [-106.1, 248.4], [-107.0, 249.0], [-107.9, 249.0], [-108.4, 248.5], [-109.2, 248.5], [-109.9, 247.8], [-110.3, 247.9], [-111.3, 250.1]] }]; // the practice bunker
+// traced bunkers: smoothed outline, centre and size for painting; "pad" grows or shrinks the outline about its centre
+BUNKERS.forEach(b => { if (!b.poly) return; let P = b.poly; for (let k = 0; k < 1; k++) { const Q = []; P.forEach((a, i) => { const c = P[(i + 1) % P.length]; Q.push([a[0] * .75 + c[0] * .25, a[1] * .75 + c[1] * .25], [a[0] * .25 + c[0] * .75, a[1] * .25 + c[1] * .75]); }); P = Q; }
+  b.sm = P; let su = 0, sv = 0; P.forEach(p => { su += p[0]; sv += p[1]; }); b.c = [su / P.length, sv / P.length]; let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; P.forEach(([u, v]) => { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); });
+  b.rx = (u1 - u0) / 2; b.ry = (v1 - v0) / 2; b.rot = 0; b.s = 2; b.box = [u0, u1, v0, v1]; });
+const WATER = { c: [-900, -900], rx: 1, ry: 1, rot: 0, s: 7 }; // no pond on this hole (the lake is off the bluff)
+const PIN = { u: 0.6, v: 297.2 };
 const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
 const shapeR = (th, s) => 1 + 0.09 * Math.sin(3 * th + s) + 0.05 * Math.sin(5 * th + s * 2.3) + 0.03 * Math.sin(7 * th + s * .7);
 // a bunker with tongues: big soft scallops, and grass fingers pushing into the sand
 function shR(th, e) { if (!e.f) return shapeR(th, e.s); let r = 1 + .1 * Math.sin(2 * th + e.s) + .06 * Math.sin(3 * th + e.s * 1.7);
   for (const [a, d, w] of e.f) { const x = wrapA(th - a) / w; r -= d * Math.exp(-x * x); } return r; }
 function inEl(u, v, e, pad = 1) {
+  if (e.sm) { if (u < e.box[0] - 12 || u > e.box[1] + 12 || v < e.box[2] - 12 || v > e.box[3] + 12) return false; return inPoly(e.c[0] + (u - e.c[0]) / pad, e.c[1] + (v - e.c[1]) / pad, e.sm); }
   const du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot);
   const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry;
   return Math.hypot(x, y) < shR(Math.atan2(y, x), e) * pad;
 }
 function elPts(e, n = 72, pad = 1) {
+  if (e.sm) return e.sm.map(([u, v]) => [e.c[0] + (u - e.c[0]) * pad, e.c[1] + (v - e.c[1]) * pad]);
   const out = []; for (let i = 0; i < n; i++) { const th = i / n * Math.PI * 2, r = shR(th, e) * pad; const x = Math.cos(th) * r * e.rx, y = Math.sin(th) * r * e.ry; out.push([e.c[0] + x * Math.cos(e.rot) - y * Math.sin(e.rot), e.c[1] + x * Math.sin(e.rot) + y * Math.cos(e.rot)]); } return out;
 }
 function inPoly(u, v, P) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a[1] > v) !== (b[1] > v) && u < (b[0] - a[0]) * (v - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
 const _ss = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const deepB = v => Math.max(fwHalf(v), 13) + 10 + 45 * (1 - _ss(62, 100, v)) + 45 * _ss(322, 358, v);
-const isDeep = (u, v) => v > 62 && v < 358 && Math.abs(u - centerU(v)) > deepB(v);
+const deepB = v => Math.max(fwHalf(v), 13) + 9 + 45 * (1 - _ss(62, 96, v)) + 45 * _ss(262, 284, v);
+const isDeep = (u, v) => v > 62 && v < 284 && Math.abs(u - centerU(v)) > deepB(v);
+const inDeepBunker = (u, v) => BUNKERS.some(b => b.deep && inEl(u, v, b));
 function lieAt(u, v) {
-  if (inEl(u, v, WATER)) return 'water';
+  if (u > bluffU(v) + 1) return 'water';             // over the edge of the bluff: down the cliff to Lake Ontario
+  if (u < pathU(v)) return 'ob';                     // left of the cart path: other holes
   if (inEl(u, v, GREEN)) return 'green';
   if (BUNKERS.some(b => inEl(u, v, b))) return 'sand';
   if (inEl(u, v, FRINGE)) return 'fringe';
   if (Math.abs(u) <= 5 && v >= -7 && v <= 7) return 'tee';
+  if (TUFTED.some(t => Math.hypot(u - t[0], v - t[1]) < 2.6)) return 'rough';   // the long grass round the trunks of the fairway trees
+  if (inPoly(u, v, PRACTICE)) return 'fringe';
   if (inPoly(u, v, FW)) return 'fairway';
   return isDeep(u, v) ? 'deep' : 'rough';
 }
 const LIES = {
   tee: { name: 'Tee box', f: 1 }, fairway: { name: 'Fairway', f: 1 }, fringe: { name: 'Fringe', f: .95, r: .03 }, rough: { name: 'Rough', f: .86, r: .1 }, deep: { name: 'Deep rough', f: .74, r: .15 },
-  sand: { name: 'Bunker', f: .7, r: .18 }, green: { name: 'Green', f: 1 }, water: { name: 'Water', f: 0 }, trees: { name: 'Trees', f: .8 }
+  sand: { name: 'Bunker', f: .7, r: .18 }, green: { name: 'Green', f: 1 }, water: { name: 'Water', f: 0 }, trees: { name: 'Trees', f: .8 }, ob: { name: 'Out of bounds', f: .86 }
 };
+// the fairway trees whose trunks stand in the fairway, with a skirt of long grass round them (a Hunt feature)
+const TUFTED = [[-46.0, 198.5], [-48.2, 210.0]]; // on the left edge of the fairway
 const TREES = (() => {
-  const R = rng(42), out = [];
-  for (let i = 0; i < 9000 && out.length < 290; i++) {
-    const u = (R() * 2 - 1) * 135, v = -45 + R() * 505;
-    const cu = centerU(clamp(v, 0, 430)), hw = Math.max(fwHalf(v), 12);
-    if (Math.abs(u - cu) < hw + 14) continue;
-    if (v > 340 && Math.hypot(u - GREEN.c[0], v - GREEN.c[1]) < 36) continue;
-    if (inEl(u, v, WATER, 1.35)) continue;
-    if (Math.abs(u) < 18 && v < 22 && v > -16) continue;
-    const n = 0.5 + 0.5 * Math.sin(u * 0.05 + v * 0.03) * Math.cos(v * 0.021 - u * 0.03);
-    if (R() > n * 0.85 + 0.12) continue;
-    if (out.some(t => Math.hypot(t.u - u, t.v - v) < 6.5)) continue;
-    out.push({ u, v, h: (9 + R() * 8) * 1.15 /* grown to suit the lifted ball flight */, r: 3.2 + R() * 2.6, pine: R() < .14, k: R() });
-  }
+  const R = rng(42), out = [], add = (u, v, r, h, o = {}) => out.push(Object.assign({ u, v, h: h * 1.15, r, pine: false, k: R() }, o));
+  // by hand, from the aerial
+  add(-11.5, 147.5, 7.2, 21);                                   // the big one down the right, at the front
+  add(-20.0, 168.8, 4.4, 15); add(-20.5, 182.0, 4.8, 16); add(-13.4, 177.0, 4.2, 14); add(-16.5, 194.5, 4.6, 15); // the ones past it: annoying to be behind
+  add(-46.0, 198.5, 4.6, 17, { tuft: true }); add(-48.2, 210.0, 5.0, 18, { tuft: true }); // trunks just inside the left edge of the fairway
+  add(-61.4, 189.2, 5.2, 16); add(-59.0, 168.3, 4.0, 14); add(-64.4, 134.7, 5.4, 16);            // down the left
+  add(-68.1, 210.3, 6.6, 19); add(-61.3, 239.2, 5.8, 18); add(-47.7, 244.3, 4.6, 16);            // between the hole and the practice green
+  add(-104.2, 279.5, 5.4, 17); add(-118.0, 230.0, 4.0, 14);                                        // by the practice green and its bunker
+  add(6.2, 268.0, 2.7, 10.5);       // right of the approach
+  add(-63.9, 301.0, 7, 19); add(-49.1, 318.5, 6.2, 18); add(14.2, 334.5, 5.4, 17); // the few left of and behind the green
+  const ok = (u, v, gap) => !out.some(t => Math.hypot(t.u - u, t.v - v) < gap);
+  // the woods along the right, from the tree line out toward the bluff
+  for (let i = 0; i < 2500; i++) { const v = -35 + R() * 425, u = bluffU(v) + 3 + R() * 12.5; // trees growing down the face of the bluff: their tops sit below the edge
+    if (ok(u, v, 6.2)) add(u, v, 3.2 + R() * 2.2, 13 + R() * 8, { pine: R() < .15, face: true }); }
+  // the other holes left of the cart path, and the trees round the clubhouse
+  [[-146.0, 251.1, 6], [-132.1, 243.9, 5], [-123.5, 150.3, 5.6], [-101.0, 135.6, 5], [-75.2, 100.7, 5.4], [-140, 300, 6], [-128, 330, 5.4], [-150, 190, 5.6]].forEach(([u, v, r]) => add(u, v, r, 15 + r)); // a few over on the other holes
+  // behind the green, beyond the back path
   return out;
 })();
 const CLUBS = [
@@ -838,20 +863,31 @@ const PHYS = (() => {
 /* ---- green contours: raised, rising toward the back with a small tier, shedding off the edges ---- */
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 function fringeD(u, v) { const e = FRINGE, du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); }
+// the green: about a third of the way on it tips downhill toward the back right, so balls in the middle run back-right;
+// the back is flatter and breaks less to the right, least of all on the back-left
 function greenH(u, v) {
-  if (u < -70 || u > 14 || v < 345 || v > 432) return 0;
+  if (Math.abs(u - FRINGE.c[0]) > 34 || Math.abs(v - FRINGE.c[1]) > 34) return 0;
   const d = fringeD(u, v); if (d > 1.45) return 0;
-  const m = 1 - smooth(.92, 1.45, d);
-  const crown = .2 * (1 - Math.min(1, d / .95) ** 2);
-  return m * Math.max(0, .62 + .45 + crown + .3 * (v - 388) / 19 + .12 * Math.tanh((v - 393) / 4.5) + .08 * (u + 28) / 15 + .045 * Math.sin((u + 28) * .21 + (v - 388) * .11) + .03 * Math.cos((v - 380) * .25 - (u + 30) * .08));
+  const m = 1 - smooth(.92, 1.45, d), du = u - GREEN.c[0], dv = v - GREEN.c[1], cs = Math.cos(-GREEN.rot), sn = Math.sin(-GREEN.rot);
+  const b = (du * cs - dv * sn) / GREEN.rx, a = (du * sn + dv * cs) / GREEN.ry;   // a: front (-1) to back (+1) · b: left (-1) to right (+1)
+  const back = smooth(.2, .85, a), front = 1 - smooth(-.6, .3, a), left = smooth(.35, -.75, b);
+  const tilt = .1 + .07 * front * left - back * (.04 + .04 * left); // breaks right everywhere, most on the front-left, least on the back-left; never severe
+  const crown = .06 * (1 - Math.min(1, d / .95) ** 2);
+  return m * Math.max(0, 1.05 + crown + .06 * (1 - smooth(-1, -.45, a)) - .3 * smooth(-.4, .55, a) - tilt * b * (1 + .12 * Math.sin(a * 2.1)) + .025 * Math.sin(a * 4.3 + b * 2.2));
 }
 const TERRAIN_BASE = 2.6, TERRAIN_AMP = .72;
 function waterD(u, v) { const e = WATER, du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); }
+const BLUFF_D = -66; // yards below the course
+function bunkerD(u, v, e) { if (e.sm) { if (u < e.box[0] - 6 || u > e.box[1] + 6 || v < e.box[2] - 6 || v > e.box[3] + 6) return 9; let d2 = 1e9; const P = e.sm; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const ax = P[j][0], ay = P[j][1], bx = P[i][0] - ax, by = P[i][1] - ay, t = clamp(((u - ax) * bx + (v - ay) * by) / (bx * bx + by * by || 1), 0, 1), dx = u - ax - bx * t, dy = v - ay - by * t; d2 = Math.min(d2, dx * dx + dy * dy); }
+  const d = Math.sqrt(d2) / 6; return inPoly(u, v, P) ? 1 - d : 1 + d; } /* traced shape: 1 at the edge, 0.83 two yards in, 1.17 one yard out */ const du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shR(Math.atan2(y, x), e); }
 function terrainH(u, v) {
   const raw = 1.5 * Math.sin(u * .045 + v * .012) + 1.15 * Math.sin(v * .031 + 1.3) * Math.cos(u * .052) + .55 * Math.sin(u * .12 - v * .075 + 2) + .35 * Math.sin(v * .11 + u * .03);
-  const local = smooth(8, 24, Math.hypot(u, v)) * smooth(1.08, 1.7, waterD(u, v)) * smooth(1.05, 1.9, fringeD(u, v));
-  const edge = (1 - smooth(112, 136, Math.abs(u))) * smooth(-38, -18, v) * (1 - smooth(428, 448, v));
-  return edge * (TERRAIN_BASE + local * raw * TERRAIN_AMP);
+  const local = smooth(8, 24, Math.hypot(u, v)) * smooth(1.05, 1.9, fringeD(u, v)) * .8;
+  const edge = (1 - smooth(-148, -128, -u) * 0 - smooth(128, 148, -u)) * smooth(-38, -18, v) * (1 - smooth(368, 388, v));
+  let h = edge * (TERRAIN_BASE + local * raw * TERRAIN_AMP);
+  const bu = bluffU(v); if (u > bu) { const t = clamp((u - bu) / 16, 0, 1), k = 1 - (1 - t) * (1 - t) * (1 - .35 * t); h = h * (1 - k) + BLUFF_D * k; if (u > bu + 22) h = BLUFF_D - 3 * smooth(bu + 22, bu + 26, u); } // the bluff: a sheer drop of ~200 ft to a strip of beach, then the lake
+  for (const b of BUNKERS) if (b.deep) { const d = bunkerD(u, v, b); if (d < 1.6) h += (-.9 * (1 - smooth(.7, 1.0, d)) + .45 * Math.exp(-(((d - 1.14) / .13) ** 2))) * smooth(1.0, 1.25, fringeD(u, v)); } /* never digs into the green */ // dug in, with a raised lip
+  return h;
 }
 const groundHeight = (u, v) => terrainH(u, v) + greenH(u, v);
 const groundHW = (x, z) => groundHeight(x, -z);
@@ -897,7 +933,7 @@ scene.add(new THREE.HemisphereLight(0xfff3dc, 0x4f7d35, 0.55));
 const sun = new THREE.DirectionalLight(0xffe4b8, 1.0); sun.position.set(-55, 110, -60); scene.add(sun);
 
 /* ---- painted course texture ---- */
-const MAP = { U0: -140, U1: 140, V0: -40, V1: 450, W: 1536 };
+const MAP = { U0: -150, U1: 90, V0: -40, V1: 390, W: 1536 };
 MAP.ppy = MAP.W / (MAP.U1 - MAP.U0); MAP.H = Math.round((MAP.V1 - MAP.V0) * MAP.ppy);
 function paintCourse(real = false) {
   const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d');
@@ -920,10 +956,11 @@ function paintCourse(real = false) {
   if (!real) { g.beginPath(); for (let i = 0; i < 1800; i++) { const x = R() * MAP.W, y = R() * MAP.H; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke(); }
   if (!real) for (let i = 0; i < 380; i++) { g.fillStyle = R() < .5 ? 'rgba(255,250,240,.85)' : 'rgba(255,214,70,.9)'; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 1.3 + R(), 0, 7); g.fill(); }
   // deep rough: darker, longer grass well off the fairway
-  { const band = (inset, col) => { for (const sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 360; v += 2) pts.push([centerU(v) + sd * (deepB(v) + inset), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 360]); path(pts); g.fillStyle = col; g.fill(); } };
+  { g.save(); { const pts = []; for (let v = -40; v <= 390; v += 4) pts.push([pathU(v), v]); for (let v = 390; v >= -40; v -= 4) pts.push([bluffU(v), v]); path(pts); g.clip(); }
+  { const band = (inset, col) => { for (const sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + inset), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); path(pts); g.fillStyle = col; g.fill(); } };
     band(0, real ? 'rgba(25,60,20,.28)' : 'rgba(30,95,30,.28)'); band(1.6, real ? 'rgba(25,60,20,.22)' : 'rgba(30,95,30,.24)');
-    if (!real) { g.save(); band(1.6, 'rgba(0,0,0,0)'); g.beginPath(); for (let sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 360; v += 2) pts.push([centerU(v) + sd * (deepB(v) + 1.6), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 360]); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); } g.clip();
-      g.beginPath(); for (let i = 0; i < 9000; i++) { const x = R() * MAP.W, y = Y(60 + R() * 300), a = -1.15 + (R() - .5) * .5, l = 7 + R() * 8; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(20,60,20,.3)'; g.lineWidth = 1.3; g.stroke(); g.restore(); } }
+    if (!real) { g.save(); band(1.6, 'rgba(0,0,0,0)'); g.beginPath(); for (let sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + 1.6), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); } g.clip();
+      g.beginPath(); for (let i = 0; i < 9000; i++) { const x = R() * MAP.W, y = Y(60 + R() * 230), a = -1.15 + (R() - .5) * .5, l = 7 + R() * 8; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(20,60,20,.3)'; g.lineWidth = 1.3; g.stroke(); g.restore(); } } g.restore(); }
   // water
   const wp = elPts(WATER, 96);
   path(elPts(WATER, 96, 1.08)); g.fillStyle = real ? '#5d8f3c' : '#9fd36a'; g.fill();
@@ -934,10 +971,28 @@ function paintCourse(real = false) {
   // fairway
   path(FW); g.lineWidth = 3.4 * ppy; g.strokeStyle = real ? 'rgba(98,150,58,.8)' : '#7dbb48'; g.lineJoin = 'round'; if (real) { g.filter = 'blur(3px)'; } g.stroke(); g.filter = 'none';
   g.save(); path(FW); g.clip();
-  for (let v = 80, k = 0; v < 372; v += 7, k++) { g.fillStyle = real ? (k % 2 ? '#6aa646' : '#62a03f') : (k % 2 ? '#a4d75a' : '#95cb4f'); g.fillRect(0, Y(v + 7), MAP.W, 7 * ppy + 1); }
-  if (real) { g.fillStyle = 'rgba(30,70,25,.12)'; for (let i = 0; i < 26000; i++) g.fillRect(R() * MAP.W, Y(90 + R() * 275), 1, 1); }
-  g.beginPath(); for (let i = 0; i < 2600; i++) { const x = R() * MAP.W, y = Y(90 + R() * 275), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = real ? 'rgba(40,90,30,.08)' : 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
+  for (let v = 86, k = 0; v < 290; v += 7, k++) { g.fillStyle = real ? (k % 2 ? '#6aa646' : '#62a03f') : (k % 2 ? '#a4d75a' : '#95cb4f'); g.fillRect(0, Y(v + 7), MAP.W, 7 * ppy + 1); }
+  if (real) { g.fillStyle = 'rgba(30,70,25,.12)'; for (let i = 0; i < 26000; i++) g.fillRect(R() * MAP.W, Y(90 + R() * 195), 1, 1); }
+  g.beginPath(); for (let i = 0; i < 2600; i++) { const x = R() * MAP.W, y = Y(90 + R() * 195), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = real ? 'rgba(40,90,30,.08)' : 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
   g.restore(); sketch(FW, 2.6, .8);
+  // the practice green (and the cart paths: out of bounds left of the main one)
+  { path(PRACTICE); g.fillStyle = real ? '#6fae4a' : '#8fd255'; g.fill(); const pg = PRACTICE.map(([u, v]) => { const cx = -92, cy = 235; return [cx + (u - cx) * .9, cy + (v - cy) * .92]; });
+    path(pg); g.fillStyle = real ? '#7dbd55' : '#a9ea6d'; g.fill(); sketch(PRACTICE, 2.2, .7); }
+  const road = (P, w) => { g.save(); g.lineJoin = g.lineCap = 'round'; path(P, false); g.lineWidth = (w + .9) * ppy; g.strokeStyle = real ? 'rgba(60,60,55,.6)' : 'rgba(29,42,26,.85)'; g.stroke();
+    path(P, false); g.lineWidth = w * ppy; g.strokeStyle = real ? '#a9a59a' : '#d9d3c4'; g.stroke(); path(P, false); g.lineWidth = w * .25 * ppy; g.strokeStyle = 'rgba(255,255,255,.35)'; g.setLineDash([3 * ppy, 4 * ppy]); g.stroke(); g.restore(); };
+  road(PATH, 2.4); road(PATH2, 2.2);
+  // the bluff: the grass breaks over the edge, then a scrubby face with clay showing through, down to a strip of beach
+  { const band = (a, b) => { const A = [], B = []; for (let v = -40; v <= 390; v += 2) { A.push([bluffU(v) + a, v]); B.push([bluffU(v) + b, v]); } return A.concat(B.reverse()); };
+    path(band(.4, 16.5)); g.fillStyle = real ? '#5d7a3e' : '#6f9f47'; g.fill();
+    path(band(.4, 16.5)); g.save(); g.clip();
+    for (let i = 0; i < 70; i++) { const v = -40 + R() * 430, u0 = bluffU(v) + 3 + R() * 6, len = 5 + R() * 7; g.beginPath(); g.moveTo(X(u0), Y(v)); g.quadraticCurveTo(X(u0 + len * .5), Y(v + (R() - .5) * 4), X(u0 + len), Y(v + (R() - .5) * 6)); g.lineWidth = (1.2 + R() * 1.6) * ppy; g.lineCap = 'round'; g.strokeStyle = 'rgba(176,132,84,.55)'; g.stroke(); } // clay gullies
+    const clump = (u, v, r, c) => { const k = [[0, 0, 1], [.55, .25, .72], [-.5, .3, .68], [.1, -.5, .6]]; g.beginPath(); k.forEach(([a, b, s]) => { g.moveTo(X(u + a * r) + r * s * ppy, Y(v + b * r)); g.arc(X(u + a * r), Y(v + b * r), r * s * ppy, 0, 7); });
+      g.fillStyle = 'rgba(29,42,26,.85)'; g.save(); g.translate(.9, 1.1); g.fill(); g.restore(); g.fillStyle = c; g.fill(); g.beginPath(); g.arc(X(u - r * .25), Y(v + r * .3), r * .38 * ppy, 0, 7); g.fillStyle = 'rgba(255,255,255,.14)'; g.fill(); };
+    const cs = ['#4f8f36', '#5c9c3c', '#467f31', '#6aa846'];
+    for (let i = 0; i < 520; i++) { const v = -40 + R() * 430, d = Math.pow(R(), 1.3) * 14, u = bluffU(v) + 1.2 + d; clump(u, v, (1 - d / 24) * (.8 + R() * 1.0), cs[(R() * cs.length) | 0]); } // scrub, thickest just under the edge
+    g.restore();
+    path(band(16, 23)); g.fillStyle = '#e4dccb'; g.fill(); path(band(21, 23)); g.fillStyle = 'rgba(190,214,222,.6)'; g.fill(); // the beach and the wet edge of the lake
+    if (!real) for (let pass = 0; pass < 2; pass++) { g.beginPath(); for (let v = -40; v <= 390; v += 2) { const x = X(bluffU(v) + .4) + (R() - .5) * (pass ? 1.6 : .5), y = Y(v); v === -40 ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineWidth = pass ? 1.4 : 2.6; g.strokeStyle = `rgba(29,42,26,${pass ? .38 : .85})`; g.lineJoin = 'round'; g.stroke(); } } // the edge of the bluff (an open line: no closing stroke across the map)
   // tee
   const tee = [[-5, -7], [5, -7], [5, 7], [-5, 7]];
   path(tee); g.fillStyle = real ? '#6fae4a' : '#98d85a'; g.fill(); g.save(); path(tee); g.clip(); for (let v = -7, k = 0; v < 7; v += 2.5, k++) { g.fillStyle = real ? (k % 2 ? '#6aa846' : '#74b24f') : k % 2 ? '#8ccd50' : '#a3e063'; g.fillRect(0, Y(v + 2.5), MAP.W, 2.5 * ppy + 1); } g.restore(); sketch(tee, 2.4, .8);
@@ -947,7 +1002,7 @@ function paintCourse(real = false) {
   g.save(); path(gp); g.clip(); for (let k = 9; k > 0; k--) { path(elPts(Object.assign({}, GREEN, { rx: GREEN.rx * k / 9, ry: GREEN.ry * k / 9 }), 64)); g.fillStyle = k % 2 ? 'rgba(255,255,255,.07)' : 'rgba(40,120,40,.05)'; g.fill(); } g.restore(); sketch(gp, 2.6, .85);
   // bunkers
   BUNKERS.forEach(b => {
-    const bp = elPts(b, 180); path(elPts(b, 180, 1.3)); g.fillStyle = real ? '#5f9a3e' : 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = real ? '#5f9a3e' : '#8fcf55'; g.fill(); /* the raised grass lip, with a shadow falling off it */
+    const bp = elPts(b, 180); if (b.sm) { g.save(); g.lineJoin = 'round'; path(bp); g.lineWidth = 5.4 * ppy; g.strokeStyle = real ? '#5f9a3e' : 'rgba(46,96,34,.35)'; g.stroke(); path(bp); g.lineWidth = 2.6 * ppy; g.strokeStyle = real ? '#5f9a3e' : '#8fcf55'; g.stroke(); g.restore(); } else { path(elPts(b, 180, 1.3)); g.fillStyle = real ? '#5f9a3e' : 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = real ? '#5f9a3e' : '#8fcf55'; g.fill(); } /* the raised grass lip, with a shadow falling off it */
     path(bp); g.fillStyle = real ? '#e3cf9c' : '#f6ecd4'; g.fill(); g.save(); path(bp); g.clip();
     g.fillStyle = 'rgba(205,180,130,.45)'; for (let i = 0; i < 160; i++) { g.beginPath(); g.arc(X(b.c[0] + (R() - .5) * b.rx * 2.4), Y(b.c[1] + (R() - .5) * b.ry * 2.4), .6 + R() * .9, 0, 7); g.fill(); }
     g.lineWidth = 2.4 * ppy; g.strokeStyle = 'rgba(176,146,96,.42)'; g.translate(0, 2.2 * ppy); path(bp); g.stroke(); g.restore(); /* the shaded face under the far lip */
@@ -1051,7 +1106,8 @@ course.rotation.x = -Math.PI / 2; course.position.set((MAP.U0 + MAP.U1) / 2, 0, 
   for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(40,110,40,${.05 + R() * .06})`; g.beginPath(); g.arc(R() * 256, R() * 256, 10 + R() * 30, 0, 7); g.fill(); }
   g.beginPath(); for (let i = 0; i < 500; i++) { const x = R() * 256, y = R() * 256; g.moveTo(x, y); g.lineTo(x + 3, y - 5); } g.strokeStyle = 'rgba(25,75,25,.25)'; g.lineWidth = 1.2; g.stroke();
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso;
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), groundMat(t, 3400 / 36)); outer.rotation.x = -Math.PI / 2; outer.position.set(0, -0.8, -200); scene.userData.outer = outer; scene.add(outer);
+  const osh = new THREE.Shape(); osh.moveTo(-1900, -1900); osh.lineTo(bluffU(-40) + .5, -1900); for (let v = -40; v <= 390; v += 5) osh.lineTo(bluffU(v) + .5, v); osh.lineTo(bluffU(390) + .5, 1600); osh.lineTo(-1900, 1600); osh.closePath(); /* the land: ends at the edge of the bluff */
+  const outer = new THREE.Mesh(new THREE.ShapeGeometry(osh), groundMat(t, 1 / 36)); outer.rotation.x = -Math.PI / 2; outer.position.set(0, -0.8, 0); scene.userData.outer = outer; scene.add(outer);
 })();
 
 /* ---- culled instancing: one InstancedMesh per kind (same draw calls as before), but each frame the camera moves only the
@@ -1124,10 +1180,11 @@ function updateCull() {
   inst(trunkGeo, inkMat, trunks, (o, s) => s.set(o.s[0] * 1.45, o.s[1], o.s[2] * 1.45));
 })();
 
-/* ---- Lake Ontario past the bluff behind the green ---- */
-(() => { const lake = new THREE.Mesh(new THREE.PlaneGeometry(5200, 2600), new THREE.MeshBasicMaterial({ color: 0xc4d9df, fog: true }));
-  lake.rotation.x = -Math.PI / 2; lake.position.set(0, -0.55, -470 - 1300); lake.userData.ink = false; lake.renderOrder = -2; scene.add(lake); /* drawn first so the ground under it fails the depth test instead of shading twice */
-  const shore = new THREE.Mesh(new THREE.PlaneGeometry(5200, 6), new THREE.MeshBasicMaterial({ color: 0xe9dcc0, fog: true })); shore.rotation.x = -Math.PI / 2; shore.position.set(0, -0.5, -473); shore.userData.ink = false; scene.add(shore); })();
+/* ---- Lake Ontario off the bluff down the right ---- */
+(() => { const lake = new THREE.Mesh(new THREE.PlaneGeometry(4000, 5200), new THREE.MeshBasicMaterial({ color: 0xbcd6de, fog: true }));
+  lake.rotation.x = -Math.PI / 2; lake.position.set(0 + 2000, BLUFF_D - .7, -200); lake.userData.ink = false; lake.renderOrder = -2; scene.add(lake); /* drawn first so the ground under it fails the depth test */
+  const pts = []; for (let v = -60; v <= 420; v += 6) pts.push(new THREE.Vector3(bluffU(v) + 21.6, BLUFF_D - .55, -v)); // a pale line of beach at the foot of the bluff
+  const g = new THREE.BufferGeometry().setFromPoints(pts); const beach = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xece0c2, fog: true })); beach.userData.ink = false; scene.add(beach); })();
 /* ---- hills, tufts, clouds, flag, tee markers ---- */
 (() => {
   const geo = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2); const R = rng(5);
@@ -1135,8 +1192,7 @@ function updateCull() {
   const hills = [];
   // background hills must never overlap the playable area (+ room for the cameras), or a camera can end up inside one
   const clearOf = (x, z, r) => { const dx = Math.max(-170 - x, 0, x - 170), dz = Math.max(-480 - z, 0, z - 70); return Math.hypot(dx, dz) > r + 6; };
-  for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(Math.cos(a) * d, -200 + Math.sin(a) * d, r)) d += 15; if (-200 + Math.sin(a) * d - r < -470) continue; hills.push({ p: new THREE.Vector3(Math.cos(a) * d, -2, -200 + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
-  [[-10, 432, 16], [-46, 425, 13], [-62, 380, 10]].forEach(([u, v, r]) => hills.push({ p: W(u, v, groundHeight(u, v) - .3), s: new THREE.Vector3(r, r * .28, r), c: '#5aa743', ink: false }));
+  for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(Math.cos(a) * d, -200 + Math.sin(a) * d, r)) d += 15; if (Math.cos(a) * d - r < 60 && false) continue; if (Math.cos(a) * d > 40) continue; hills.push({ p: new THREE.Vector3(Math.cos(a) * d, -2, -200 + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
   const hm = new THREE.InstancedMesh(geo, toon(0xffffff), hills.length), inked = hills.filter(h => h.ink), ho = new THREE.InstancedMesh(geo, inkMat, inked.length);
   const M4 = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), C0 = new THREE.Color(), S0 = new THREE.Vector3();
   hills.forEach((h, i) => { hm.setMatrixAt(i, M4.compose(h.p, Q0, h.s)); hm.setColorAt(i, C0.set(h.c)); });
@@ -1152,10 +1208,11 @@ function updateCull() {
   tg.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
   const list = []; const Rt = rng(21);
   for (let i = 0; i < 9000 && list.length < 2200; i++) {
-    const v = -20 + Rt() * 440, cu = centerU(clamp(v, 0, 430)), side = Rt() < .5 ? -1 : 1;
+    const v = -20 + Rt() * 330, cu = centerU(clamp(v, 0, 300)), side = Rt() < .5 ? -1 : 1;
     const u = (v < 20 && Rt() < .5) ? (Rt() - .5) * 60 : cu + side * (Math.max(fwHalf(v), 6) + 1 + Rt() * 34);
     const l = lieAt(u, v); if (l !== 'rough' && l !== 'deep') continue; list.push([u, v]);
   }
+  for (const [tu, tv] of TUFTED) for (let k = 0; k < 26; k++) { const a = Rt() * 6.28, r = .7 + Rt() * 1.8; list.push([tu + Math.cos(a) * r, tv + Math.sin(a) * r]); } // the skirts of long grass round the fairway trees
   const q = new THREE.Quaternion(), e = new THREE.Euler();
   cullInst(tg, tuftMat(tt), list.map(([u, v]) => { const s = .45 + Rt() * .55; e.set(0, Rt() * 3, 0); q.setFromEuler(e); const p = W(u, v, groundHeight(u, v) - .03); return { p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(s, s * (.8 + Rt() * .5), s)), r: 1.6 }; }), { ud: { tuft: true }, hideBeyond: 88, realHide: true });
   // clouds
@@ -1171,10 +1228,16 @@ function updateCull() {
   for (let i = 0; i < 16; i++) {
     const m = new THREE.SpriteMaterial({ map: ct, transparent: true, opacity: .92, depthWrite: false, fog: true });
     const sp = new THREE.Sprite(m); sp.userData.lowCloud = true;
-    const v = 30 + Rc() * 420, u = centerU(clamp(v, 0, 430)) + (Rc() < .5 ? -1 : 1) * (45 + Rc() * 85), w = 30 + Rc() * 38;
+    const v = 30 + Rc() * 330, u = centerU(clamp(v, 0, 300)) + (Rc() < .5 ? -1 : 1) * (45 + Rc() * 85), w = 30 + Rc() * 38;
     sp.position.set(u, 62 + Rc() * 48, -v); sp.scale.set(w, w / 2, 1); sp.renderOrder = 3; scene.add(sp);
     lc.push({ sp, u0: u, y0: sp.position.y, ph: Rc() * 6.28, sp0: .8 + Rc() * 1.4 });
   }
+  // little flags on the practice green
+  [[-80, 205], [-91, 236], [-104, 262]].forEach(([u, v], i) => { const y = groundHeight(u, v), pole = new THREE.Mesh(new THREE.CylinderGeometry(.05, .05, 1.9, 6), toon(0xfffaf0)); pole.position.copy(W(u, v, y + .95)); scene.add(pole);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(.75, .45), new THREE.MeshBasicMaterial({ color: [0xff4f9a, 0xffd23f, 0x5fe0b5][i], side: THREE.DoubleSide })); fl.position.copy(W(u + .38, v, y + 1.65)); scene.add(fl); });
+  // white out-of-bounds stakes along the cart path
+  { const sg = new THREE.CylinderGeometry(.09, .09, 1.1, 6), sm = toon(0xffffff), list = []; for (let v = 20; v <= 330; v += 14) list.push([pathU(v) - 1.6, v]);
+    const im = new THREE.InstancedMesh(sg, sm, list.length), M = new THREE.Matrix4(); list.forEach(([u, v], i) => im.setMatrixAt(i, M.makeTranslation(u, groundHeight(u, v) + .55, -v))); scene.add(im); }
   // tee markers
   [[-4.2, 3], [4.2, 3]].forEach(([u, v]) => { const m = new THREE.Mesh(new THREE.SphereGeometry(.22, 14, 10), toon(PINK)); m.position.copy(W(u, v, groundHeight(u, v) + .18)); scene.add(m); const o = new THREE.Mesh(m.geometry, inkMat); o.position.copy(m.position); o.scale.setScalar(1.25); scene.add(o); });
 })();
@@ -1223,7 +1286,7 @@ const CRITTERS = (() => {
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.userData.ink = false; scene.add(mesh);
   const R = rng(99), P = iPos.array, D = iDat.array;
   // birds: two loose flocks on big slow loops ~25-40 yd up
-  const flocks = [{ cu: 0, cv: 210, ru: 175, rv: 270, w: .045, ph: 0, h: 34 }, { cu: -20, cv: 160, ru: 130, rv: 200, w: -.06, ph: 2.6, h: 26 }];
+  const flocks = [{ cu: -20, cv: 170, ru: 120, rv: 190, w: .045, ph: 0, h: 34 }, { cu: -35, cv: 140, ru: 90, rv: 150, w: -.06, ph: 2.6, h: 26 }];
   const birds = []; for (let i = 0; i < NB; i++) birds.push({ f: flocks[i < 4 ? 0 : 1], k: i < 4 ? i : i - 4, ou: (R() - .5) * 14, ov: (R() - .5) * 14, oh: (R() - .5) * 5, fl: R() * 6, rate: 5 + R() * 2, glide: R() * 8 });
   // squirrels: sit by a trunk near the ball, now and then hop to a neighbouring tree
   const sqs = []; for (let i = 0; i < NS; i++) sqs.push({ u: 1e9, v: 0, tu: 0, tv: 0, st: 'sit', t: R() * 3, face: 1, hop: 0 });
@@ -1613,7 +1676,7 @@ function pickClub() {
 function autoAim() {
   const b = G.ball, F = dmax(), pd = pinDist(); let tu, tv;
   if (pd <= F * 1.0) { tu = PIN.u; tv = PIN.v; }
-  else { let best = null; for (let v = Math.max(b.v, 0); v <= 430; v += .25) { const u = centerU(v); if (Math.hypot(u - b.u, v - b.v) >= F) { best = { u, v }; break; } } if (!best) best = PIN; tu = best.u; tv = best.v; }
+  else { let best = null; for (let v = Math.max(b.v, 0); v <= PIN.v + 10; v += .25) { const u = centerU(v); if (Math.hypot(u - b.u, v - b.v) >= F) { best = { u, v }; break; } } if (!best) best = PIN; tu = best.u; tv = best.v; }
   const du = tu - b.u, dv = tv - b.v, L = Math.hypot(du, dv) || 1; G.dir = { u: du / L, v: dv / L }; G.D = pd <= F ? clamp(L, dmin(), F) : F;
 }
 function setClub(i, reaim = true) {
@@ -2069,8 +2132,7 @@ const CLUBHEAD = (() => {
       <ellipse cx="${f1(mid - 6)}" cy="${f1(D * .28 - 4)}" rx="${f1((tx - hx) * .16)}" ry="${f1(D * .12)}" fill="#fff" opacity=".1"/>
       <path d="${face}" fill="url(#gFace)" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>
       <path d="M${hx + 1} -8.3 Q${f1(mid)} -11.6 ${tx - .5} -8.8" stroke="#eef3f6" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-      <path d="M${f1(mid - 1)} -6 l2 2.6 l2 -2.6" stroke="#fffaf0" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
-      <g transform="translate(${f1(tx - 9)} ${f1(D * .5 - 5)}) scale(${hs} 1)"><circle r="5.2" fill="${SUN}" stroke="${INK}" stroke-width="1.6"/><text y="2.4" text-anchor="middle" font-family="Luckiest Guy" font-size="${w.badge.length > 1 ? 5 : 6.6}" fill="${INK}">${w.badge}</text></g>`;
+      <path d="M${f1(mid - 1)} -6 l2 2.6 l2 -2.6" stroke="#fffaf0" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
   }
   function iron(cl, hs) { // top-down at address: leading edge nearest the ball, the face laid back toward you by its loft, topline, then the sole; it all necks into the hosel at the heel
     const wedge = cl.loft >= 44, L = cl.loft, tx = wedge ? 27 : 28, hx = -22;
@@ -2358,6 +2420,7 @@ function launch(sw) {
   if (flub === 'blade') carry *= 1.18; else if (flub === 'chunk') carry *= .5;
   if (G.mode === 'chip') carry *= plan.cf || .45;                              // chip: meter = total, fly only the carry part
   if (G.mode === 'sand' && G.lieRoll < 1) carry /= G.lieRoll; // explosion shot: the sand is already priced in
+  if (G.lie === 'sand' && inDeepBunker(G.ball.u, G.ball.v)) carry *= .8; // the deep bunker left of the green: a tall face eats some of it
   let launchA = plan.launchL + (Math.random() - .5) * (1.2 + (1 - q) * 2.5) * risk; if (flub === 'blade') launchA *= .4; const startP = plan.p;
   if ((LIES[G.lie].f || 1) < 1 && G.mode !== 'putt') { // off a less-than-perfect lie the ball comes out a bit higher or lower: a flush strike barely varies, a poor one a little more (never wild)
     const spread = .04 + .1 * (1 - q); launchA *= 1 + clamp((Math.random() * 2 - 1) * spread, -.13, .13); }
@@ -2536,15 +2599,15 @@ function updateFlight(dt) {
   camera.position.copy(camFollow); camLook.copy(lookFollow); camera.lookAt(camLook);
 }
 function finishShot() {
-  const S = G.shot; const water = S.endLie === 'water' || S.lieLand === 'water';
+  const S = G.shot; const ob = S.endLie === 'ob' && S.lieLand !== 'water', water = S.endLie === 'water' || S.lieLand === 'water' || ob; // out of bounds plays like water, but only stroke and distance
   const endU = S.end.u, endV = S.end.v; const toPin = Math.hypot(PIN.u - endU, PIN.v - endV);
   const total = Math.hypot(endU - S.B.u, endV - S.B.v);
   const lie = water ? 'water' : S.endLie;
   let holed = !!S.holed || (lie === 'green' && toPin < .06); const gimme = !holed && !water && lie === 'green' && toPin * 3 < 4.5; /* anything that reads "4 ft" or less is good */ G.gimmeAdd = gimme ? 1 : 0; if (gimme) { G.stroke++; holed = true; AV.say(line('gimme'), { mood: 'happy', force: true }); }
   const SCORE = { '-3': 'ALBATROSS!', '-2': 'EAGLE!', '-1': 'BIRDIE!', '0': 'PAR', '1': 'BOGEY', '2': 'DOUBLE BOGEY' };
-  let word = holed ? (SCORE[G.stroke - 4] || `+${G.stroke - 4}`) : water ? 'SPLASH!' : S.putt ? (toPin * 3 < 4.5 ? 'TAP-IN LEFT' : 'MISSED') : lie === 'green' ? 'ON THE GREEN!' : (S.lieLand === 'trees' ? 'IN THE TREES' : LIES[lie].name.toUpperCase() + '!');
+  let word = holed ? (SCORE[G.stroke - 4] || `+${G.stroke - 4}`) : water ? (ob ? 'OUT OF BOUNDS' : 'SPLASH!') : S.putt ? (toPin * 3 < 4.5 ? 'TAP-IN LEFT' : 'MISSED') : lie === 'green' ? 'ON THE GREEN!' : (S.lieLand === 'trees' ? 'IN THE TREES' : LIES[lie].name.toUpperCase() + '!');
   { const L = G.log || (G.log = []); // the hole so far, for the end-of-hole card
-    L.push({ n: G.stroke - (gimme ? 1 : 0), club: S.putt ? 'Putter' : club().name, mode: G.mode, putt: !!S.putt, carry: Math.round(S.carry), total: Math.round(total), lie: water ? 'water' : S.lieLand === 'trees' ? 'trees' : lie, pin: toPin, holed: !!S.holed, gimme });
+    L.push({ n: G.stroke - (gimme ? 1 : 0), club: S.putt ? 'Putter' : club().name, mode: G.mode, putt: !!S.putt, carry: Math.round(S.carry), total: Math.round(total), lie: ob ? 'ob' : water ? 'water' : S.lieLand === 'trees' ? 'trees' : lie, pin: toPin, holed: !!S.holed, gimme });
     if (gimme) L.push({ n: G.stroke, club: 'Putter', putt: true, gimme: true, conceded: true, lie: 'green', pin: 0, holed: true }); }
   $('#result').classList.toggle('final', holed); $('#resCard').innerHTML = holed ? holeCard(G.log) : '';
   $('#resWord').textContent = word;
@@ -2558,7 +2621,8 @@ function finishShot() {
   $('#resGrid').innerHTML = stats.map(([k, v, good]) => `<div class="st${good ? ' good' : ''}"><small>${k}</small><b>${v}</b></div>`).join('') + tempoCell;
   drawSwingSketch(S);
   const btns = [];
-  if (water) { btns.push(['Replay +1', 'penalty', false]); btns.push(['Take a drop +1', 'drop', true]); }
+  if (ob) btns.push(['Replay +1', 'penalty', true]);
+  else if (water) { btns.push(['Replay +1', 'penalty', false]); btns.push(['Take a drop +1', 'drop', true]); }
   else if (holed) { btns.push(['Retry shot', 'retry', false]); btns.push(['Play hole again', 'restart', true]); }
   else { btns.push(['Retry shot', 'retry', false]); btns.push(['Play on ›', 'next', true]); }
   $('#resBtns').innerHTML = btns.map(([l, a, go]) => `<button class="btn${go ? ' go' : ''}" data-a="${a}">${l}</button>`).join('');
@@ -2917,7 +2981,7 @@ function planShot() {
 /* ================= GREEN READING: contour grid + slope streaks that flow downhill ================= */
 let READ_ZS = 1; const _gc = new THREE.Vector3(), RC0 = new THREE.Color(0xffffff), RC1 = new THREE.Color(0xffe066), RC2 = new THREE.Color(0xff8a3d), _rc = new THREE.Color();
 const READ = (() => {
-  const U0 = -68, U1 = 12, V0 = 346, V1 = 430, step = 1.5, inside = (u, v) => greenGap(u, v) <= 10, lift = .045;
+  const U0 = FRINGE.c[0] - 34, U1 = FRINGE.c[0] + 34, V0 = FRINGE.c[1] - 34, V1 = FRINGE.c[1] + 34, step = 1.5, inside = (u, v) => greenGap(u, v) <= 10, lift = .045;
   const GS = .5, GW = Math.round((U1 - U0) / GS) + 1, GH = Math.round((V1 - V0) / GS) + 1, gH = new Float32Array(GW * GH), gU = new Float32Array(GW * GH), gV = new Float32Array(GW * GH), gIn = new Uint8Array(GW * GH);
   for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const u = U0 + i * GS, v = V0 + j * GS, k = j * GW + i, g = gradUV(u, v); gH[k] = groundHeight(u, v); gU[k] = g.u; gV[k] = g.v; gIn[k] = greenGap(u, v) <= 10 ? 1 : 0; }
   const look = (u, v) => { const fx = clamp((u - U0) / GS, 0, GW - 1.001), fy = clamp((v - V0) / GS, 0, GH - 1.001), i = fx | 0, j = fy | 0, a = fx - i, b = fy - j, k = j * GW + i;
@@ -3732,8 +3796,8 @@ requestAnimationFrame(frame);
 const COURSES = [{ id: 'hunt', name: 'Toronto Hunt', sub: 'Hole 1 · Par 4', logo: HUNT_LOGO }];
 const MENU = { on: false, t: 1.4, course: store.get('course', 'hunt') };
 const homePath = (() => { // camera + look-at keys (u, v, height above ground) from behind the tee, down the hole, around the green
-  const cu = v => centerU(clamp(v, 0, 430)), P = [[14, -48, 24], [cu(55) + 30, 55, 38], [cu(160) + 40, 160, 52], [cu(262) - 34, 262, 52], [PIN.u + 44, PIN.v - 62, 38], [PIN.u + 34, PIN.v + 22, 30], [PIN.u - 22, PIN.v + 46, 32]],
-    L = [[cu(150), 150, 26], [cu(230), 230, 30], [cu(320), 320, 26], [PIN.u + 4, PIN.v - 10, 12], [PIN.u, PIN.v, 7], [PIN.u, PIN.v, 7], [PIN.u - 2, PIN.v - 6, 8]]; // aim a little above the ground ahead so the horizon sits mid-screen
+  const cu = v => centerU(clamp(v, 0, 300)), P = [[-6, -46, 24], [cu(45) - 28, 45, 36], [cu(130) - 40, 130, 48], [cu(205) - 40, 205, 50], [PIN.u - 40, PIN.v - 52, 36], [PIN.u - 34, PIN.v + 18, 28], [PIN.u + 18, PIN.v + 40, 30]],
+    L = [[cu(130), 130, 20], [cu(200), 200, 24], [cu(260), 260, 20], [PIN.u - 2, PIN.v - 10, 10], [PIN.u, PIN.v, 6], [PIN.u, PIN.v, 6], [PIN.u + 2, PIN.v - 6, 7]]; // aim a little above the ground ahead so the horizon sits mid-screen
   const curve = K => new THREE.CatmullRomCurve3(K.map(([u, v, h]) => new THREE.Vector3(u, groundHeight(u, v) + h, -v)), false, 'centripetal');
   return { pos: curve(P), look: curve(L), dur: 42 }; })();
 const _hp0 = new THREE.Vector3(), _hl0 = new THREE.Vector3();
@@ -3788,7 +3852,7 @@ function holeCard(L) {
   const tee = L[0], fw = tee && !tee.putt ? (tee.lie === 'fairway' || tee.lie === 'green') : null;
   const girIdx = L.findIndex(s => s.lie === 'green' || s.holed), gir = girIdx >= 0 && girIdx + 1 <= 2;
   const d1 = L.find(s => !s.putt && s.n === 1), drive = d1 && d1.total, long = !!d1 && d1.total >= CLUBS[0].full * att('pow') - .5; // a bomb: went at least this golfer's full driver distance
-  const LIE = { fairway: 'Fairway', rough: 'Rough', deep: 'Deep rough', sand: 'Bunker', green: 'Green', fringe: 'Fringe', water: 'Water', trees: 'Trees', tee: 'Tee' };
+  const LIE = { fairway: 'Fairway', rough: 'Rough', deep: 'Deep rough', sand: 'Bunker', green: 'Green', fringe: 'Fringe', water: 'Water', trees: 'Trees', tee: 'Tee', ob: 'Out of bounds' };
   const rows = L.map(s => { const res = s.conceded ? 'Gimme' : s.holed ? 'In the hole!' : s.putt ? `${(s.pin * 3).toFixed(s.pin * 3 < 10 ? 1 : 0)} ft left` : `${LIE[s.lie] || s.lie}${s.lie === 'green' || s.pin < 60 ? ` · ${s.lie === 'green' ? Math.round(s.pin * 3) + ' ft' : Math.round(s.pin) + ' yds'}` : ''}`;
     const what = s.conceded ? 'Putter' : s.putt ? 'Putter' : `${s.club}${s.mode && s.mode !== 'full' ? ' ' + MODES[s.mode].name : ''}`, dist = s.putt || s.conceded ? '' : `${s.total} yds`;
     return `<li class="${s.holed ? 'in' : ''}${s.pen ? ' pen' : ''}"><i>${s.n}</i><span>${what}</span><em>${dist}</em><b>${res}${s.pen ? ' +1' : ''}</b></li>`; }).join('');
