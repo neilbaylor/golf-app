@@ -2687,14 +2687,15 @@ const DROP = (() => {
     if (dpinch && dp.size >= 2) { const [a, b] = [...dp.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
       panBy({ x: dpinch.mx, y: dpinch.my }, { x: mx, y: my }); zoomAim(dpinch.d / d, mx, my); dpinch = { d, mx, my }; return; }
     if (!drag || drag.id !== e.pointerId) return;
-    if (drag.mode === 'ball') { const g = groundAt(e.clientX, e.clientY); if (g) place(snap(g.u, g.v)); return; }
+    if (drag.mode === 'ball') { EDGE.kind = 'drop'; EDGE.x = e.clientX; EDGE.y = e.clientY; const g = groundAt(e.clientX, e.clientY); if (g) place(snap(g.u, g.v)); return; }
     if (drag.mode === 'tap' && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 8) drag.mode = 'pan';
     if (drag.mode === 'pan') { panBy(drag.last, { x: e.clientX, y: e.clientY }); drag.last = { x: e.clientX, y: e.clientY }; } });
-  const up = e => { if (!dp.has(e.pointerId)) return; dp.delete(e.pointerId); if (dp.size < 2) dpinch = null;
+  const up = e => { if (!dp.has(e.pointerId)) return; dp.delete(e.pointerId); if (dp.size < 2) dpinch = null; if (EDGE.kind === 'drop') EDGE.kind = null;
     if (drag && drag.id === e.pointerId) { if (drag.mode === 'tap' && G.drop) { const g = groundAt(e.clientX, e.clientY); if (g) place(snap(g.u, g.v)); } drag = null; } };
   window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   $('#dropUI').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !G.drop) return; sfx('pop'); finish(b.dataset.a); });
-  return { open, frame, update, finish, crossing, get st() { return st; } };
+  const dragTo = (x, y) => { const g = st && groundAt(x, y); if (g) place(snap(g.u, g.v)); };
+  return { open, frame, update, finish, crossing, dragTo, get st() { return st; } };
 })();
 
 /* ================= CAMERA ================= */
@@ -3076,6 +3077,17 @@ const raycaster = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE
 function groundAt(cx, cy) { const r = RECT.canvas; raycaster.setFromCamera({ x: (cx - r.left) / r.width * 2 - 1, y: -((cy - r.top) / r.height) * 2 + 1 }, camera);
   let h = TERRAIN_BASE; for (let i = 0; i < 3; i++) { groundPlane.constant = -h; if (!raycaster.ray.intersectPlane(groundPlane, _hit)) return null; h = groundHW(_hit.x, _hit.z); } return { u: _hit.x, v: -_hit.z }; }
 let aimDrag = null, tap = null;
+// drag the target (or a penalty drop) toward a screen edge and the view slides along with you
+const EDGE = { kind: null, x: 0, y: 0 };
+function edgePanStep(dt) {
+  if (!EDGE.kind) return; if (G.view !== 'aim' || G.aimT < .9 || (EDGE.kind === 'target' && aimDrag !== 'target') || (EDGE.kind === 'drop' && !G.drop)) { EDGE.kind = null; return; }
+  const r = RECT.canvas, m = 64, top = (RECT.hudB || r.top + 140) + 6, bot = EDGE.kind === 'drop' ? $('#dropUI').getBoundingClientRect().top - 6 : (RECT.ctrlT || r.bottom) - 6, x = EDGE.x, y = EDGE.y;
+  const vx = x < r.left + m ? -(r.left + m - x) / m : x > r.right - m ? (x - (r.right - m)) / m : 0, vy = y < top + m ? -(top + m - y) / m : y > bot - m ? (y - (bot - m)) / m : 0;
+  if (!vx && !vy) return;
+  const sp = 140 * Math.min(dt, 1 / 30), g0 = groundAt(x, y), g1 = groundAt(x + clamp(vx, -1, 1) * sp, y + clamp(vy, -1, 1) * sp); /* scaled to the ground under the finger, so it slides at a steady on-screen speed */ if (!g0 || !g1) return;
+  const A = aimPose(); A.pan.x += g1.u - g0.u; A.pan.z -= g1.v - g0.v; clampPan(A);
+  if (EDGE.kind === 'target') dragTarget({ clientX: x, clientY: y }); else DROP.dragTo(x, y); // keep it under the finger as the ground slides
+}
 function dragTarget(e) {
   if (!G.aimUsed) { G.aimUsed = true; store.set('aimUsed', true); }
   const g = groundAt(e.clientX, e.clientY); if (!g) return;
@@ -3154,6 +3166,7 @@ $('#mid').addEventListener('pointerdown', e => { if (G.view !== 'aim') return; e
   aimDrag = 'mid'; midStart = { t: performance.now(), curve: G.curve }; midStart.id = e.pointerId; $('#mid').classList.add('grab'); buzz(6); });
 window.addEventListener('pointermove', e => { pinchMove(e);
   if (aimDrag === 'pending' && pend) { pend.last = { clientX: e.clientX, clientY: e.clientY }; if (Math.hypot(e.clientX - pend.x, e.clientY - pend.y) > 8 && performance.now() - pend.t > 40) { clearTimeout(pend.to); aimDrag = 'target'; } }
+  if (aimDrag === 'target') { EDGE.kind = 'target'; EDGE.x = e.clientX; EDGE.y = e.clientY; } else if (EDGE.kind === 'target') EDGE.kind = null;
   if (aimDrag === 'target') dragTarget(e); else if (aimDrag === 'mid' && (!midStart || midStart.id === e.pointerId)) dragMid(e); });
 window.addEventListener('pointerup', e => {
   G.ff = false;
@@ -3679,7 +3692,7 @@ function frame(now) {
   { const ch = Math.max(0, camera.position.y - TERRAIN_BASE); scene.fog.near = 240 + ch * 2.4; scene.fog.far = 1050 + ch * 3.2; } // the higher the camera, the thinner the haze
   const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null; /* sky fully hidden by the ground: skip its pass */
   try { if (POST.mode) POST.render(t); else if (REAL.on) { renderer.clear(); renderer.render(scene, camera); } else { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } } finally { scene.background = _bg; }
-  updateOverlays(); drawTrTop(); if (G.drop) DROP.update();
+  edgePanStep(dt); updateOverlays(); drawTrTop(); if (G.drop) DROP.update();
   fpsAcc += Math.min(rawDt, 1); fpsN++; perfT += Math.min(rawDt, 1); // real frame times, not the capped game step
   scaler(now);
   if (perfT > .5) { const i = renderer.info.render; $('#perf').textContent = `${Math.round(fpsN / fpsAcc)}/${Math.round(1000 / SC.budget)} fps`; fpsAcc = fpsN = perfT = 0; }
