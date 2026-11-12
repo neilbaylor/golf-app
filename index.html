@@ -2939,7 +2939,9 @@ const READ = (() => {
   mesh.visible = false; mesh.frustumCulled = false; mesh.renderOrder = 3; scene.add(mesh);
   mesh.instanceMatrix.setUsage(THREE.StreamDrawUsage); mesh.setColorAt(0, RC0); mesh.instanceColor.setUsage(THREE.StreamDrawUsage); /* rewritten every frame */
   const P = Array.from({ length: N }, () => ({ u: 0, v: 0, life: 0, max: 1 }));
-  const spawn = q => { for (let k = 0; k < 20; k++) { const u = U0 + Math.random() * (U1 - U0), v = V0 + Math.random() * (V1 - V0); if (look(u, v).inside) { q.u = u; q.v = v; break; } } q.life = 0; q.max = 1.2 + Math.random() * 1.4; };
+  const F = { on: false, u: 0, v: 0, r: 0 }; // zoomed in on a short putt: most new arrows appear in the patch you're looking at, so it never reads blank
+  const NF = 34; /* arrows kept for the close-up */
+  const spawn = (q, i = N) => { const near = F.on && i < NF; for (let k = 0; k < 20; k++) { const u = near ? F.u + (Math.random() * 2 - 1) * F.r : U0 + Math.random() * (U1 - U0), v = near ? F.v + (Math.random() * 2 - 1) * F.r : V0 + Math.random() * (V1 - V0); if (look(u, v).inside) { q.u = u; q.v = v; break; } } q.life = 0; q.max = 1.2 + Math.random() * 1.4; };
   P.forEach(q => { spawn(q); q.life = Math.random() * q.max; });
   const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), qn = new THREE.Quaternion(), nrm = new THREE.Vector3(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   let on = false;
@@ -2947,14 +2949,15 @@ const READ = (() => {
     if (show !== on) { on = show; grid.visible = mesh.visible = show; }
     if (!on) return;
     READ_ZS = Math.min(5, Math.max(1, camera.position.distanceTo(_gc.set(GREEN.c[0], groundHeight(GREEN.c[0], GREEN.c[1]), -GREEN.c[1])) / 26));
+    { const hgt = camera.position.y - groundHeight(camLook.x, -camLook.z); F.on = G.mode === 'putt' && hgt < 22; if (F.on) { F.u = camLook.x; F.v = -camLook.z; F.r = Math.max(2.5, hgt * Math.tan(camera.fov * Math.PI / 360) * 1.15); } }
     for (let i = 0; i < N; i++) {
       const q = P[i], gd = look(q.u, q.v), sl = Math.hypot(gd.u, gd.v); q.life += dt;
       if (sl > 1e-4) { const sp = (.45 + sl * 24) * READ_ZS; /* a slow drift downhill */ q.u -= gd.u / sl * sp * dt; q.v -= gd.v / sl * sp * dt; }
-      if (q.life > q.max || !gd.inside) spawn(q);
+      if (q.life > q.max || !gd.inside || (F.on && i < NF && Math.hypot(q.u - F.u, q.v - F.v) > F.r * 1.6)) spawn(q, i);
       const k = q.life / q.max, len = .9 + Math.min(1.4, sl * 36), cd = Math.hypot(camera.position.x - q.u, camera.position.y - gd.h, camera.position.z + q.v), fade = Math.min(1, Math.sin(Math.PI * Math.min(1, k)) * 1.6) * smooth(2.2, 5.5, cd);
       qt.setFromAxisAngle(up, Math.atan2(gd.u, -gd.v) + Math.PI / 2); // points downhill…
       qn.setFromUnitVectors(up, nrm.set(-gd.u, 1, gd.v).normalize()); qt.premultiply(qn); // …and lies flat on the slope it's describing
-      const zs = Math.min(5, Math.max(1, cd / 26)), shown = i < N / Math.max(1, zs * .8); const st = clamp(sl / .04, 0, 1); sc.set(shown ? len * (.6 + .4 * fade) * zs : 0, 1, shown ? (.22 + .26 * st) * fade * zs : 0); // steeper = longer, fatter, warmer
+      const zs = F.on ? clamp(F.r / 6.5, .42, 1) : Math.min(5, Math.max(1, cd / 26)), shown = F.on ? i < NF : i < N / Math.max(1, zs * .8); /* close-up: fewer, smaller arrows scaled to the view */ const st = clamp(sl / .04, 0, 1); sc.set(shown ? len * (.6 + .4 * fade) * zs : 0, 1, shown ? (.22 + .26 * st) * fade * zs : 0); // steeper = longer, fatter, warmer
       mesh.setColorAt(i, st < .5 ? _rc.copy(RC0).lerp(RC1, st * 2) : _rc.copy(RC1).lerp(RC2, st * 2 - 1)); ps.set(q.u, gd.h + .02, -q.v);
       mesh.setMatrixAt(i, m4.compose(ps, qt, sc));
     }
