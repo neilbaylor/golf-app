@@ -239,15 +239,16 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #boot .homeFade.on{opacity:1}
 #boot::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 30%,rgba(255,255,255,0) 70%,rgba(20,40,20,.18));opacity:0;transition:opacity .9s}
 #boot.home::after{opacity:1}
-#boot .stats{position:relative;z-index:1;display:grid;grid-template-columns:auto auto;width:var(--boardW);box-sizing:border-box;gap:1px 14px;align-items:center;background:var(--paper);border:4px solid var(--ink);border-top:0;border-radius:0 0 16px 16px;box-shadow:4px 6px 0 var(--ink);padding:11px 18px 7px;justify-content:center;margin-top:calc(-1 * clamp(10px,2.2vh,26px));opacity:0;transition:opacity .35s .05s} /* hangs from the bottom of the golfer board, tucked under its edge */
+#boot .stats{position:relative;z-index:1;display:grid;grid-template-columns:1fr auto;width:var(--boardW);box-sizing:border-box;gap:1px 14px;align-items:center;background:var(--paper);border:4px solid var(--ink);border-top:0;border-radius:0 0 16px 16px;box-shadow:4px 6px 0 var(--ink);padding:11px 22px 7px;margin-top:calc(-1 * clamp(10px,2.2vh,26px));opacity:0;transition:opacity .35s .05s} /* hangs from the bottom of the golfer board, tucked under its edge */
 #boot.home .stats{opacity:1}
 #boot .stats .k{font:14px/1.05 var(--font-hand)}
-#boot .stats .v{display:flex;align-items:center;gap:6px;font:12px/1 var(--font-hand);opacity:.85}
+#boot .stats .v{display:flex;align-items:center;gap:10px;font:13px/1 var(--font-hand)}
+#boot .stats .v b{font-weight:400;min-width:50px;opacity:.85} /* fixed so the pips line up */
 #boot .stats .pips{display:flex;gap:3px}
-#boot .stats .pips i{width:13px;height:9px;border-radius:3px;border:2px solid var(--ink);background:transparent}
+#boot .stats .pips i{width:17px;height:10px;border-radius:3px;border:2px solid var(--ink);background:transparent}
 #boot .stats .pips i.on{background:var(--sun)}
 #boot .stats .pips.l2 i.on{background:var(--pink)}
-#boot .stats .shape{grid-column:1/-1;text-align:center;font:14px/1 var(--font-display);letter-spacing:.03em;margin-top:2px}
+#boot .stats .shape{grid-column:1/-1;text-align:center;font:14px/1 var(--font-display);letter-spacing:.03em;margin-top:7px}
 #boot .courses{margin-top:auto;margin-bottom:calc(clamp(8px,2.4vh,22px) + 1.2vh);display:flex;gap:10px;justify-content:center;opacity:0;transform:translateY(8px);transition:opacity .35s .1s,transform .35s .1s}
 #boot.home .courses{opacity:1;transform:none}
 #boot .course{appearance:none;position:relative;display:flex;align-items:center;gap:12px;padding:13px 22px 13px 12px;font:inherit;color:var(--ink);background:var(--paper);border:3px solid var(--ink);border-radius:16px 13px 17px 12px;box-shadow:3px 4px 0 var(--ink);transform:rotate(.4deg);cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:left}
@@ -3720,7 +3721,7 @@ const HOMEAV = (() => {
     b.querySelectorAll('.face').forEach(t => { const i = t.dataset.i, eL = t.querySelector('#b' + i + 'avEyeL'), eR = t.querySelector('#b' + i + 'avEyeR'); if (!eL || !eR) return; let ex = 0, ey = 0;
       if (t !== tile) { const r = t.getBoundingClientRect(), dx = cx - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2), L = Math.hypot(dx, dy) || 1; ex = dx / L * 2.2; ey = dy / L * 1.6; }
       eL.setAttribute('cx', (42 + ex).toFixed(1)); eL.setAttribute('cy', (54 + ey).toFixed(1)); eR.setAttribute('cx', (58 + ex).toFixed(1)); eR.setAttribute('cy', (54 + ey).toFixed(1)); }); }
-  function bind(tile, w) { lookAtPick(tile); const i = tile.dataset.i, q = id => tile.querySelector('#b' + i + id); f = { tile, eL: q('avEyeL'), eR: q('avEyeR'), mo: q('avMouth'), br: q('avBrows') }; who = w; T = AV.tables(w); lastM = ''; talk = null; hideBub(true); }
+  function bind(tile, w, picked) { lookAtPick(tile); const i = tile.dataset.i, q = id => tile.querySelector('#b' + i + id); f = { tile, eL: q('avEyeL'), eR: q('avEyeR'), mo: q('avMouth'), br: q('avBrows') }; who = w; T = AV.tables(w); lastM = ''; talk = null; if (picked) nextTalk = 6 + Math.random() * 4; hideBub(true); } /* just picked: their pick line comes next, no random line sneaks in first */
   function say(text) { const b = $('#hbub'), bw = $('#bunch'); if (!f) return; b.innerHTML = '<span></span><span style="opacity:0"></span>'; b.lastChild.textContent = text; /* sized to the whole line from the start; the words type into it */ b.classList.remove('out'); b.hidden = false; b.style.left = (f.tile.offsetLeft + f.tile.offsetWidth / 2) + 'px'; b.style.bottom = (b.offsetParent ? b.offsetParent.offsetHeight - f.tile.offsetTop + 6 : 0) + 'px'; /* above the speaker's own tile, whichever row */ b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';  talk = { text, n: 0, acc: 0, hold: 0, vis: 'closed', vt: 0 }; }
   function place(b) { // keep the bubble on screen; the tail still points at the face
     const bw = $('#bunch').getBoundingClientRect(), W = $('#boot').getBoundingClientRect(), cx = f.tile.offsetLeft + f.tile.offsetWidth / 2, w = b.offsetWidth;
@@ -3850,11 +3851,11 @@ const ROSTER = () => Object.keys(CHARS).filter(w => AV.has(w)); // golfers whose
     board.innerHTML = ids.map((who, i) => { const svg = AV.homeArt(who).replace(/\bid="av/g, `id="b${i}av`).replace(/url\(#av/g, `url(#b${i}av`).replace(/ style="[^"]*"/g, '');
       return `<button type="button" class="face${who === G.who ? ' sel' : ''}" data-i="${i}" data-who="${who}" role="radio" aria-checked="${who === G.who}" aria-label="${CHARS[who].name}"><div class="pic">${svg}</div><span class="nametag">${CHARS[who].name}</span></button>`; }).join('');
     const LV = ['Average', 'Good', 'Great'], stats = () => { const c = ME(); $('#stats').innerHTML = [['Power', c.pow], ['Accuracy', c.acc], ['Short game', c.sg], ['Putting', c.putt]].map(([k, l]) =>
-        `<span class="k">${k}</span><span class="v"><span class="pips l${l}">${[0, 1, 2].map(i => `<i class="${i <= l ? 'on' : ''}"></i>`).join('')}</span>${LV[l]}</span>`).join('') +
+        `<span class="k">${k}</span><span class="v"><span class="pips l${l}">${[0, 1, 2].map(i => `<i class="${i <= l ? 'on' : ''}"></i>`).join('')}</span><b>${LV[l]}</b></span>`).join('') +
         `<span class="shape">${{ draw: 'Draws it', fade: 'Fades it', straight: 'Hits it straight' }[c.shape]} · ${G.lefty ? 'Lefty' : 'Righty'}</span>`; };
     stats(); board.addEventListener('click', () => requestAnimationFrame(stats));
     HOMEAV.bind(board.querySelector('.face.sel') || board.querySelector('.face'), G.who);
-    board.addEventListener('click', e => { const b = e.target.closest('.face'); if (!b || b.dataset.who === G.who) return; pickGolfer(b.dataset.who); HOMEAV.bind(b, b.dataset.who); setTimeout(() => HOMEAV.say(HOMEAV.line(b.dataset.who, 'picked')), 250);
+    board.addEventListener('click', e => { const b = e.target.closest('.face'); if (!b || b.dataset.who === G.who) return; pickGolfer(b.dataset.who); HOMEAV.bind(b, b.dataset.who, true); setTimeout(() => HOMEAV.say(HOMEAV.line(b.dataset.who, 'picked')), 250);
       board.querySelectorAll('.face').forEach(f => { const on = f === b; f.classList.toggle('sel', on); f.setAttribute('aria-checked', on); }); });
   } catch (e) {}
   { const crs = $('#courses'); crs.innerHTML = COURSES.map(c => `<button type="button" class="course${c.id === MENU.course ? ' sel' : ''}" role="radio" aria-checked="${c.id === MENU.course}" data-id="${c.id}"><span class="cl clw"><img class="clogo" src="${c.logo}" alt=""><span class="glint"></span></span><span><b>${c.name}</b><small>${c.sub}</small></span></button>`).join('');
