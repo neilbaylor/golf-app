@@ -1323,11 +1323,11 @@ const flag = (() => {
     x.setLineDash([9, 9]); x.lineWidth = 3; x.strokeStyle = 'rgba(29,42,26,.55)'; x.beginPath(); x.moveTo(34, 14); x.lineTo(34, H - 14); x.stroke(); x.setLineDash([]);
     x.restore(); body(); x.lineWidth = 14; x.strokeStyle = I; x.stroke(); x.restore();
     // the club crest on a white sticker oval (drawn once the image has loaded)
-    if (HUNT_IMG.complete && HUNT_IMG.naturalWidth) { const lw = 296, lh = lw * HUNT_IMG.naturalHeight / HUNT_IMG.naturalWidth, cx = X(214), cy = H * .5 + 2;
+    if (HUNT_IMG.complete && HUNT_IMG.naturalWidth) { const lw = 296, lh = lw * HUNT_IMG.naturalHeight / HUNT_IMG.naturalWidth, cx = X(232), cy = H * .5 + 2;
       x.beginPath(); x.ellipse(cx, cy, lw / 2 + 9, lh / 2 + 9, 0, 0, 7); x.fillStyle = '#fffaf0'; x.fill(); x.lineWidth = 7; x.strokeStyle = I; x.stroke();
       x.drawImage(HUNT_IMG, cx - lw / 2, cy - lh / 2, lw, lh); }
     // hole number
-    x.font = `${Math.round(H * .26)}px "Luckiest Guy", Impact, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; const nx = X(W * .905), ny = H * .76; /* small, tucked into the bottom corner */
+    x.font = `${Math.round(H * .3)}px "Luckiest Guy", Impact, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; const nx = X(W * .905), ny = H * .27; /* small, tucked into the top corner */
     x.lineWidth = 10; x.strokeStyle = I; x.strokeText('1', nx, ny); x.lineWidth = 5; x.strokeStyle = '#fffaf0'; x.strokeText('1', nx, ny); x.fillStyle = '#0a3255'; x.fillText('1', nx, ny); }; // the club's navy
   const fc = document.createElement('canvas'), fcB = document.createElement('canvas'); fc.width = fcB.width = 512; fc.height = fcB.height = 320; paintFlag(fc); paintFlag(fcB, true);
   const ft = new THREE.CanvasTexture(fc); ft.anisotropy = 4; const ftB = new THREE.CanvasTexture(fcB); ftB.anisotropy = 4; ftB.wrapS = THREE.RepeatWrapping; ftB.repeat.x = -1; ftB.offset.x = 1; // back face: flipped so the number reads the right way from behind
