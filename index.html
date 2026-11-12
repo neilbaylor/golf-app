@@ -410,7 +410,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #result.final #resWord{font-size:44px;margin-top:2px}
 #result.final #resSub{font-size:17px;margin:-5px 0 7px}
 #result.final #resBody{display:none}
-#result.final .sc{list-style:none;margin:0 0 10px;padding:6px 8px;border:2px dashed rgba(29,42,26,.3);border-radius:12px;display:flex;flex-direction:column;gap:5px;max-height:34vh;overflow:auto}
+#result.final .sc{list-style:none;margin:0 0 10px;padding:6px 8px;border:2px solid rgba(29,42,26,.13);background:rgba(29,42,26,.03);border-radius:14px;display:flex;flex-direction:column;gap:5px;max-height:34vh;overflow:auto}
 #result.final .sc li{display:grid;grid-template-columns:20px minmax(0,1fr) auto auto;align-items:center;gap:7px;font-size:14px;line-height:1.1}
 #result.final .sc li i{font:13px/23px var(--font-display);font-style:normal;text-align:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--paper)}
 #result.final .sc li span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -420,6 +420,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #result.final .sc li.pen b{color:#c0392b}
 #result.final .scs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:28px}
 #result.final .scs .st{grid-column:span 2}
+#result.final .st:not(.good):not(.bad){border-style:solid;border-color:rgba(29,42,26,.13)} /* neutral boxes: a soft solid edge, no dashes */
 #result.final .scs.five .st:nth-child(n+4){grid-column:span 3} /* no penalties: the bottom row's two stats share the width */
 #result.final .scs .st b{font-size:17px}
 #result.final .scs .st b small{font:12px var(--font-hand);opacity:.7}
@@ -2273,7 +2274,7 @@ function buzz(ms) { if (BOOT.on) return; try { navigator.vibrate && navigator.vi
 
 /* ---- finger trail ---- */
 const trail = $('#trail'), tctx = trail.getContext('2d'); let trailPts = [], trailAlpha = 0, trailFading = false, trailHold = 0, trailLabel = '', trailSub = '';
-function sizeTrail() { const r = RECT.app; trail.width = r.width * PR; trail.height = r.height * PR; }
+function sizeTrail() { const r = RECT.app; trail.width = r.width * PR; trail.height = r.height * PR; trail._k = null; /* resizing wipes the canvas: draw it again */ }
 function trailReset() { trailPts = []; trailAlpha = 1; trailFading = false; trailHold = 0; trailLabel = ''; trailSub = ''; }
 function trailPush(x, y, ph) { const r = RECT.app; trailPts.push({ x: (x - r.left) * PR, y: (y - r.top) * PR, ph }); }
 function trailFade() { trailFading = true; }
@@ -2281,8 +2282,12 @@ let trailDirty = false;
 function drawTrail(dt) {
   const live = trailAlpha > 0 && trailPts.length > 1; if (live !== trail._live) { trail.style.visibility = live ? 'visible' : 'hidden'; trail._live = live; }
   if (!trailDirty && !live) return;
-  tctx.clearRect(0, 0, trail.width, trail.height); trailDirty = trailAlpha > 0 && trailPts.length > 1;
+  const was = trailAlpha > 0 && trailPts.length > 1;
   if (trailFading) { if (trailHold > 0) trailHold -= dt; else trailAlpha = Math.max(0, trailAlpha - dt * (trailLabel ? 1.4 : 2.2)); }
+  trailDirty = was;
+  const K = trail._k; if (K && K[0] === trailPts && K[1] === trailPts.length && K[2] === trailAlpha && K[3] === trailLabel && K[4] === trailSub) return; /* the canvas already shows exactly this (e.g. the 2.8 s label hold): no redraw */
+  trail._k = [trailPts, trailPts.length, trailAlpha, trailLabel, trailSub];
+  tctx.clearRect(0, 0, trail.width, trail.height);
   if (trailAlpha <= 0 || trailPts.length < 2) return;
   tctx.globalAlpha = trailAlpha; tctx.lineCap = tctx.lineJoin = 'round';
   const seg = ph => { tctx.beginPath(); let started = false; trailPts.forEach(p => { if (p.ph !== ph) return; started ? tctx.lineTo(p.x, p.y) : tctx.moveTo(p.x, p.y); started = true; }); };
@@ -2348,14 +2353,15 @@ function renderDial(dt, t) {
 
 /* ================= PUTTING ================= */
 // rolling ball on the green: friction (stimp ~10) + gravity along the slope (5/7 g for a rolling sphere) + the cup
-const PUTT = { decel: { green: .5, fringe: .5 / .9, fairway: .5 / .7, tee: .5 / .7, rough: .5 / .1, deep: .5 / .05, sand: 30 }, g: 10.73, cupR: .059, capture: 1.65 };
+const PUTT = { decel: { green: .5, fringe: .5 / .9, fairway: .5 / .7, tee: .5 / .7, rough: .5 / .1, deep: .5 / .05, sand: 30 }, g: 10.73, cupR: .059, capture: 1.65, updown: .75 };
 function rollPutt(u0, v0, vu, vv) {
   const out = [{ t: 0, x: u0, y: groundHeight(u0, v0), z: -v0 }], ev = []; let u = u0, v = v0, t = 0, holed = false; const dt = 1 / 120, cst = { inCup: false, kind: 'putt' };
   for (let i = 0; i < 120 * 14; i++) {
     const lie = lieAt(u, v); if (lie === 'water') { ev.push({ t, type: 'water' }); break; }
     const a = PUTT.decel[lie] || 2.8, g = gradUV(u, v), su = -PUTT.g * (5 / 7) * g.u, sv = -PUTT.g * (5 / 7) * g.v, sp = Math.hypot(vu, vv);
     if (sp < .02 && Math.hypot(su, sv) < a * 1.1) break; // static friction holds it
-    let au = su, av = sv; if (sp > 1e-4) { au -= a * vu / sp; av -= a * vv / sp; }
+    let au = su, av = sv; if (sp > 1e-4) { const k = (1 - PUTT.updown) * (su * vu + sv * vv) / (sp * sp); au -= k * vu; av -= k * vv; } /* softer uphill / downhill pull along the line; the sideways break stays full */
+    if (sp > 1e-4) { au -= a * vu / sp; av -= a * vv / sp; }
     const nu = vu + au * dt, nv = vv + av * dt; if (sp > 1e-4 && nu * vu + nv * vv < 0 && Math.hypot(su, sv) < a) { vu = 0; vv = 0; } else { vu = nu; vv = nv; }
     u += vu * dt; v += vv * dt; t += dt;
     { const r = cupStep(u, v, vu, vv, cst);
@@ -3327,7 +3333,7 @@ const AV = (() => {
   function setTalking(on) { if (on !== app.classList.contains('talking')) app.classList.toggle('talking', on); }
   function say(text, opts = {}) {
     if (st.text && st.shown < st.text.length && !opts.force) { if (st.queue.length < 1) st.queue.push([text, opts]); return; }
-    st.text = text; st.shown = 0; st.typeAcc = 0; st.hideT = 0; bubble.hidden = false; sayA.textContent = ''; sayB.textContent = text; app.style.setProperty('--sayH', (bubble.offsetHeight + 12) + 'px'); setTalking(true);
+    st.text = text; st.shown = 0; st.typeAcc = 0; st.hideT = 0; bubble.hidden = false; sayA.textContent = ''; sayB.textContent = text; st.drawn = 0; app.style.setProperty('--sayH', (bubble.offsetHeight + 12) + 'px'); setTalking(true);
     bubble.style.animation = 'none'; void bubble.offsetWidth; bubble.style.animation = '';
     if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5);
   }
@@ -3341,7 +3347,7 @@ const AV = (() => {
       if (st.shown < st.text.length) {
         talking = true; st.typeAcc += dt * 30;
         while (st.typeAcc >= 1 && st.shown < st.text.length) { st.typeAcc -= 1; st.shown++; }
-        sayA.textContent = st.text.slice(0, st.shown); sayB.textContent = st.text.slice(st.shown);
+        if (st.shown !== st.drawn) { st.drawn = st.shown; sayA.textContent = st.text.slice(0, st.shown); sayB.textContent = st.text.slice(st.shown); } /* rewrite (and re-lay-out) the bubble only when a letter appears */
         st.visT -= dt; if (st.visT <= 0) { st.viseme = vowelMap(st.text[Math.max(0, st.shown - 1)] || ' '); st.visT = .06 + Math.random() * .05; }
       } else {
         st.hideT += dt;
@@ -3826,7 +3832,7 @@ const HOMEAV = (() => {
       if (t !== tile) { const r = t.getBoundingClientRect(), dx = cx - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2), L = Math.hypot(dx, dy) || 1; ex = dx / L * 2.2; ey = dy / L * 1.6; }
       eL.setAttribute('cx', (42 + ex).toFixed(1)); eL.setAttribute('cy', (54 + ey).toFixed(1)); eR.setAttribute('cx', (58 + ex).toFixed(1)); eR.setAttribute('cy', (54 + ey).toFixed(1)); }); }
   function bind(tile, w, picked) { lookAtPick(tile); const i = tile.dataset.i, q = id => tile.querySelector('#b' + i + id); f = { tile, eL: q('avEyeL'), eR: q('avEyeR'), mo: q('avMouth'), br: q('avBrows') }; who = w; T = AV.tables(w); lastM = ''; talk = null; if (picked) nextTalk = 6 + Math.random() * 4; hideBub(true); } /* just picked: their pick line comes next, no random line sneaks in first */
-  function say(text) { const b = $('#hbub'), bw = $('#bunch'); if (!f) return; b.innerHTML = '<span></span><span style="opacity:0"></span>'; b.lastChild.textContent = text; /* sized to the whole line from the start; the words type into it */ b.classList.remove('out'); b.hidden = false; b.style.left = (f.tile.offsetLeft + f.tile.offsetWidth / 2) + 'px'; b.style.bottom = (b.offsetParent ? b.offsetParent.offsetHeight - f.tile.offsetTop + 6 : 0) + 'px'; /* above the speaker's own tile, whichever row */ b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';  talk = { text, n: 0, acc: 0, hold: 0, vis: 'closed', vt: 0 }; }
+  function say(text) { const b = $('#hbub'), bw = $('#bunch'); if (!f) return; b.innerHTML = '<span></span><span style="opacity:0"></span>'; b.lastChild.textContent = text; /* sized to the whole line from the start; the words type into it */ b.classList.remove('out'); b.hidden = false; b.style.left = (f.tile.offsetLeft + f.tile.offsetWidth / 2) + 'px'; b.style.bottom = (b.offsetParent ? b.offsetParent.offsetHeight - f.tile.offsetTop + 6 : 0) + 'px'; /* above the speaker's own tile, whichever row */ b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';  talk = { text, n: 0, w: 0, acc: 0, hold: 0, vis: 'closed', vt: 0 }; }
   function place(b) { // keep the bubble on screen; the tail still points at the face
     const bw = $('#bunch').getBoundingClientRect(), W = $('#boot').getBoundingClientRect(), cx = f.tile.offsetLeft + f.tile.offsetWidth / 2, w = b.offsetWidth;
     const lo = W.left - bw.left + w / 2 + 8, hi = W.right - bw.left - w / 2 - 8, x = Math.min(hi, Math.max(lo, cx)); b.style.left = x + 'px'; b.style.setProperty('--tx', (cx - x) + 'px'); }
@@ -3834,7 +3840,7 @@ const HOMEAV = (() => {
   function update(dt) {
     if (!f || !T || INTRO.on || performance.now() < (INTRO.calm || 0)) return; // quiet until the intro's hand-off has settled
     let mKey = 'rest';
-    if (talk) { if (talk.n < talk.text.length) { talk.acc += dt * 28; while (talk.acc >= 1 && talk.n < talk.text.length) { talk.acc--; talk.n++; } const hb = $('#hbub'); if (hb.childNodes.length === 2) { hb.firstChild.textContent = talk.text.slice(0, talk.n); hb.lastChild.textContent = talk.text.slice(talk.n); } else hb.textContent = talk.text.slice(0, talk.n); place(hb); talk.vt -= dt; if (talk.vt <= 0) { talk.vis = vis(talk.text[talk.n - 1] || ' '); talk.vt = .06 + Math.random() * .05; } mKey = talk.vis; }
+    if (talk) { if (talk.n < talk.text.length) { talk.acc += dt * 28; while (talk.acc >= 1 && talk.n < talk.text.length) { talk.acc--; talk.n++; } const hb = $('#hbub'); if (talk.n !== talk.w) { talk.w = talk.n; if (hb.childNodes.length === 2) { hb.firstChild.textContent = talk.text.slice(0, talk.n); hb.lastChild.textContent = talk.text.slice(talk.n); } else hb.textContent = talk.text.slice(0, talk.n); } place(hb); /* text rewritten only when a letter appears, so place() reads a clean layout */ talk.vt -= dt; if (talk.vt <= 0) { talk.vis = vis(talk.text[talk.n - 1] || ' '); talk.vt = .06 + Math.random() * .05; } mKey = talk.vis; }
       else { talk.hold += dt; if (talk.hold > 2.8 + talk.text.length * .06) { talk = null; hideBub(); nextTalk = 5 + Math.random() * 5; } /* longer lines stay up longer; never under ~3 s */ } }
     else { nextTalk -= dt; if (nextTalk <= 0) say(homeLine(who, 'home'));
       idleT -= dt; if (idleT <= 0) { const P = ['rest', 'rest', 'closed', 'grin', 'small']; idleM = P[Math.floor(Math.random() * P.length)]; idleT = idleM === 'rest' ? 3 + Math.random() * 3 : 1.4 + Math.random() * 1.6; } mKey = idleM; } // between lines the face changes a little (never the oo/ee shapes)
