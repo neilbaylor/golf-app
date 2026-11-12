@@ -3207,7 +3207,7 @@ const AV = (() => {
   };
   const st = { mood: 'neutral', moodT: 0, look: { x: 0, y: 0 }, lookT: { x: 0, y: 0 }, glanceT: 0, nextSacc: 1.5, nextBlink: 2.5, blinkT: -1, dbl: false,
     text: '', shown: 0, typeAcc: 0, hideT: 0, viseme: 'rest', visT: 0, focus: false, nod: 0, shake: 0, hop: 0, queue: [] };
-  let lastM = '', lastB = '', lastH = '', headL = head.ownerSVGElement;
+  let lastM = '', lastB = '', lastH = '', headL = head.ownerSVGElement, idleM = 'rest', idleT = 3;
   // characters: each has its own art (two SVGs: background + head layer) and its own mouth/brow shapes; the animation code is shared
   const ART = { neil: { html: [...$('#player').querySelectorAll('svg')].map(v => v.outerHTML).join(''), MOUTH, BROWS } }; ART.neil.home = ART.neil.html;
   function setChar(who) {
@@ -3264,7 +3264,8 @@ const AV = (() => {
     // brows + mouth
     const bKey = { focus: 'focus', watch: 'up', oops: 'up', sad: 'sad', happy: 'happy', proud: 'happy', nervous: 'sad' }[mood] || 'neutral';
     if (bKey !== lastB) { setA(brows, 'd', BROWS[bKey]); lastB = bKey; }
-    let mKey = talking ? st.viseme : ({ focus: 'tight', watch: 'o', oops: 'shock', sad: 'frown', happy: 'grin', proud: 'grin', nervous: 'wobble' }[mood] || 'rest');
+    if (!talking && (!mood || mood === 'neutral')) { idleT -= dt; if (idleT <= 0) { const P = ['rest', 'rest', 'closed', 'closed', 'small', 'tight']; idleM = P[Math.floor(Math.random() * P.length)]; idleT = idleM === 'rest' ? 3 + Math.random() * 4 : 1.6 + Math.random() * 2.4; } } else { idleM = 'rest'; idleT = 2.5; } // idle: not frozen on one face
+    let mKey = talking ? st.viseme : ({ focus: 'tight', watch: 'o', oops: 'shock', sad: 'frown', happy: 'grin', proud: 'grin', nervous: 'wobble' }[mood] || idleM);
     if (talking && (mood === 'happy' || mood === 'proud') && st.viseme === 'closed') mKey = 'rest';
     if (mKey !== lastM) { const m = MOUTH[mKey]; setA(mouth, 'd', m[0]); setA(mouth, 'fill', m[1]); lastM = mKey; }
     setA(sweat, 'opacity', mood === 'nervous' || (st.focus && SW.vis > 1) ? 1 : 0);
@@ -3764,7 +3765,7 @@ async function runIntro() {
     if (hydrate()) { await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await wait(120); } // skipped early: give it a beat to paint
     await new Promise(r => requestAnimationFrame(r));
     const board = $('#bunch'), pairs = faces.map(f => [f, board && board.querySelector(`.face[data-who="${f.dataset.who}"]`)]).filter(p => p[1]);
-    el.classList.add('exit'); C.forEach(c => c.classList.remove('hl'));
+    el.classList.add('exit'); C.forEach(c => c.classList.remove('hl')); clearInterval(moodT); faces.forEach(f => face(f, 'rest'));
     pairs.forEach(([f, h]) => { // land exactly on the home tile's picture (inside its ink border), matching its name tag, gaze, pose and dimming
       h.style.transition = 'none'; h.style.opacity = '.01'; const pic = h.querySelector('.pic') || h, a = f.getBoundingClientRect(), b = pic.getBoundingClientRect(), sx = b.width / a.width, sy = b.height / a.height, sel = h.classList.contains('sel');
       const hi = h.dataset.i, fk = f.dataset.k; ['avEyeL', 'avEyeR'].forEach(id => { const he = h.querySelector('#b' + hi + id), fe = f.querySelector('#i' + fk + id); if (he && fe) ['cx', 'cy', 'ry'].forEach(at => fe.setAttribute(at, he.getAttribute(at))); });
@@ -3784,6 +3785,11 @@ async function runIntro() {
   const lookAt = (f, tk, stare = 1) => { const k = +f.dataset.k, dx = (tk % 3) - (k % 3), dy = Math.floor(tk / 3) - Math.floor(k / 3), L = Math.hypot(dx, dy) || 1, ex = tk === k ? 0 : dx / L * 3.3 * stare, ey = tk === k ? 0 : dy / L * 2.3 * stare;
     const hd = f.querySelector('svg.avHeadL'); if (hd) { hd.style.rotate = (ex * 2).toFixed(1) + 'deg'; hd.style.translate = (ex * .9).toFixed(1) + '% ' + (ey * .5).toFixed(1) + '%'; } // the head turns with the eyes
     const [l, r] = eyes(f); if (l) { l.setAttribute('cx', (42 + ex).toFixed(1)); l.setAttribute('cy', (54 + ey).toFixed(1)); } if (r) { r.setAttribute('cx', (58 + ex).toFixed(1)); r.setAttribute('cy', (54 + ey).toFixed(1)); } };
+  const MOODS = { rest: 'neutral', closed: 'neutral', small: 'neutral', tight: 'focus', o: 'up', grin: 'happy', ee: 'happy' };
+  const face = (f, key) => { const k = f.dataset.k, T = AV.tables(f.dataset.who), m = T.MOUTH && T.MOUTH[key]; if (!m) return; const mo = f.querySelector(`#i${k}avMouth`), br = f.querySelector(`#i${k}avBrows`);
+    if (mo) { mo.setAttribute('d', m[0]); mo.setAttribute('fill', m[1].replace(/url\(#av/g, `url(#i${k}av`)); } if (br && T.BROWS && T.BROWS[MOODS[key]]) br.setAttribute('d', T.BROWS[MOODS[key]]); };
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const moodT = setInterval(() => { if (stop || !faces.length) return; const f = pick(faces); if (f.classList.contains('hl')) return; face(f, pick(['rest', 'closed', 'closed', 'small', 'tight', 'o', 'grin', 'ee'])); }, 520); // the board's faces don't all just grin
   const blink = f => { const [l, r] = eyes(f); [l, r].forEach(e => { if (!e) return; const ry = e.getAttribute('ry'); e.setAttribute('ry', .3); setTimeout(() => e.setAttribute('ry', ry), 140); }); };
   const blinkT = setInterval(() => { if (faces.length) blink(faces[Math.floor(Math.random() * faces.length)]); }, 700);
   (async () => {
@@ -3800,14 +3806,14 @@ async function runIntro() {
     await wait(1800);
     // 4. credits: each golfer gets their moment, the rest of the board looks their way
     for (let n = 0; n < faces.length && !stop; n++) { const f = faces[n], name = f.querySelector('.nametag').textContent;
-      C.forEach(c => c.classList.toggle('hl', c === f)); faces.forEach(o => lookAt(o, +f.dataset.k, o === f ? 1 : 1.15)); // the star of the moment looks out at you; everyone else stares right at them
+      C.forEach(c => c.classList.toggle('hl', c === f)); faces.forEach(o => lookAt(o, +f.dataset.k, o === f ? 1 : 1.15)); face(f, pick(['grin', 'rest', 'ee'])); faces.forEach(o => { if (o !== f && Math.random() < .5) face(o, pick(['o', 'small', 'closed'])); }); // the star of the moment looks out at you; everyone else stares right at them
       mid.innerHTML = `<div class="cred"><small>${n === 0 ? 'starring' : n === faces.length - 1 && faces.length > 1 ? 'and' : 'with'}</small>${name}</div>`; await wait(1300); }
     if (stop) return; const crest = C.find(c => c.classList.contains('p-crest'));
     C.forEach(c => c.classList.toggle('hl', c === crest)); faces.forEach(o => crest && lookAt(o, +crest.dataset.k));
     mid.innerHTML = `<div class="cred"><small>live from</small>Toronto Hunt</div>`; await wait(1100);
     end();
   })();
-  await fin; clearInterval(blinkT);
+  await fin; clearInterval(blinkT); clearInterval(moodT);
 }
 function pickGolfer(who) {
   if (!CHARS[who]) return; G.who = who; store.set('who', who); G.lefty = handFor(who); AV.setChar(who); setHand(false); G.curve = curveDefault(); applyModeTempo(); setClub(G.club); tracerDirty = true;
