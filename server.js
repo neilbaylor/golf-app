@@ -8,7 +8,7 @@ const HEAD = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Tee Party">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=2">
 <style>html,body{margin:0;height:100%;background:#1d2a1a;overscroll-behavior:none}[hidden]{display:none!important}</style>
 </head><body>`;
 const page = Buffer.from(HEAD + fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8') + '</body></html>');
