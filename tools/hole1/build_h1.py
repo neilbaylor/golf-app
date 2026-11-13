@@ -180,7 +180,7 @@ R("const outer = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), groundMat(t
 # ---------------------------------------------------------------- 7. play: aiming down this hole, the deep bunker, out of bounds
 R("for (let v = Math.max(b.v, 0); v <= 430; v += .25) { const u = centerU(v);", "for (let v = Math.max(b.v, 0); v <= PIN.v + 10; v += .25) { const u = centerU(v);")
 R("  if (G.mode === 'sand' && G.lieRoll < 1) carry /= G.lieRoll; // explosion shot: the sand is already priced in",
-  "  if (G.mode === 'sand' && G.lieRoll < 1) carry /= G.lieRoll; // explosion shot: the sand is already priced in\n  if (G.lie === 'sand' && inDeepBunker(G.ball.u, G.ball.v)) carry *= .8; // the deep bunker left of the green: a tall face eats some of it")
+  "  if (G.mode === 'sand' && G.lieRoll < 1) carry /= G.lieRoll; // explosion shot: the sand is already priced in")
 R("  const S = G.shot; const water = S.endLie === 'water' || S.lieLand === 'water';",
   "  const S = G.shot; const ob = S.endLie === 'ob' && S.lieLand !== 'water', water = S.endLie === 'water' || S.lieLand === 'water' || ob; // out of bounds plays like water, but only stroke and distance")
 R("water ? 'SPLASH!' : S.putt ?", "water ? (ob ? 'OUT OF BOUNDS' : 'SPLASH!') : S.putt ?")
