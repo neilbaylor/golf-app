@@ -265,6 +265,23 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 @media (prefers-reduced-motion:reduce){.cl,.cl .glint{animation:none}}
 #boot .course b{display:block;font:24px/1 var(--font-display);letter-spacing:.02em}
 #boot .course small{display:block;font:15px/1.1 var(--font-hand);opacity:.75;margin-top:4px}
+#flyUI{position:absolute;inset:0;z-index:12}
+#flyUI .fbug{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(78px + env(safe-area-inset-bottom,0px));width:min(250px,calc(100% - 28px));transform:rotate(-1.5deg);animation:fbugIn .7s .6s both;filter:drop-shadow(3px 4px 0 rgba(29,42,26,.85))}
+#flyUI .fhead{display:flex;align-items:center;gap:10px;padding:8px 12px 7px 8px;background:var(--paper);border:3px solid var(--ink);border-bottom:0;border-radius:16px 16px 0 0}
+#flyUI .flogo{width:46px;height:46px;object-fit:contain;flex:none;filter:drop-shadow(1px 1.5px 0 rgba(29,42,26,.8))}
+#flyUI .fname{min-width:0;display:flex;flex-direction:column}
+#flyUI .fname .fc{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;white-space:nowrap}
+#flyUI .fname b{font:34px/1 var(--font-display);margin-top:1px}
+#flyUI .fstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--ink);color:var(--paper);border:3px solid var(--ink);border-radius:0 0 16px 16px;padding:5px 4px 4px}
+#flyUI .fstats span{display:flex;flex-direction:column;align-items:center;gap:1px}
+#flyUI .fstats span+span{border-left:1.5px solid rgba(255,250,240,.25)}
+#flyUI .fstats i{font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+#flyUI .fstats b{font:20px/1 var(--font-display);color:var(--sun)}
+#flyUI .fskip{position:absolute;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));font-size:16px;padding:10px 18px 8px;animation:ftagIn .5s 1s both}
+@keyframes fbugIn{from{opacity:0;translate:-30px 0}to{opacity:1;translate:0 0}}
+@keyframes ftagIn{from{opacity:0;translate:0 -8px}to{opacity:1;translate:0 0}}
+#app.droning #top,#app.droning #say,#app.droning #pinMk,#app.droning #aimLbl,#app.droning #mid,#app.droning #aimTip,#app.droning #ballView,#app.droning #coach,#app.droning #slopeKey,#app.droning #trail,#app.droning #trTop{opacity:0!important;pointer-events:none}
+#app.droning #bottom{transform:translateY(135%)}
 #dropUI{position:absolute;z-index:9;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(370px,calc(100% - 20px));box-sizing:border-box;transform:translateX(-50%) rotate(-1deg);padding:9px 10px 10px;display:flex;gap:10px;align-items:center;animation:drop .5s cubic-bezier(.3,1.6,.5,1)}
 #dropUI .dmini{flex:none;display:flex} #dropUI .dmini #mini{margin:0;visibility:visible!important}
 #dropUI .dmain{flex:1;min-width:0;text-align:center}
@@ -590,6 +607,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
     <div id="strikeTotal"></div>
     <div id="presets"></div>
   </div>
+  <div id="flyUI" hidden><div class="fbug"><div class="fhead"><img class="flogo" alt=""><div class="fname"><span class="fc">Toronto Hunt</span><b>Hole 1</b></div></div><div class="fstats"><span><i>Par</i><b>4</b></span><span><i>Yards</i><b>300</b></span><span><i>Handicap</i><b>7</b></span></div></div><button type="button" class="btn fskip">Skip ›</button></div>
   <div id="dropUI" class="card" hidden><div class="dmini"></div><div class="dmain"><b class="dt">Take a drop<span>+1 stroke</span></b><p class="dg">Drag the ball into the <em class="z">pink patch</em> or <em class="l">back on the line</em>.</p><div class="db"><button type="button" class="btn" data-a="replay">Replay shot</button><button type="button" class="btn go" data-a="drop">Drop here</button></div></div></div>
   <div class="dlbl" id="dLblZ" hidden>2 club lengths</div><div class="dlbl" id="dLblL" hidden>Back on the line</div><div class="dlbl x" id="dLblX" hidden>Went in here</div>
   <div id="result" class="card" hidden>
@@ -694,7 +712,7 @@ const TUFTED = [[-46.0, 198.5], [-48.2, 210.0]]; // on the left edge of the fair
 const TREES = (() => {
   const R = rng(42), out = [], TK = 87 / 73, add = (u, v, r, h, o = {}) => out.push(Object.assign({ u, v, h: h * 1.15 * TK + (TK - 1) * r * .9 / .74, r, pine: false, k: R() }, o)); /* TK: canopy tops scaled so the tallest (the big one down the right) stands 87 ft */
   // by hand, from the aerial
-  add(-11.5, 147.5, 7.2, 21);                                   // the big one down the right, at the front
+  add(-11.5, 147.5, 7.2, 22.95);                                   // the big one down the right, at the front
   add(-20.0, 168.8, 4.4, 15); add(-20.5, 182.0, 4.8, 16); add(-13.4, 177.0, 4.2, 14); add(-16.5, 194.5, 4.6, 15); // the ones past it: annoying to be behind
   add(-46.0, 198.5, 4.6, 17, { tuft: true }); add(-48.2, 210.0, 5.0, 18, { tuft: true }); // trunks just inside the left edge of the fairway
   add(-61.4, 189.2, 5.2, 16); add(-59.0, 168.3, 4.0, 14); add(-64.4, 134.7, 5.4, 16);            // down the left
@@ -1465,7 +1483,7 @@ const treeMk = (() => { const c = document.createElement('canvas'); c.width = c.
 const puffTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.fillStyle = INK; g.beginPath(); g.arc(32, 32, 29, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(32, 32, 23, 0, 7); g.fill(); return new THREE.CanvasTexture(c); })();
 const puffs = []; for (let i = 0; i < 70; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false })); s.visible = false; scene.add(s); puffs.push({ s, life: 0, max: 1, size: 1, col: 0xffffff }); }
 let puffIdx = 0;
-function puff(pos, size, life, color = 0xffffff, vel) { const p = puffs[puffIdx++ % puffs.length]; p.s.visible = true; p.s.position.copy(pos); p.life = 0; p.max = life; p.size = size; p.s.material.color.set(color); p.vel = vel || null; }
+function puff(pos, size, life, color = 0xffffff, vel, op = 1) { const p = puffs[puffIdx++ % puffs.length]; p.s.visible = true; p.s.position.copy(pos); p.life = 0; p.max = life; p.size = size; p.op = op; p.s.material.color.set(color); p.vel = vel || null; }
 
 /* ---- tracer tube (dash-textured, ink hull) ---- */
 const TR = { segs: 64, rad: 8 };
@@ -2576,7 +2594,7 @@ function updateFlight(dt) {
       if (S.lieLand === 'water') { for (let i = 0; i < 12; i++) puff(pos.clone().setY(pos.y + .2), .8 + Math.random(), .9, 0x8fd3ff, new THREE.Vector3((Math.random() - .5) * 3, 2 + Math.random() * 3, (Math.random() - .5) * 3)); sfx('splash'); }
       else if (S.lieLand === 'sand') { for (let i = 0; i < 8; i++) puff(pos.clone().setY(pos.y + .15), .6 + Math.random() * .6, .8, 0xf5dc93, new THREE.Vector3((Math.random() - .5) * 2.5, 1.5 + Math.random() * 2, (Math.random() - .5) * 2.5)); sfx('plop'); }
       else if (S.lieLand === 'trees') { for (let i = 0; i < 10; i++) puff(pos.clone(), .8 + Math.random() * .8, 1, 0x6cbf48, new THREE.Vector3((Math.random() - .5) * 4, Math.random() * 2, (Math.random() - .5) * 4)); sfx('plop'); }
-      else { puff(pos.clone().setY(pos.y + .1), 1.2, .6, 0xffffff); sfx('plop'); }
+      else { puff(pos.clone().setY(pos.y + .1), .85, .5, 0xffffff, null, .6); sfx('plop'); } /* the touch-down ring: small and soft */
       if (S.lieLand === 'water' || S.lieLand === 'trees') callLie(S, S.lieLand, S.land); else S.callPending = true; /* splash / timber right away; anything else is called where it stops */
     }
   } else {
@@ -2916,12 +2934,13 @@ function updateCamera(dt) {
     pos.lerp(P.pos, w); look.lerp(P.look, w); if (P.t >= P.r + P.h + P.f || w < .002 && (P.cancel || P.t > P.r)) G.preview = null;
     const pv = !!G.preview && !P.cancel && P.t < P.r + P.h + P.f * .35; if (pv !== G._pv) { app.classList.toggle('previewing', pv); G._pv = pv; } }
   else if (G._pv) { app.classList.remove('previewing'); G._pv = false; }
+  if (FLY.on) FLY.step(dt, pos, look); /* the hole's opening fly-over drives the camera */
   camera.position.copy(pos); camLook.copy(look);
   const fovT = 52 + 13 * Math.max(0, SP.z || 0) * (1 - e) - (SW.phase === 'back' || SW.phase === 'down' ? clamp(SW.vis, 0, 1.1) * 8.2 : 0) * (1 - e); /* backswing push-in */
   { // backswing light: edges dim and a warm glow settles on the ball as you load up (a cheap alpha overlay, no blend modes)
     const sw = app.classList.contains('swinging'), o = sw ? (.35 + .65 * clamp(SW.phase === 'back' || SW.phase === 'down' ? SW.vis : 0, 0, 1)).toFixed(2) : '';
     if (o !== G._vigO) { VIG.style.opacity = o; G._vigO = o; } }
-  const nf = lerp(camera.fov, fovT, 1 - Math.exp(-dt * 10)); if (Math.abs(nf - camera.fov) > 1e-4) { camera.fov = nf; camera.updateProjectionMatrix(); }
+  const nf = FLY.on ? FLY.fov : lerp(camera.fov, fovT, 1 - Math.exp(-dt * 10)); if (Math.abs(nf - camera.fov) > 1e-4) { camera.fov = nf; camera.updateProjectionMatrix(); }
   camera.lookAt(camLook);
   // with the camera pulled back for long clubs, keep the resting ball readable (>= ~5.5 px radius), still sitting on its tee/lie
   if ((G.view === 'swing' || G.view === 'aim') && ball.userData.restY != null) { const d = camera.position.distanceTo(ball.position), rMin = 5.5 / (RECT.canvas.height / 2) * d * Math.tan(camera.fov * Math.PI / 360);
@@ -2943,7 +2962,7 @@ function shotSpec(cl, m, h, q, D, F) { const o = shotSpec0(cl, m, h, q, D, F); i
 function shotSpec0(cl, m, h, q, D, F) {
   const L = cl.loft, part = clamp(D / Math.max(1, F * (isChip(m) ? CHIP_AT : 1)), .3, 1);
   switch (m) {
-    case 'power': return { launch: PHYS.launchFor(L, h) - 1, spin: PHYS.spinFor(L, q, h) * .95 };
+    case 'power': return { launch: PHYS.launchFor(L, h), spin: PHYS.spinFor(L, q, h) * .95 };
     case 'punch': return { launch: PHYS.launchFor(L, h) * .55, spin: PHYS.spinFor(L, q, h) * .5 };
     case 'pitch': return { launch: L * .58 + 3 * h, spin: (3700 + (L - 46) * 110 + 1700 * part) * (.75 + .25 * q) };
     case 'chip':  return { launch: L * .3 + 1.5 * h, spin: (1800 + (L - 46) * 60) * (.8 + .2 * q) };
@@ -3805,13 +3824,13 @@ function frame(now) {
     rings.scale.setScalar(base * (1 + (RM ? 0 : Math.sin(t * 3) * .04))); } rings.rotation.y = t * .2;
   treeMk.visible = !!treeMk.userData.at && rings.visible && G.view !== 'flight' && G.mode !== 'putt';
   flag.wave(t);
-  for (const p of puffs) { if (!p.s.visible) continue; p.life += dt; const k = p.life / p.max; if (k >= 1) { p.s.visible = false; continue; } if (p.vel) { p.s.position.addScaledVector(p.vel, dt); p.vel.y -= 6 * dt; } p.s.scale.setScalar(p.size * (.4 + k * .9)); p.s.material.opacity = (1 - k) * smooth(p.s.scale.x * .6, p.s.scale.x * 2.2, camera.position.distanceTo(p.s.position)); }
+  for (const p of puffs) { if (!p.s.visible) continue; p.life += dt; const k = p.life / p.max; if (k >= 1) { p.s.visible = false; continue; } if (p.vel) { p.s.position.addScaledVector(p.vel, dt); p.vel.y -= 6 * dt; } p.s.scale.setScalar(p.size * (.4 + k * .9)); p.s.material.opacity = (1 - k) * p.op * smooth(p.s.scale.x * .6, p.s.scale.x * 2.2, camera.position.distanceTo(p.s.position)); }
   TURF.update(dt); CONFETTI.update(dt); CRITTERS.update(dt, t); renderDial(dt, t); drawTrail(dt); drawStrikeDot(dt); AV.update(dt, t);
   { // slope arrows: while aiming the short game, and whenever the ball is on the green (a putt rolling, an approach that has landed on it, or resting there)
     let onG = G.lie === 'green';
     if (G.view === 'flight') { const S = G.shot; if (!S || S.phase === 'air') G._rdG = false; else if ((G._rdF = ((G._rdF || 0) + 1) % 6) === 1) G._rdG = lieAt(ball.position.x, -ball.position.z) === 'green'; onG = !!S && (S.putt || !!G._rdG); } // lie check only every 6th frame
     else G._rdG = false;
-    READ.update(dt, onG || (G.view !== 'flight' && (G.aimT > .4 || ['putt', 'pitch', 'flop', 'sand'].includes(G.mode)))); }
+    READ.update(dt, onG || FLY.green || (G.view !== 'flight' && (G.aimT > .4 || ['putt', 'pitch', 'flop', 'sand'].includes(G.mode)))); }
   REAL.follow(); updateCull();
   { const ch = Math.max(0, camera.position.y - TERRAIN_BASE); scene.fog.near = 240 + ch * 2.4; scene.fog.far = 1050 + ch * 3.2; } // the higher the camera, the thinner the haze
   const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null; /* sky fully hidden by the ground: skip its pass */
@@ -3830,7 +3849,7 @@ for (const a of [tracer.geometry.attributes.position, tracer.geometry.attributes
   finally { for (const [o, v, f] of saved) { o.visible = v; o.frustumCulled = f; } renderer.setScissorTest(false); renderer.clear(); } })();
 requestAnimationFrame(frame);
 // ---- home screen: courses, and a slow live fly-over of the selected course's first hole behind the menu
-const COURSES = [{ id: 'hunt', name: 'Toronto Hunt', sub: 'Hole 1 · Par 4', logo: HUNT_LOGO }];
+const COURSES = [{ id: 'hunt', name: 'Toronto Hunt', sub: '9 holes · Par 35', logo: HUNT_LOGO }];
 const MENU = { on: false, t: 1.4, course: store.get('course', 'hunt') };
 const homePath = (() => { // camera + look-at keys (u, v, height above ground) from behind the tee, down the hole, around the green
   const cu = v => centerU(clamp(v, 0, 300)), P = [[-6, -46, 24], [cu(45) - 28, 45, 36], [cu(130) - 40, 130, 48], [cu(205) - 40, 205, 50], [PIN.u - 40, PIN.v - 52, 36], [PIN.u - 34, PIN.v + 18, 28], [PIN.u + 18, PIN.v + 40, 30]],
@@ -3844,6 +3863,38 @@ function homeCam(dt) {
   camera.position.copy(_hp0); camLook.copy(_hl0); if (Math.abs(camera.fov - 50) > .01) { camera.fov = 50; camera.updateProjectionMatrix(); } camera.lookAt(camLook);
   const fade = k > .955 || k < .025; if (fade !== MENU.fade) { $('#homeFade').classList.toggle('on', fade); MENU.fade = fade; } // dip to sky at the loop seam
 }
+/* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
+   down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
+const FLY = (() => {
+  const seen = new Set(), T_IN = 1.4, T_RUN = 7.4, T_ORB = 4.6, T_HOLD = 1.9; let S = null, after = null;
+  const _p = new THREE.Vector3(), _l = new THREE.Vector3(), gp = (u, v, h) => new THREE.Vector3(u, groundHeight(u, v) + h, -v);
+  function start(key, done) {
+    if (seen.has(key)) return false; seen.add(key); after = done;
+    const cu = v => centerU(clamp(v, 0, 300)), C = { u: GREEN.c[0], v: GREEN.c[1] }, cv = K => new THREE.CatmullRomCurve3(K.map(([u, v, h]) => gp(u, v, h)), false, 'centripetal');
+    const P = cv([[cu(0), -75, 92], [cu(35), 35, 92], [cu(110), 110, 88], [cu(180), 180, 80], [cu(232), 232, 70], [C.u - 6, C.v - 62, 60]]); /* ~90 yds up (270 ft) easing down to ~60 */
+    const L = cv([[cu(55), 55, 0], [cu(125), 125, 0], [cu(195), 195, 0], [cu(250), 250, 0], [C.u, C.v - 22, 0], [C.u, C.v, 0]]);
+    const E = P.getPointAt(1), gy0 = groundHeight(C.u, C.v);
+    S = { t: 0, P, L, C, gy0, a0: Math.atan2(E.x - C.u, -E.z - C.v), R0: Math.hypot(E.x - C.u, -E.z - C.v), H0: E.y - gy0, from: camera.position.clone(), fromLook: camLook.clone(), fov: 52 };
+    app.classList.add('droning'); $('#flyUI .flogo').src = HUNT_LOGO; $('#flyUI').hidden = false; tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = false; straightRef.visible = false; treeMk.visible = false;
+    return true;
+  }
+  function step(dt, pos, look) {
+    S.t += dt; const t = S.t, { C } = S;
+    if (t < T_RUN) { const e = smoother(t / T_RUN); S.P.getPointAt(e, _p); S.L.getPointAt(e, _l); S.fov = 52; }
+    else { const k = smoother(clamp((t - T_RUN) / T_ORB, 0, 1)), ka = smoother(clamp((t - T_RUN) / (T_ORB + T_HOLD), 0, 1)), h = smoother(clamp((t - T_RUN - T_ORB) / T_HOLD, 0, 1));
+      const a = S.a0 + 1.85 * ka, R = lerp(S.R0, 42, k), H = lerp(S.H0, 40, k); /* swing round the left side, so the lake sits behind the green */
+      _p.set(C.u + Math.sin(a) * R, S.gy0 + H, -(C.v + Math.cos(a) * R)); _l.set(C.u, S.gy0, -C.v); S.fov = 52 - 13 * h; } /* the hold: a slow push in on the green */
+    const w = smoother(Math.min(1, t / T_IN)); pos.copy(S.from).lerp(_p, w); look.copy(S.fromLook).lerp(_l, w); /* ease out of wherever the camera was */
+    if (t >= T_RUN + T_ORB + T_HOLD) end();
+  }
+  function end() {
+    if (!S) return; S = null; app.classList.remove('droning'); $('#flyUI').hidden = true;
+    tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; startCamTween(2.2);
+    const f = after; after = null; if (f) setTimeout(f, 1500);
+  }
+  $('#flyUI .fskip').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); end(); });
+  return { start, step, end, get on() { return !!S; }, get green() { return !!S && S.t > T_RUN - .6; }, get fov() { return S ? S.fov : 52; } };
+})();
 function setHome(on) {
   MENU.on = on; app.classList.toggle('atHome', on);
   tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = !on; if (on) { straightRef.visible = false; treeMk.visible = false; try { ttx.setTransform(1, 0, 0, 1, 0, 0); ttx.clearRect(0, 0, trTop.width, trTop.height); TT.drawn = false; trTop.style.visibility = 'hidden'; } catch (e) {} } // wipe any tracer left on the overlay from the warm-up swing
@@ -3892,7 +3943,7 @@ function holeCard(L) {
   const LIE = { fairway: 'Fairway', rough: 'Rough', deep: 'Deep rough', sand: 'Bunker', green: 'Green', fringe: 'Fringe', water: 'Water', trees: 'Trees', tee: 'Tee', ob: 'Out of bounds' };
   const rows = L.map(s => { const res = s.conceded ? 'Gimme' : s.holed ? 'In the hole!' : s.putt ? `${(s.pin * 3).toFixed(s.pin * 3 < 10 ? 1 : 0)} ft left` : `${LIE[s.lie] || s.lie}${s.lie === 'green' || s.pin < 60 ? ` · ${s.lie === 'green' ? Math.round(s.pin * 3) + ' ft' : Math.round(s.pin) + ' yds'}` : ''}`;
     const what = s.conceded ? 'Putter' : s.putt ? 'Putter' : `${s.club}${s.mode && s.mode !== 'full' ? ' ' + MODES[s.mode].name : ''}`, dist = s.putt || s.conceded ? '' : `${s.total} yds`;
-    return `<li class="${s.holed ? 'in' : ''}${s.pen ? ' pen' : ''}"><i>${s.n}</i><span>${what}</span><em>${dist}</em><b>${res}${s.pen ? ' +1' : ''}</b></li>`; }).join('');
+    return `<li class="${s.holed && !s.conceded ? 'in' : ''}${s.pen ? ' pen' : ''}"><i>${s.n}</i><span>${what}</span><em>${dist}</em><b>${res}${s.pen ? ' +1' : ''}</b></li>`; }).join('');
   const st = (k, v, good) => `<div class="st${good ? ' good' : good === false ? ' bad' : ''}"><small>${k}</small><b>${v}</b></div>`; /* true green · false red · null plain */
   return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - 4 > 0 ? '+' : ''}${strokes - 4 || 'E'})</small>`, strokes <= 4)}${st('Putts', putts, putts <= 2)}${st('Drive', drive ? drive + ' yds' : '—', drive ? long : null)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', fw == null ? null : !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
 }
@@ -4028,7 +4079,7 @@ const ROSTER = () => Object.keys(CHARS).filter(w => AV.has(w)); // golfers whose
   if (!MENU.on) setHome(true); // switch the 3D to the home fly-over (and its render scale) now, hidden behind the cover, so the intro's exit only has the tiles to move
   INTRO.onExit = () => { if (!MENU.on) setHome(true); el.classList.add('home'); };
   try { await runIntro(); } catch (e) { INTRO.on = false; const ie = $('#intro'); if (ie) ie.remove(); } INTRO.onExit(); // warmed up: hydrate into the home screen over the live fly-over
-  $('#playBtn').addEventListener('click', () => { BOOT.on = false; setHome(false); startCamTween(1.6); el.classList.add('done'); setTimeout(() => el.remove(), 600); if (BOOT.greet) setTimeout(BOOT.greet, 900); }, { once: true });
+  $('#playBtn').addEventListener('click', () => { BOOT.on = false; setHome(false); if (!FLY.start(MENU.course + ':1', BOOT.greet)) { startCamTween(1.6); if (BOOT.greet) setTimeout(BOOT.greet, 900); } el.classList.add('done'); setTimeout(() => el.remove(), 600); }, { once: true }); /* first time on the hole: the drone fly-over, then the tee */
 })();
 window.__G = G; window.__AV = () => AV; window.__cup = { PIN, cupStep }; window.__RECT = RECT; window.__ph = { PHYS, lieAt, groundHW, gradUV, planShot: () => planShot() }; window.__trees = TREES; window.__treeHit = treeHit; window.__confetti = () => CONFETTI.burst(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v); window.__trEnd = () => ({ e: trPts[TR.segs].toArray().map(x => +x.toFixed(2)), s: shPts[TR.segs].toArray().map(x => +x.toFixed(2)), t: targetUV(), r: rings.position.toArray().map(x => +x.toFixed(2)), track: !!planShot().track }); window.__blk = _blk; window.__SW = SW; window.__setup = (u, v) => { setupShot(u, v); startCamTween(.01); };
 })();

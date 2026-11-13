@@ -66,7 +66,7 @@ const TUFTED = [[-46.0, 198.5], [-48.2, 210.0]]; // on the left edge of the fair
 const TREES = (() => {
   const R = rng(42), out = [], TK = 87 / 73, add = (u, v, r, h, o = {}) => out.push(Object.assign({ u, v, h: h * 1.15 * TK + (TK - 1) * r * .9 / .74, r, pine: false, k: R() }, o)); /* TK: canopy tops scaled so the tallest (the big one down the right) stands 87 ft */
   // by hand, from the aerial
-  add(-11.5, 147.5, 7.2, 21);                                   // the big one down the right, at the front
+  add(-11.5, 147.5, 7.2, 22.95);                                   // the big one down the right, at the front
   add(-20.0, 168.8, 4.4, 15); add(-20.5, 182.0, 4.8, 16); add(-13.4, 177.0, 4.2, 14); add(-16.5, 194.5, 4.6, 15); // the ones past it: annoying to be behind
   add(-46.0, 198.5, 4.6, 17, { tuft: true }); add(-48.2, 210.0, 5.0, 18, { tuft: true }); // trunks just inside the left edge of the fairway
   add(-61.4, 189.2, 5.2, 16); add(-59.0, 168.3, 4.0, 14); add(-64.4, 134.7, 5.4, 16);            // down the left
