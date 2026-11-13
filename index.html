@@ -3937,7 +3937,7 @@ const QUIT = (() => {
     clearTimeout(G.resTO); if (G.drop) DROP.close(); FLY.stop(); FLY.reset(); /* a new round from home gets its fly-over again */
     $('#result').hidden = true; $('#result').classList.remove('final'); app.classList.remove('resulting', 'flying', 'previewing', 'swinging'); G.preview = null; G.camTween = null;
     G.stroke = 1; G.log = []; G.gimmeAdd = 0; G.view = 'swing'; G.aimGoal = 0; G.aimT = 0; aimFrame = null; newWind(); setupShot(0, 0, 'tee'); updateHUD(); tracerDirty = true;
-    const el = $('#boot'); BOOT.on = true; MENU.t = 1.4; setHome(true); if (el) { el.hidden = false; void el.offsetWidth; el.classList.remove('done'); }
+    const el = $('#boot'); BOOT.on = true; MENU.t = 1.4; setHome(true); if (el) { el.style.transition = 'none'; el.hidden = false; el.classList.remove('done'); void el.offsetWidth; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; })); } /* the menu is back at once: no fade (its visibility transition would leave the bare course showing for a moment) */
   }
   ui.addEventListener('click', e => { const b = e.target.closest('button'); if (b) sfx('pop'); if (e.target === ui || (b && b.dataset.q === 'stay')) ui.hidden = true; else if (b && b.dataset.q === 'quit') { ui.hidden = true; home(); } });
   $('#homeBtn').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); ask(); });
