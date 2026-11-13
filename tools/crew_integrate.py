@@ -1,7 +1,7 @@
 """Re-runnable: embeds the crew avatars (Hunter, Sean, Sherbo, Darren) into sketchy-golf.html between CREW_ART markers.
 In-game art = the hat version where the golfer has one; home-screen art = always the no-hat version."""
-import re, json
-p='/home/claude/golf/sketchy-golf.html'; s=open(p).read()
+import re, json, sys
+p=sys.argv[1] if len(sys.argv) > 1 else '/home/claude/golf/sketchy-golf.html'; s=open(p).read()
 C='/home/claude/golf/avatar/crew/'
 GAME = {'hunter': 'hunter/avatar-hat.svg', 'sean': 'sean/avatar.svg', 'sherbo': 'sherbo/avatar-hat.svg', 'darren': 'darren/avatar-hat.svg'}   # what they wear on the course
 HOME = {'hunter': 'hunter/avatar.svg', 'sean': 'sean/avatar.svg', 'sherbo': 'sherbo/avatar.svg', 'darren': 'darren/avatar.svg'}       # home screen: no hats
