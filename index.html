@@ -3045,24 +3045,26 @@ const READ = (() => {
   const GP = elPts(GREEN, 120), near10 = (u, v) => { if (greenGap(u, v) > 10) return false; if (inEl(u, v, GREEN)) return true; let d2 = 1e9; for (let i = 0, j = GP.length - 1; i < GP.length; j = i++) { const ax = GP[j][0], ay = GP[j][1], bx = GP[i][0] - ax, by = GP[i][1] - ay, t = clamp(((u - ax) * bx + (v - ay) * by) / (bx * bx + by * by || 1), 0, 1), dx = u - ax - bx * t, dy = v - ay - by * t; d2 = Math.min(d2, dx * dx + dy * dy); } return d2 <= 100; }; /* within a true 10 yds of the green's edge, all the way round */
   const inside = (u, v) => near10(u, v) && !['sand', 'deep'].includes(lieAt(u, v)); /* never in the bunkers or the deep rough */
   const GS = .5, GW = Math.round((U1 - U0) / GS) + 1, GH = Math.round((V1 - V0) / GS) + 1, gH = new Float32Array(GW * GH), gU = new Float32Array(GW * GH), gV = new Float32Array(GW * GH), gIn = new Uint8Array(GW * GH);
-  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const u = U0 + i * GS, v = V0 + j * GS, k = j * GW + i, g = gradUV(u, v); gH[k] = groundHeight(u, v); gU[k] = g.u; gV[k] = g.v; gIn[k] = inside(u, v) ? 1 : 0; } /* no slope arrows in the bunkers */
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const u = U0 + i * GS, v = V0 + j * GS, k = j * GW + i, g = gradUV(u, v); gH[k] = groundHeight(u, v); gU[k] = g.u; gV[k] = g.v; gIn[k] = inEl(u, v, GREEN) ? 2 : inside(u, v) ? 1 : 0; } /* 2 on the putting surface, 1 within 10 yds of it (no bunkers, no deep rough) */
+  let only = false; /* the drone fly-over reads the green itself, nothing around it */
   const look = (u, v) => { const fx = clamp((u - U0) / GS, 0, GW - 1.001), fy = clamp((v - V0) / GS, 0, GH - 1.001), i = fx | 0, j = fy | 0, a = fx - i, b = fy - j, k = j * GW + i;
-    const L = (A) => (A[k] * (1 - a) + A[k + 1] * a) * (1 - b) + (A[k + GW] * (1 - a) + A[k + GW + 1] * a) * b; return { h: L(gH), u: L(gU), v: L(gV), inside: gIn[Math.round(fy) * GW + Math.round(fx)] === 1 }; };
-  const segs = [];
-  for (let u = U0; u <= U1; u += step) for (let v = V0; v < V1; v += .75) if (inside(u, v) && inside(u, v + .75)) segs.push(u, groundHeight(u, v) + lift, -v, u, groundHeight(u, v + .75) + lift, -(v + .75));
-  for (let v = V0; v <= V1; v += step) for (let u = U0; u < U1; u += .75) if (inside(u, v) && inside(u + .75, v)) segs.push(u, groundHeight(u, v) + lift, -v, u + .75, groundHeight(u + .75, v) + lift, -v);
-  const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
-  const grid = new THREE.LineSegments(gg, new THREE.LineBasicMaterial({ color: 0x1d4a1a, transparent: true, opacity: .22, depthWrite: false })); grid.visible = false; scene.add(grid);
+    const L = (A) => (A[k] * (1 - a) + A[k + 1] * a) * (1 - b) + (A[k + GW] * (1 - a) + A[k + GW + 1] * a) * b; return { h: L(gH), u: L(gU), v: L(gV), inside: gIn[Math.round(fy) * GW + Math.round(fx)] >= (only ? 2 : 1) }; };
+  const gridMat = new THREE.LineBasicMaterial({ color: 0x1d4a1a, transparent: true, opacity: .22, depthWrite: false });
+  const mkGrid = ok => { const segs = [];
+    for (let u = U0; u <= U1; u += step) for (let v = V0; v < V1; v += .75) if (ok(u, v) && ok(u, v + .75)) segs.push(u, groundHeight(u, v) + lift, -v, u, groundHeight(u, v + .75) + lift, -(v + .75));
+    for (let v = V0; v <= V1; v += step) for (let u = U0; u < U1; u += .75) if (ok(u, v) && ok(u + .75, v)) segs.push(u, groundHeight(u, v) + lift, -v, u + .75, groundHeight(u + .75, v) + lift, -v);
+    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3)); const m = new THREE.LineSegments(gg, gridMat); m.visible = false; scene.add(m); return m; };
+  const grid = mkGrid(inside), gridG = mkGrid((u, v) => inEl(u, v, GREEN)); /* the reading band, and the green alone for the fly-over */
   // streaks: small soft dashes that slide downhill, faster where it's steeper ("rain on the green")
   const N = 150, c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
-  // a painted-on arrow: thin tail swelling into the body, a rounded head, a soft ink edge and a lit spine, fading in from the tail
-  const arrow = () => { g.beginPath(); g.moveTo(10, 32); g.bezierCurveTo(60, 29, 120, 25, 178, 24); g.lineTo(172, 12); g.quadraticCurveTo(176, 9, 181, 11); g.lineTo(244, 29); g.quadraticCurveTo(250, 32, 244, 35); g.lineTo(181, 53); g.quadraticCurveTo(176, 55, 172, 52); g.lineTo(178, 40); g.bezierCurveTo(120, 39, 60, 35, 10, 32); g.closePath(); };
-  g.lineJoin = g.lineCap = 'round'; arrow(); g.lineWidth = 9; g.strokeStyle = 'rgba(29,42,26,.55)'; g.stroke(); arrow(); g.fillStyle = '#fffaf0'; g.fill();
-  g.save(); arrow(); g.clip(); g.fillStyle = 'rgba(29,42,26,.13)'; g.fillRect(0, 33, 256, 31); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 3; g.beginPath(); g.moveTo(40, 30.5); g.bezierCurveTo(100, 28, 160, 26.5, 222, 28); g.stroke(); g.restore(); // shaded lower half + a lit spine so it reads as painted on a curved surface
-  g.globalCompositeOperation = 'destination-in'; const gr = g.createLinearGradient(0, 0, 256, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.38, 'rgba(0,0,0,.8)'); gr.addColorStop(.7, 'rgba(0,0,0,1)'); g.fillStyle = gr; g.fillRect(0, 0, 256, 64); g.globalCompositeOperation = 'source-over';
+  // the slope arrow: a slim tapered shaft into a swept, pointed head, outlined in ink like the rest of the art, with a lit edge; fades in from the tail
+  const arrow = () => { g.beginPath(); g.moveTo(26, 30.6); g.lineTo(198, 26.2); g.lineTo(188, 14.5); g.quadraticCurveTo(191, 11, 196, 13); g.lineTo(242, 29); g.quadraticCurveTo(248, 32, 242, 35); g.lineTo(196, 51); g.quadraticCurveTo(191, 53, 188, 49.5); g.lineTo(198, 37.8); g.lineTo(26, 33.4); g.quadraticCurveTo(21, 32, 26, 30.6); g.closePath(); };
+  g.lineJoin = g.lineCap = 'round'; arrow(); g.lineWidth = 7; g.strokeStyle = '#1d2a1a'; g.stroke(); arrow(); g.fillStyle = '#fffaf0'; g.fill();
+  g.save(); arrow(); g.clip(); g.fillStyle = 'rgba(29,42,26,.12)'; g.fillRect(0, 33, 256, 31); g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(44, 31); g.lineTo(194, 28.4); g.stroke(); g.restore(); // shaded lower half + a lit top edge
+  g.globalCompositeOperation = 'destination-in'; const gr = g.createLinearGradient(0, 0, 256, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.3, 'rgba(0,0,0,.75)'); gr.addColorStop(.62, 'rgba(0,0,0,1)'); g.fillStyle = gr; g.fillRect(0, 0, 256, 64); g.globalCompositeOperation = 'source-over';
   const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
   const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
-  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: .9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 }), N); // lies on the turf; the offset keeps it from flickering into it
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: .78, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 }), N); // lies on the turf; the offset keeps it from flickering into it
   mesh.visible = false; mesh.frustumCulled = false; mesh.renderOrder = 3; scene.add(mesh);
   mesh.instanceMatrix.setUsage(THREE.StreamDrawUsage); mesh.setColorAt(0, RC0); mesh.instanceColor.setUsage(THREE.StreamDrawUsage); /* rewritten every frame */
   const P = Array.from({ length: N }, () => ({ u: 0, v: 0, life: 0, max: 1 }));
@@ -3073,7 +3075,9 @@ const READ = (() => {
   const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), qn = new THREE.Quaternion(), nrm = new THREE.Vector3(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   let on = false;
   function update(dt, show) {
-    if (show !== on) { on = show; grid.visible = mesh.visible = show; }
+    if (show !== on) { on = show; mesh.visible = show; }
+    if (only !== FLY.on) { only = FLY.on; P.forEach(q => { q.life = q.max + 1; }); } /* switching between the green alone and the full band: re-seed the arrows */
+    grid.visible = show && !only; gridG.visible = show && only;
     if (!on) return;
     const ZC = FLY.on ? 12 : 5; /* from the drone, way up the hole, the arrows grow so the green still reads */
     READ_ZS = Math.min(ZC, Math.max(1, camera.position.distanceTo(_gc.set(GREEN.c[0], groundHeight(GREEN.c[0], GREEN.c[1]), -GREEN.c[1])) / 26));
@@ -3889,7 +3893,7 @@ function homeCam(dt) {
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
 const FLY = (() => {
-  const seen = new Set(), T_RUN = 7.4, T_PAUSE = .45, T_ORB = 3.2, T_BACK = 1.75; let S = null, after = null;
+  const seen = new Set(), T_RUN = 7.4, T_PAUSE = .45, T_ORB = 3.2, T_BACK = 2.0; let S = null, after = null;
   const _p = new THREE.Vector3(), _l = new THREE.Vector3(), gp = (u, v, h) => new THREE.Vector3(u, groundHeight(u, v) + h, -v);
   function start(key, done) {
     if (seen.has(key)) return false; seen.add(key); after = done;
@@ -3903,8 +3907,10 @@ const FLY = (() => {
   }
   function step(dt, pos, look) {
     if (S.back) { /* back to the tee on our own arc: rises a little, glides down into the shot view, zoom easing out on the way */
-      const B = S.back; B.t += dt; const k = smoother(Math.min(1, B.t / T_BACK));
-      _p.copy(B.pos).lerp(pos, k); _p.y += Math.sin(k * Math.PI) * B.arc; _l.copy(B.look).lerp(look, k); pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, k);
+      const B = S.back; B.t += dt; const x = Math.min(1, B.t / T_BACK), k = .5 - .5 * Math.cos(Math.PI * x), m = 1 - k; /* sine ease: gentler peak speed than smootherstep */
+      const d = B.pos.distanceTo(pos), cy = Math.max(B.pos.y, pos.y) + Math.min(70, d * .22); /* one high swooping arc (a quadratic Bézier over the middle of the hole): from up there the ground slides by slowly instead of whipping past */
+      _p.set(m * m * B.pos.x + 2 * m * k * (B.pos.x + pos.x) / 2 + k * k * pos.x, m * m * B.pos.y + 2 * m * k * cy + k * k * pos.y, m * m * B.pos.z + 2 * m * k * (B.pos.z + pos.z) / 2 + k * k * pos.z);
+      const kl = .5 - .5 * Math.cos(Math.PI * Math.min(1, x * 1.08)); _l.copy(B.look).lerp(look, kl); pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, k);
       if (B.t >= T_BACK) done(); return; }
     S.t += dt; const t = S.t, { C } = S;
     if (t < T_RUN) { const e = smoother(t / T_RUN); S.P.getPointAt(e, _p); S.L.getPointAt(e, _l); S.fov = 52; }
