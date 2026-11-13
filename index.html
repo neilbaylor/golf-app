@@ -2710,12 +2710,12 @@ function drawSwingSketch(S) {
   const down = sw.pts.filter(p => p.ph === 'down'), e = down[down.length - 1] || sw.pts[sw.pts.length - 1], a = down[Math.max(0, down.length - 4)] || e;
   const ang = Math.atan2(Y(e) - Y(a), X(e) - X(a)) * 180 / Math.PI;
   svg.innerHTML = `<line x1="40" y1="4" x2="40" y2="108" stroke="${INK}" stroke-width="1.5" stroke-dasharray="2 4" opacity=".28"/>
-    <path d="${line('back')}" fill="none" stroke="${INK}" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" opacity=".45"/>
-    <path d="${line('down')}" fill="none" stroke="${INK}" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
-    ${down.slice(1).map((p, i) => `<line x1="${X(down[i]).toFixed(1)}" y1="${Y(down[i]).toFixed(1)}" x2="${X(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="${wobCol(Math.max(p.w || 0, down[i].w || 0))}" stroke-width="3" stroke-linecap="round"/>`).join('')}
+    <path d="${line('back')}" fill="none" stroke="${INK}" stroke-width="3.2" stroke-dasharray="5 5" stroke-linecap="round" opacity=".5"/>
+    <path d="${line('down')}" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    ${down.slice(1).map((p, i) => `<line x1="${X(down[i]).toFixed(1)}" y1="${Y(down[i]).toFixed(1)}" x2="${X(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="${wobCol(Math.max(p.w || 0, down[i].w || 0))}" stroke-width="5.6" stroke-linecap="round"/>`).join('')}
     <text x="77" y="109" text-anchor="end" font-family="Patrick Hand, sans-serif" font-size="9" fill="${INK}" opacity=".5">↔ ×2</text>
-    <path transform="translate(${X(e).toFixed(1)} ${Y(e).toFixed(1)}) rotate(${ang.toFixed(1)})" d="M7 0 L-4 -6 L-4 6Z" fill="${SUN}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
-    <circle cx="40" cy="${Y(p0).toFixed(1)}" r="4" fill="${PINK}" stroke="${INK}" stroke-width="2"/>`;
+    <path transform="translate(${X(e).toFixed(1)} ${Y(e).toFixed(1)}) rotate(${ang.toFixed(1)})" d="M11 0 L-5 -9 L-5 9Z" fill="${SUN}" stroke="${INK}" stroke-width="2.6" stroke-linejoin="round"/>
+    <circle cx="40" cy="${Y(p0).toFixed(1)}" r="5.5" fill="${PINK}" stroke="${INK}" stroke-width="2.6"/>`;
 }
 function restorePrev() { const p = G.prev; G.ball = { u: p.u, v: p.v }; G.lie = p.lie; G.club = p.club; G.mode = p.mode || 'full'; if (G.mode === 'putt') G.puttMax = puttScale(p.D); applyModeTempo(); G.Feff = meterTop(G.club, G.mode); G.dir = p.dir; G.D = p.D; G.curve = p.curve; G.spinX = p.spinX; G.height = p.height; placeBall(); updateHUD(); tracerDirty = true; }
 { let eat = 0; /* the shot card: a tap anywhere on screen carries on (only when it has no buttons to choose from) */
