@@ -283,6 +283,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #app.droning #top,#app.droning #say,#app.droning #pinMk,#app.droning #aimLbl,#app.droning #mid,#app.droning #aimTip,#app.droning #ballView,#app.droning #coach,#app.droning #slopeKey,#app.droning #trail,#app.droning #trTop{opacity:0!important;pointer-events:none}
 #app.droning #bottom{transform:translateY(135%)}
 #app.settling :is(#coach,#aimTip,#ffTip){opacity:0!important;visibility:hidden}
+#app.notrans > :not(#boot),#app.notrans > :not(#boot) *{transition:none!important} /* switching straight from the menu into the fly-over: the HUD must not slide or fade out on screen */
 #dropUI{position:absolute;z-index:9;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(370px,calc(100% - 20px));box-sizing:border-box;transform:translateX(-50%) rotate(-1deg);padding:9px 10px 10px;display:flex;gap:10px;align-items:center;animation:drop .5s cubic-bezier(.3,1.6,.5,1)}
 #dropUI .dmini{flex:none;display:flex} #dropUI .dmini #mini{margin:0;visibility:visible!important}
 #dropUI .dmain{flex:1;min-width:0;text-align:center}
@@ -3084,7 +3085,10 @@ const READ = (() => {
       const k = q.life / q.max, len = .9 + Math.min(1.4, sl * 36), cd = Math.hypot(camera.position.x - q.u, camera.position.y - gd.h, camera.position.z + q.v), fade = Math.min(1, Math.sin(Math.PI * Math.min(1, k)) * 1.6) * smooth(2.2, 5.5, cd);
       qt.setFromAxisAngle(up, Math.atan2(gd.u, -gd.v) + Math.PI / 2); // points downhill…
       qn.setFromUnitVectors(up, nrm.set(-gd.u, 1, gd.v).normalize()); qt.premultiply(qn); // …and lies flat on the slope it's describing
-      const zs = F.on ? clamp(F.r / 6.5, .42, 1) : Math.min(ZC, Math.max(1, cd / 26)), shown = F.on ? i < NF : i < N / Math.max(1, Math.min(5, zs) * .8); /* close-up: fewer, smaller arrows scaled to the view */ const st = clamp(sl / .04, 0, 1); sc.set(shown ? len * (.6 + .4 * fade) * zs : 0, 1, shown ? (.22 + .26 * st) * fade * zs : 0); // steeper = longer, fatter, warmer
+      const zs = F.on ? clamp(F.r / 6.5, .42, 1) : Math.min(ZC, Math.max(1, cd / 26)), shown = F.on ? i < NF : i < N / Math.max(1, Math.min(5, zs) * .8); /* close-up: fewer, smaller arrows scaled to the view */ const st = clamp(sl / .04, 0, 1);
+      let fits = true; if (shown && sl > 1e-4) { const du = -gd.u / sl, dv = -gd.v / sl, hl = len * zs * .5, hw = (.22 + .26 * st) * zs * .5; /* the whole arrow (all four corners, at full size) must sit in the reading area: none half in a bunker */
+        for (let c = 0; c < 4 && fits; c++) { const a = c < 2 ? 1 : -1, b = c % 2 ? 1 : -1; if (!look(q.u + du * hl * a - dv * hw * b, q.v + dv * hl * a + du * hw * b).inside) fits = false; } if (!fits) spawn(q, i); }
+      sc.set(shown && fits ? len * (.6 + .4 * fade) * zs : 0, 1, shown && fits ? (.22 + .26 * st) * fade * zs : 0); // steeper = longer, fatter, warmer
       mesh.setColorAt(i, st < .5 ? _rc.copy(RC0).lerp(RC1, st * 2) : _rc.copy(RC1).lerp(RC2, st * 2 - 1)); ps.set(q.u, gd.h + .02, -q.v);
       mesh.setMatrixAt(i, m4.compose(ps, qt, sc));
     }
@@ -3894,7 +3898,7 @@ const FLY = (() => {
     const L = cv([[cu(55), 55, 0], [cu(125), 125, 0], [cu(195), 195, 0], [cu(250), 250, 0], [C.u, C.v - 22, 0], [C.u, C.v, 0]]);
     const E = P.getPointAt(1), gy0 = groundHeight(C.u, C.v);
     S = { t: 0, P, L, C, gy0, a0: Math.atan2(E.x - C.u, -E.z - C.v), R0: Math.hypot(E.x - C.u, -E.z - C.v), H0: E.y - gy0, from: camera.position.clone(), fromLook: camLook.clone(), fov: 52 };
-    app.classList.add('droning'); $('#flyUI .flogo').src = HUNT_LOGO; $('#flyUI').hidden = false; tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = false; straightRef.visible = false; treeMk.visible = false;
+    app.classList.add('notrans', 'droning'); requestAnimationFrame(() => requestAnimationFrame(() => app.classList.remove('notrans'))); $('#flyUI .flogo').src = HUNT_LOGO; $('#flyUI').hidden = false; tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = false; straightRef.visible = false; treeMk.visible = false;
     return true;
   }
   function step(dt, pos, look) {
