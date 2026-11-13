@@ -3070,7 +3070,7 @@ const READ = (() => {
   g.globalCompositeOperation = 'destination-in'; const gr = g.createLinearGradient(0, 0, 256, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.3, 'rgba(0,0,0,.75)'); gr.addColorStop(.62, 'rgba(0,0,0,1)'); g.fillStyle = gr; g.fillRect(0, 0, 256, 64); g.globalCompositeOperation = 'source-over';
   const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
   const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
-  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: .78, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 }), N); // lies on the turf; the offset keeps it from flickering into it
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: .62, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 }), N); // lies on the turf; the offset keeps it from flickering into it
   mesh.visible = false; mesh.frustumCulled = false; mesh.renderOrder = 3; scene.add(mesh);
   mesh.instanceMatrix.setUsage(THREE.StreamDrawUsage); mesh.setColorAt(0, RC0); mesh.instanceColor.setUsage(THREE.StreamDrawUsage); /* rewritten every frame */
   const P = Array.from({ length: N }, () => ({ u: 0, v: 0, life: 0, max: 1 }));
