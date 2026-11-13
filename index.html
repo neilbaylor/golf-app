@@ -2680,8 +2680,8 @@ function finishShot() {
   if (ob) btns.push(['Replay +1', 'penalty', true]);
   else if (water) { btns.push(['Replay +1', 'penalty', false]); btns.push(['Take a drop +1', 'drop', true]); }
   else if (holed) { btns.push(['Quit', 'quit', 'quit']); btns.push(['Play again', 'restart', true]); }
-  else btns.push(['Play on ›', 'next', true]); /* no mulligans */
-  $('#resBtns').innerHTML = btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}">${l}</button>`).join('');
+  else btns.push(['Play on ›', 'next', 'hide']); /* no mulligans; and no button: a tap anywhere carries on (the hidden button keeps the auto-advance working) */
+  $('#resBtns').innerHTML = btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}"${go === 'hide' ? ' hidden' : ''}>${l}</button>`).join('');
   $('#result').hidden = false; app.classList.add('resulting'); sfx('pop');
   clearTimeout(G.resTO); if (!holed && !water) G.resTO = setTimeout(() => { const r = $('#result'), go = r.querySelector('#resBtns .btn.go'); if (!r.hidden && go) go.click(); }, 2450); // carry on by itself
   G.view = 'result'; app.classList.remove('flying');
@@ -2691,8 +2691,8 @@ function finishShot() {
   startCamTween(1.5); G.preview = null; if (!holed && G.mode === 'putt') { aimFrame = null; G.aimGoal = 1; G.aimT = 1; } /* straight to the overhead putt view, no detour via the swing view */ // next putt: stay overhead
   if (!water && !holed) startPreview();
   if (!water && !holed && lie !== 'green' && !G.aimed) { G.coachAim = true; }
-  // putts and chips (pitch/flop) don't stop for a result card: straight on to the next shot (holing out still shows the score)
-  if (!water && !holed && (S.putt || ['pitch', 'flop'].includes(G.prev && G.prev.mode))) { clearTimeout(G.resTO); const go = $('#resBtns .btn.go'); if (go) go.click(); }
+  // putts, and short-game shots (chip / pitch / flop / bunker) that FINISH on the green, don't stop for a result card: straight on to the next shot (holing out still shows the score)
+  if (!water && !holed && (S.putt || (lie === 'green' && ['chip', 'pitch', 'flop', 'sand'].includes(G.prev && G.prev.mode)))) { clearTimeout(G.resTO); const go = $('#resBtns .btn.go'); if (go) go.click(); }
 }
 function drawSwingSketch(S) {
   const sw = G.lastSwing, svg = $('#resSwingSvg'), deg = sw ? sw.curveDeg : 0, kind = pathKind(deg);
@@ -2715,6 +2715,9 @@ function drawSwingSketch(S) {
     <circle cx="40" cy="${Y(p0).toFixed(1)}" r="4" fill="${PINK}" stroke="${INK}" stroke-width="2"/>`;
 }
 function restorePrev() { const p = G.prev; G.ball = { u: p.u, v: p.v }; G.lie = p.lie; G.club = p.club; G.mode = p.mode || 'full'; if (G.mode === 'putt') G.puttMax = puttScale(p.D); applyModeTempo(); G.Feff = meterTop(G.club, G.mode); G.dir = p.dir; G.D = p.D; G.curve = p.curve; G.spinX = p.spinX; G.height = p.height; placeBall(); updateHUD(); tracerDirty = true; }
+{ let eat = false; /* the shot card: a tap anywhere on screen carries on (only when it has no buttons to choose from) */
+  window.addEventListener('pointerdown', e => { const r = $('#result'); if (r.hidden || QUIT && !$('#quitUI').hidden) return; const go = r.querySelector('#resBtns .btn[data-a="next"][hidden]'); if (!go) return; e.stopPropagation(); e.preventDefault(); go.click(); eat = true; }, true); /* eat the tap's own click afterwards (set after, so the synthetic click gets through) */
+  window.addEventListener('click', e => { if (eat) { eat = false; e.stopPropagation(); e.preventDefault(); } }, true); }
 $('#resBtns').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return; const a = b.dataset.a; sfx('pop'); if (a === 'quit') { QUIT.ask(); return; } clearTimeout(G.resTO); if (a !== 'next') G.preview = null;
   $('#result').hidden = true; app.classList.remove('resulting');
