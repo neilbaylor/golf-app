@@ -268,7 +268,9 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #flyUI{position:absolute;inset:0;z-index:12}
 #flyUI .fbug{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(78px + env(safe-area-inset-bottom,0px));width:min(250px,calc(100% - 28px));transform:rotate(-1.5deg);animation:fbugIn .7s .6s both;filter:drop-shadow(3px 4px 0 rgba(29,42,26,.85))}
 #flyUI .fhead{display:flex;align-items:center;gap:10px;padding:8px 12px 7px 8px;background:var(--paper);border:3px solid var(--ink);border-bottom:0;border-radius:16px 16px 0 0}
-#flyUI .flogo{width:46px;height:46px;object-fit:contain;flex:none;filter:drop-shadow(1px 1.5px 0 rgba(29,42,26,.8))}
+#flyUI .fcl{flex:none;width:46px;height:46px}
+#flyUI .fcl .glint{animation-delay:-3.9s} /* the crest's shimmer sweeps across soon after the card arrives */
+#flyUI .flogo{width:46px;height:46px;object-fit:contain;display:block;filter:drop-shadow(1px 1.5px 0 rgba(29,42,26,.8))}
 #flyUI .fname{min-width:0;display:flex;flex-direction:column}
 #flyUI .fname .fc{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;white-space:nowrap}
 #flyUI .fname b{font:34px/1 var(--font-display);margin-top:1px}
@@ -456,13 +458,14 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #result{width:min(232px,calc(100% - 56px));padding:5px 8px 7px}
 #resWord{font-size:20px}
 #resSub{font-size:11px;margin:1px 0 4px;line-height:1.15}
-#resBody{grid-template-columns:38px minmax(0,1fr);gap:6px;margin-bottom:6px;align-items:start}
-#resSwing,#resSwing.good{border:0;border-radius:9px;padding:3px 2px 4px;gap:1px}
-#resSwing.good{box-shadow:inset 0 0 0 2px var(--mint)}
-#resSwing svg{width:28px;height:39px}
+#resBody{grid-template-columns:50px minmax(0,1fr);gap:8px;margin-bottom:6px;align-items:center}
+#resSwing,#resSwing.good{border:0;border-radius:0;padding:0;gap:2px;background:none}
+#resSwing figcaption{color:var(--ink)}
+#resSwing.good b{background:rgba(95,224,181,.55);border-radius:5px;padding:1px 3px 0}
+#resSwing svg{width:50px;height:84px} /* the swipe fills the card's height: readable at a glance */
 #resSwing small{display:none}
-#resSwing b{font-size:8.5px}
-#resGrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 2px!important}
+#resSwing b{font-size:10px;max-width:56px;text-wrap:balance;line-height:1.05}
+#resGrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px 2px!important}
 #resGrid .st{border:0;padding:0;gap:0}
 #resGrid .st small{font-size:8px;letter-spacing:.04em;opacity:.6;white-space:nowrap}
 #resGrid .st b{font-size:13px;padding:1px 3px;border-radius:6px}
@@ -621,7 +624,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
     <div id="presets"></div>
   </div>
   <div id="quitUI" hidden><div class="qcard card" role="dialog" aria-modal="true" aria-labelledby="quitT"><b id="quitT">Quit this round?</b><p>Your score on this hole won't be kept.</p><div class="qb"><button type="button" class="btn" data-q="stay">Cancel</button><button type="button" class="btn quit" data-q="quit">Quit</button></div></div></div>
-  <div id="flyUI" hidden><div class="fbug"><div class="fhead"><img class="flogo" alt=""><div class="fname"><span class="fc">Toronto Hunt</span><b>Hole 1</b></div></div><div class="fstats"><span><i>Par</i><b>4</b></span><span><i>Yards</i><b>300</b></span><span><i>Handicap</i><b>7</b></span></div></div><button type="button" class="btn fskip">Skip ›</button></div>
+  <div id="flyUI" hidden><div class="fbug"><div class="fhead"><span class="cl fcl"><img class="flogo" alt=""><span class="glint"></span></span><div class="fname"><span class="fc">Toronto Hunt</span><b>Hole 1</b></div></div><div class="fstats"><span><i>Par</i><b>4</b></span><span><i>Yards</i><b>300</b></span><span><i>Handicap</i><b>7</b></span></div></div><button type="button" class="btn fskip">Skip ›</button></div>
   <div id="dropUI" class="card" hidden><div class="dmini"></div><div class="dmain"><b class="dt">Take a drop<span>+1 stroke</span></b><p class="dg">Drag the ball into the <em class="z">pink patch</em> or <em class="l">back on the line</em>.</p><div class="db"><button type="button" class="btn" data-a="replay">Replay shot</button><button type="button" class="btn go" data-a="drop">Drop here</button></div></div></div>
   <div class="dlbl" id="dLblZ" hidden>2 club lengths</div><div class="dlbl" id="dLblL" hidden>Back on the line</div><div class="dlbl x" id="dLblX" hidden>Went in here</div>
   <div id="result" class="card" hidden>
@@ -2706,11 +2709,11 @@ function drawSwingSketch(S) {
   const line = ph => sw.pts.filter(p => p.ph === ph).map((p, i) => `${i ? 'L' : 'M'}${X(p).toFixed(1)} ${Y(p).toFixed(1)}`).join(' ');
   const down = sw.pts.filter(p => p.ph === 'down'), e = down[down.length - 1] || sw.pts[sw.pts.length - 1], a = down[Math.max(0, down.length - 4)] || e;
   const ang = Math.atan2(Y(e) - Y(a), X(e) - X(a)) * 180 / Math.PI;
-  svg.innerHTML = `<line x1="40" y1="4" x2="40" y2="108" stroke="#fffaf0" stroke-width="1.5" stroke-dasharray="2 4" opacity=".7"/>
-    <path d="${line('back')}" fill="none" stroke="#fffaf0" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" opacity=".9"/>
+  svg.innerHTML = `<line x1="40" y1="4" x2="40" y2="108" stroke="${INK}" stroke-width="1.5" stroke-dasharray="2 4" opacity=".28"/>
+    <path d="${line('back')}" fill="none" stroke="${INK}" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" opacity=".45"/>
     <path d="${line('down')}" fill="none" stroke="${INK}" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
     ${down.slice(1).map((p, i) => `<line x1="${X(down[i]).toFixed(1)}" y1="${Y(down[i]).toFixed(1)}" x2="${X(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="${wobCol(Math.max(p.w || 0, down[i].w || 0))}" stroke-width="3" stroke-linecap="round"/>`).join('')}
-    <text x="77" y="109" text-anchor="end" font-family="Patrick Hand, sans-serif" font-size="9" fill="#fffaf0" opacity=".75">↔ ×2</text>
+    <text x="77" y="109" text-anchor="end" font-family="Patrick Hand, sans-serif" font-size="9" fill="${INK}" opacity=".5">↔ ×2</text>
     <path transform="translate(${X(e).toFixed(1)} ${Y(e).toFixed(1)}) rotate(${ang.toFixed(1)})" d="M7 0 L-4 -6 L-4 6Z" fill="${SUN}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
     <circle cx="40" cy="${Y(p0).toFixed(1)}" r="4" fill="${PINK}" stroke="${INK}" stroke-width="2"/>`;
 }
