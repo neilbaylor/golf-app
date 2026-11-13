@@ -2679,8 +2679,8 @@ function finishShot() {
   const btns = [];
   if (ob) btns.push(['Replay +1', 'penalty', true]);
   else if (water) { btns.push(['Replay +1', 'penalty', false]); btns.push(['Take a drop +1', 'drop', true]); }
-  else if (holed) { btns.push(['Quit', 'quit', 'quit']); btns.push(['Retry shot', 'retry', false]); btns.push(['Play again', 'restart', true]); }
-  else { btns.push(['Retry shot', 'retry', false]); btns.push(['Play on ›', 'next', true]); }
+  else if (holed) { btns.push(['Quit', 'quit', 'quit']); btns.push(['Play again', 'restart', true]); }
+  else btns.push(['Play on ›', 'next', true]); /* no mulligans */
   $('#resBtns').innerHTML = btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}">${l}</button>`).join('');
   $('#result').hidden = false; app.classList.add('resulting'); sfx('pop');
   clearTimeout(G.resTO); if (!holed && !water) G.resTO = setTimeout(() => { const r = $('#result'), go = r.querySelector('#resBtns .btn.go'); if (!r.hidden && go) go.click(); }, 2450); // carry on by itself
