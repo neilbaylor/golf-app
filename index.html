@@ -3040,9 +3040,11 @@ function planShot() {
 /* ================= GREEN READING: contour grid + slope streaks that flow downhill ================= */
 let READ_ZS = 1; const _gc = new THREE.Vector3(), RC0 = new THREE.Color(0xffffff), RC1 = new THREE.Color(0xffe066), RC2 = new THREE.Color(0xff8a3d), _rc = new THREE.Color();
 const READ = (() => {
-  const U0 = FRINGE.c[0] - 34, U1 = FRINGE.c[0] + 34, V0 = FRINGE.c[1] - 34, V1 = FRINGE.c[1] + 34, step = 1.5, inside = (u, v) => greenGap(u, v) <= 10, lift = .045;
+  const U0 = FRINGE.c[0] - 34, U1 = FRINGE.c[0] + 34, V0 = FRINGE.c[1] - 34, V1 = FRINGE.c[1] + 34, step = 1.5, lift = .045;
+  const GP = elPts(GREEN, 120), near10 = (u, v) => { if (greenGap(u, v) > 10) return false; if (inEl(u, v, GREEN)) return true; let d2 = 1e9; for (let i = 0, j = GP.length - 1; i < GP.length; j = i++) { const ax = GP[j][0], ay = GP[j][1], bx = GP[i][0] - ax, by = GP[i][1] - ay, t = clamp(((u - ax) * bx + (v - ay) * by) / (bx * bx + by * by || 1), 0, 1), dx = u - ax - bx * t, dy = v - ay - by * t; d2 = Math.min(d2, dx * dx + dy * dy); } return d2 <= 100; }; /* within a true 10 yds of the green's edge, all the way round */
+  const inside = (u, v) => near10(u, v) && !['sand', 'deep'].includes(lieAt(u, v)); /* never in the bunkers or the deep rough */
   const GS = .5, GW = Math.round((U1 - U0) / GS) + 1, GH = Math.round((V1 - V0) / GS) + 1, gH = new Float32Array(GW * GH), gU = new Float32Array(GW * GH), gV = new Float32Array(GW * GH), gIn = new Uint8Array(GW * GH);
-  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const u = U0 + i * GS, v = V0 + j * GS, k = j * GW + i, g = gradUV(u, v); gH[k] = groundHeight(u, v); gU[k] = g.u; gV[k] = g.v; gIn[k] = greenGap(u, v) <= 10 && lieAt(u, v) !== 'sand' ? 1 : 0; } /* no slope arrows in the bunkers */
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const u = U0 + i * GS, v = V0 + j * GS, k = j * GW + i, g = gradUV(u, v); gH[k] = groundHeight(u, v); gU[k] = g.u; gV[k] = g.v; gIn[k] = inside(u, v) ? 1 : 0; } /* no slope arrows in the bunkers */
   const look = (u, v) => { const fx = clamp((u - U0) / GS, 0, GW - 1.001), fy = clamp((v - V0) / GS, 0, GH - 1.001), i = fx | 0, j = fy | 0, a = fx - i, b = fy - j, k = j * GW + i;
     const L = (A) => (A[k] * (1 - a) + A[k + 1] * a) * (1 - b) + (A[k + GW] * (1 - a) + A[k + GW + 1] * a) * b; return { h: L(gH), u: L(gU), v: L(gV), inside: gIn[Math.round(fy) * GW + Math.round(fx)] === 1 }; };
   const segs = [];
@@ -3144,6 +3146,7 @@ function drawTrTop() {
 }
 function updateTracer() {
   if (G.view === 'flight') return;
+  if (FLY.on) { trShadow.visible = false; return; } /* the drone fly-over shows the hole, not the shot */
   const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
   if (G.mode === 'putt') { // how far it would roll if the green were flat and straight: it does NOT follow the break
     const D = G.D, e = smoother(G.aimT);
@@ -3882,7 +3885,7 @@ function homeCam(dt) {
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
 const FLY = (() => {
-  const seen = new Set(), T_IN = 1.4, T_RUN = 7.4, T_PAUSE = .45, T_ORB = 3.2; let S = null, after = null;
+  const seen = new Set(), T_RUN = 7.4, T_PAUSE = .45, T_ORB = 3.2, T_BACK = 1.75; let S = null, after = null;
   const _p = new THREE.Vector3(), _l = new THREE.Vector3(), gp = (u, v, h) => new THREE.Vector3(u, groundHeight(u, v) + h, -v);
   function start(key, done) {
     if (seen.has(key)) return false; seen.add(key); after = done;
@@ -3895,28 +3898,33 @@ const FLY = (() => {
     return true;
   }
   function step(dt, pos, look) {
+    if (S.back) { /* back to the tee on our own arc: rises a little, glides down into the shot view, zoom easing out on the way */
+      const B = S.back; B.t += dt; const k = smoother(Math.min(1, B.t / T_BACK));
+      _p.copy(B.pos).lerp(pos, k); _p.y += Math.sin(k * Math.PI) * B.arc; _l.copy(B.look).lerp(look, k); pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, k);
+      if (B.t >= T_BACK) done(); return; }
     S.t += dt; const t = S.t, { C } = S;
     if (t < T_RUN) { const e = smoother(t / T_RUN); S.P.getPointAt(e, _p); S.L.getPointAt(e, _l); S.fov = 52; }
     else { const k = smoother(clamp((t - T_RUN - T_PAUSE) / T_ORB, 0, 1)); /* a beat over the green, then the turn and the push-in together */
       const a = S.a0 + 1.6 * k, R = lerp(S.R0, 42, k), H = lerp(S.H0, 40, k); /* swing round the left side, so the lake sits behind the green */
       _p.set(C.u + Math.sin(a) * R, S.gy0 + H, -(C.v + Math.cos(a) * R)); _l.set(C.u, S.gy0, -C.v); S.fov = 52 - 12 * k; }
-    const w = smoother(Math.min(1, t / T_IN)); pos.copy(S.from).lerp(_p, w); look.copy(S.fromLook).lerp(_l, w); /* ease out of wherever the camera was */
+    pos.copy(_p); look.copy(_l); /* starts already up high behind the tee: no climb from the menu camera */
     if (t >= T_RUN + T_PAUSE + T_ORB) end();
   }
-  function end() {
-    if (!S) return; S = null; app.classList.remove('droning'); $('#flyUI').hidden = true;
-    tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; startCamTween(2.2); settleTips(2300);
-    const f = after; after = null; if (f) setTimeout(f, 1500);
+  function end() { /* finished or skipped: head back to the tee */
+    if (!S || S.back) return; S.back = { t: 0, pos: camera.position.clone(), look: camLook.clone(), fov: camera.fov, arc: Math.min(26, camera.position.distanceTo(ball.position) * .08) };
+    app.classList.remove('droning'); $('#flyUI').hidden = true; clearTimeout(settleTips.to); app.classList.add('settling');
   }
+  function done() { S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
+  function stop() { if (!S) return; S = null; after = null; app.classList.remove('droning', 'settling'); $('#flyUI').hidden = true; } /* quitting mid fly-over */
   $('#flyUI .fskip').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); end(); });
-  return { start, step, end, reset() { seen.clear(); }, get on() { return !!S; }, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
+  return { start, step, end, stop, reset() { seen.clear(); }, get on() { return !!S; }, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
 })();
 /* ---- quitting back to the home screen (the end-of-hole card and the little Home button both ask first) ---- */
 const QUIT = (() => {
   const ui = $('#quitUI');
   function ask() { ui.hidden = false; const k = ui.querySelector('[data-q="stay"]'); if (k) k.focus({ preventScroll: true }); }
   function home() {
-    clearTimeout(G.resTO); if (G.drop) DROP.close(); if (FLY.on) FLY.end(); FLY.reset(); /* a new round from home gets its fly-over again */
+    clearTimeout(G.resTO); if (G.drop) DROP.close(); FLY.stop(); FLY.reset(); /* a new round from home gets its fly-over again */
     $('#result').hidden = true; $('#result').classList.remove('final'); app.classList.remove('resulting', 'flying', 'previewing', 'swinging'); G.preview = null; G.camTween = null;
     G.stroke = 1; G.log = []; G.gimmeAdd = 0; G.view = 'swing'; G.aimGoal = 0; G.aimT = 0; aimFrame = null; newWind(); setupShot(0, 0, 'tee'); updateHUD(); tracerDirty = true;
     const el = $('#boot'); BOOT.on = true; MENU.t = 1.4; setHome(true); if (el) { el.hidden = false; void el.offsetWidth; el.classList.remove('done'); }
