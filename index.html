@@ -3893,7 +3893,7 @@ function homeCam(dt) {
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
 const FLY = (() => {
-  const seen = new Set(), T_RUN = 7.4, T_PAUSE = .45, T_ORB = 3.2, T_BACK = 2.0; let S = null, after = null;
+  const seen = new Set(), T_RUN = 7.6, T_PAUSE = .45, T_ORB = 3.2, T_BACK = 1.65; let S = null, after = null;
   const _p = new THREE.Vector3(), _l = new THREE.Vector3(), gp = (u, v, h) => new THREE.Vector3(u, groundHeight(u, v) + h, -v);
   function start(key, done) {
     if (seen.has(key)) return false; seen.add(key); after = done;
@@ -3908,7 +3908,7 @@ const FLY = (() => {
   function step(dt, pos, look) {
     if (S.back) { /* back to the tee on our own arc: rises a little, glides down into the shot view, zoom easing out on the way */
       const B = S.back; B.t += dt; const x = Math.min(1, B.t / T_BACK), k = .5 - .5 * Math.cos(Math.PI * x), m = 1 - k; /* sine ease: gentler peak speed than smootherstep */
-      const d = B.pos.distanceTo(pos), cy = Math.max(B.pos.y, pos.y) + Math.min(70, d * .22); /* one high swooping arc (a quadratic Bézier over the middle of the hole): from up there the ground slides by slowly instead of whipping past */
+      const d = B.pos.distanceTo(pos), cy = Math.max(B.pos.y, pos.y) + Math.min(48, d * .15); /* one high swooping arc (a quadratic Bézier over the middle of the hole): from up there the ground slides by slowly instead of whipping past */
       _p.set(m * m * B.pos.x + 2 * m * k * (B.pos.x + pos.x) / 2 + k * k * pos.x, m * m * B.pos.y + 2 * m * k * cy + k * k * pos.y, m * m * B.pos.z + 2 * m * k * (B.pos.z + pos.z) / 2 + k * k * pos.z);
       const kl = .5 - .5 * Math.cos(Math.PI * Math.min(1, x * 1.08)); _l.copy(B.look).lerp(look, kl); pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, k);
       if (B.t >= T_BACK) done(); return; }
