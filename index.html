@@ -282,6 +282,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 @keyframes ftagIn{from{opacity:0;translate:0 -8px}to{opacity:1;translate:0 0}}
 #app.droning #top,#app.droning #say,#app.droning #pinMk,#app.droning #aimLbl,#app.droning #mid,#app.droning #aimTip,#app.droning #ballView,#app.droning #coach,#app.droning #slopeKey,#app.droning #trail,#app.droning #trTop{opacity:0!important;pointer-events:none}
 #app.droning #bottom{transform:translateY(135%)}
+#app.settling :is(#coach,#aimTip,#ffTip){opacity:0!important;visibility:hidden}
 #dropUI{position:absolute;z-index:9;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(370px,calc(100% - 20px));box-sizing:border-box;transform:translateX(-50%) rotate(-1deg);padding:9px 10px 10px;display:flex;gap:10px;align-items:center;animation:drop .5s cubic-bezier(.3,1.6,.5,1)}
 #dropUI .dmini{flex:none;display:flex} #dropUI .dmini #mini{margin:0;visibility:visible!important}
 #dropUI .dmain{flex:1;min-width:0;text-align:center}
@@ -477,6 +478,16 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #resBtns .btn{font-size:13px;padding:8px 5px 6px;box-shadow:2px 3px 0 var(--ink)}
 .btn{flex:1;font:18px/1 var(--font-display);letter-spacing:.04em;padding:12px 8px 9px;border:3px solid var(--ink);border-radius:var(--wob);background:var(--paper);box-shadow:3px 4px 0 var(--ink)}
 .btn.go{background:var(--sun)}
+.btn.quit{background:#ff6a55;color:var(--paper);text-shadow:0 1.5px 0 rgba(29,42,26,.45)}
+#homeBtn{font:13px/1 var(--font-display);letter-spacing:.06em;text-transform:uppercase;padding:6px 12px 4px;border:2.5px solid var(--ink);border-radius:999px;background:var(--paper);box-shadow:2px 3px 0 var(--ink);color:var(--ink);transform:rotate(-1.5deg);margin-top:1px}
+#homeBtn:active{transform:translate(1px,2px);box-shadow:1px 1px 0 var(--ink)}
+#quitUI{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:rgba(20,32,16,.35);padding:0 max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px))}
+#quitUI .qcard{width:min(320px,100%);box-sizing:border-box;padding:14px 14px 15px;text-align:center;transform:rotate(-1deg);animation:qIn .22s cubic-bezier(.3,1.3,.5,1) both}
+#quitUI b{display:block;font:24px/1.05 var(--font-display);margin-top:2px}
+#quitUI p{margin:6px 0 14px;font-size:15px;opacity:.75}
+#quitUI .qb{display:flex;gap:10px}
+#quitUI .btn{font-size:15px;white-space:nowrap;padding-left:6px;padding-right:6px}
+@keyframes qIn{from{opacity:0;transform:scale(.9) rotate(-1deg)}to{opacity:1;transform:scale(1) rotate(-1deg)}}
 .btn:active{transform:translate(2px,3px);box-shadow:1px 1px 0 var(--ink)}
 
 #perf{position:absolute;left:6px;bottom:calc(2px + max(0px,env(safe-area-inset-bottom,0px) - 26px));z-index:7;font:9px/1.4 ui-monospace,Menlo,Consolas,monospace;color:rgba(255,255,255,.85);background:rgba(20,32,16,.45);border-radius:4px;padding:1px 5px;pointer-events:none;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -586,6 +597,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
     <div class="side">
       <canvas id="mini" aria-label="Hole map"></canvas>
       <button id="clubBtn" aria-label="Change club"><span class="clubBadge" id="clubBadge">7i</span><span id="clubName">7 Iron</span><span id="clubMode">Full</span></button>
+      <button id="homeBtn" type="button">Home</button>
     </div>
   </div>
 
@@ -607,6 +619,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
     <div id="strikeTotal"></div>
     <div id="presets"></div>
   </div>
+  <div id="quitUI" hidden><div class="qcard card" role="dialog" aria-modal="true" aria-labelledby="quitT"><b id="quitT">Quit this round?</b><p>Your score on this hole won't be kept.</p><div class="qb"><button type="button" class="btn" data-q="stay">Keep playing</button><button type="button" class="btn quit" data-q="quit">Quit</button></div></div></div>
   <div id="flyUI" hidden><div class="fbug"><div class="fhead"><img class="flogo" alt=""><div class="fname"><span class="fc">Toronto Hunt</span><b>Hole 1</b></div></div><div class="fstats"><span><i>Par</i><b>4</b></span><span><i>Yards</i><b>300</b></span><span><i>Handicap</i><b>7</b></span></div></div><button type="button" class="btn fskip">Skip ›</button></div>
   <div id="dropUI" class="card" hidden><div class="dmini"></div><div class="dmain"><b class="dt">Take a drop<span>+1 stroke</span></b><p class="dg">Drag the ball into the <em class="z">pink patch</em> or <em class="l">back on the line</em>.</p><div class="db"><button type="button" class="btn" data-a="replay">Replay shot</button><button type="button" class="btn go" data-a="drop">Drop here</button></div></div></div>
   <div class="dlbl" id="dLblZ" hidden>2 club lengths</div><div class="dlbl" id="dLblL" hidden>Back on the line</div><div class="dlbl x" id="dLblX" hidden>Went in here</div>
@@ -1298,7 +1311,7 @@ const CRITTERS = (() => {
   const bird = (up) => { x.strokeStyle = '#26333a'; x.lineWidth = 8; x.beginPath(); if (up) { x.moveTo(8, 22); x.quadraticCurveTo(22, 20, 32, 38); x.quadraticCurveTo(42, 20, 56, 22); } else { x.moveTo(8, 42); x.quadraticCurveTo(22, 30, 32, 36); x.quadraticCurveTo(42, 30, 56, 42); } x.stroke(); };
   fr(0, () => sq(false)); fr(1, () => sq(true)); fr(2, () => bird(true)); fr(3, () => bird(false));
   const tex = new THREE.CanvasTexture(c);
-  const NB = 7, NS = 3, N = NB + NS, base = new THREE.PlaneGeometry(1, 1); base.translate(0, .5, 0); // anchored at the feet
+  const NB = 15, NS = 3, N = NB + NS, base = new THREE.PlaneGeometry(1, 1); base.translate(0, .5, 0); // anchored at the feet
   const geo = new THREE.InstancedBufferGeometry(); geo.index = base.index; geo.setAttribute('position', base.attributes.position); geo.setAttribute('uv', base.attributes.uv);
   const iPos = new THREE.InstancedBufferAttribute(new Float32Array(N * 3), 3), iDat = new THREE.InstancedBufferAttribute(new Float32Array(N * 3), 3); // frame, size (signed = facing), alpha
   iPos.setUsage(THREE.StreamDrawUsage); iDat.setUsage(THREE.StreamDrawUsage); geo.setAttribute('iPos', iPos); geo.setAttribute('iDat', iDat); geo.instanceCount = N;
@@ -1310,8 +1323,9 @@ const CRITTERS = (() => {
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.userData.ink = false; scene.add(mesh);
   const R = rng(99), P = iPos.array, D = iDat.array;
   // birds: two loose flocks on big slow loops ~25-40 yd up
-  const flocks = [{ cu: -20, cv: 170, ru: 120, rv: 190, w: .045, ph: 0, h: 34 }, { cu: -35, cv: 140, ru: 90, rv: 150, w: -.06, ph: 2.6, h: 26 }];
-  const birds = []; for (let i = 0; i < NB; i++) birds.push({ f: flocks[i < 4 ? 0 : 1], k: i < 4 ? i : i - 4, ou: (R() - .5) * 14, ov: (R() - .5) * 14, oh: (R() - .5) * 5, fl: R() * 6, rate: 5 + R() * 2, glide: R() * 8 });
+  const flocks = [{ cu: -20, cv: 170, ru: 120, rv: 190, w: .045, ph: 0, h: 34 }, { cu: -35, cv: 140, ru: 90, rv: 150, w: -.06, ph: 2.6, h: 26 },
+    { cu: 150, cv: 330, ru: 170, rv: 120, w: .035, ph: 1.2, h: 58, s: 3.2 }, { cu: -60, cv: 520, ru: 160, rv: 90, w: -.04, ph: 4, h: 64, s: 3.4 }]; /* + two far-off flocks up against the sky: out over the lake, and away beyond the green */
+  const FK = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3], birds = []; for (let i = 0; i < NB; i++) birds.push({ f: flocks[FK[i]], k: FK.slice(0, i).filter(x => x === FK[i]).length, ou: (R() - .5) * 14, ov: (R() - .5) * 14, oh: (R() - .5) * 5, fl: R() * 6, rate: 5 + R() * 2, glide: R() * 8 });
   // squirrels: sit by a trunk near the ball, now and then hop to a neighbouring tree
   const sqs = []; for (let i = 0; i < NS; i++) sqs.push({ u: 1e9, v: 0, tu: 0, tv: 0, st: 'sit', t: R() * 3, face: 1, hop: 0 });
   const nearTrees = (u, v, r0, r1) => TREES.filter(t => { const d = Math.hypot(t.u - u, t.v - v); return d > r0 && d < r1; });
@@ -1322,7 +1336,7 @@ const CRITTERS = (() => {
     for (let i = 0; i < NB; i++) { const b = birds[i], f = b.f, a = f.ph + t * f.w - b.k * .018; // follow-the-leader along the loop
       const u = f.cu + Math.cos(a) * f.ru + b.ou + Math.sin(t * .4 + b.fl) * 2, v = f.cv + Math.sin(a) * f.rv + b.ov, h = f.h + b.oh + Math.sin(t * .7 + b.fl) * 1.2;
       const glide = Math.sin(t * .35 + b.glide) > .45, up = glide || Math.sin(t * b.rate + b.fl) > 0;
-      P[i * 3] = u; P[i * 3 + 1] = h; P[i * 3 + 2] = -v; D[i * 3] = up ? 2 : 3; D[i * 3 + 1] = 2.6; D[i * 3 + 2] = 1; }
+      P[i * 3] = u; P[i * 3 + 1] = h; P[i * 3 + 2] = -v; D[i * 3] = up ? 2 : 3; D[i * 3 + 1] = f.s || 2.6; D[i * 3 + 2] = 1; }
     _r.set(1, 0, 0).applyQuaternion(camera.quaternion);
     for (let j = 0; j < NS; j++) { const q = sqs[j], i = NB + j;
       if (Math.hypot(q.u - G.ball.u, q.v - G.ball.v) > 75 || q.u > 1e8) seat(q);
@@ -2664,9 +2678,9 @@ function finishShot() {
   const btns = [];
   if (ob) btns.push(['Replay +1', 'penalty', true]);
   else if (water) { btns.push(['Replay +1', 'penalty', false]); btns.push(['Take a drop +1', 'drop', true]); }
-  else if (holed) { btns.push(['Retry shot', 'retry', false]); btns.push(['Play hole again', 'restart', true]); }
+  else if (holed) { btns.push(['Quit', 'quit', 'quit']); btns.push(['Retry shot', 'retry', false]); btns.push(['Play again', 'restart', true]); }
   else { btns.push(['Retry shot', 'retry', false]); btns.push(['Play on ›', 'next', true]); }
-  $('#resBtns').innerHTML = btns.map(([l, a, go]) => `<button class="btn${go ? ' go' : ''}" data-a="${a}">${l}</button>`).join('');
+  $('#resBtns').innerHTML = btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}">${l}</button>`).join('');
   $('#result').hidden = false; app.classList.add('resulting'); sfx('pop');
   clearTimeout(G.resTO); if (!holed && !water) G.resTO = setTimeout(() => { const r = $('#result'), go = r.querySelector('#resBtns .btn.go'); if (!r.hidden && go) go.click(); }, 2450); // carry on by itself
   G.view = 'result'; app.classList.remove('flying');
@@ -2701,7 +2715,7 @@ function drawSwingSketch(S) {
 }
 function restorePrev() { const p = G.prev; G.ball = { u: p.u, v: p.v }; G.lie = p.lie; G.club = p.club; G.mode = p.mode || 'full'; if (G.mode === 'putt') G.puttMax = puttScale(p.D); applyModeTempo(); G.Feff = meterTop(G.club, G.mode); G.dir = p.dir; G.D = p.D; G.curve = p.curve; G.spinX = p.spinX; G.height = p.height; placeBall(); updateHUD(); tracerDirty = true; }
 $('#resBtns').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return; const a = b.dataset.a; sfx('pop'); clearTimeout(G.resTO); if (a !== 'next') G.preview = null;
+  const b = e.target.closest('button'); if (!b) return; const a = b.dataset.a; sfx('pop'); if (a === 'quit') { QUIT.ask(); return; } clearTimeout(G.resTO); if (a !== 'next') G.preview = null;
   $('#result').hidden = true; app.classList.remove('resulting');
   if (a === 'next') { G.stroke++; newWind(); setTimeout(() => AV.say(preShotLine()), 900); }
   else if (a === 'retry') { G.stroke -= G.gimmeAdd || 0; if (G.log) { G.log.pop(); if (G.gimmeAdd && G.log.length) G.log.pop(); } G.gimmeAdd = 0; restorePrev(); startCamTween(1.1); AV.say(line('mulligan')); }
@@ -2823,7 +2837,7 @@ const DROP = (() => {
   window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   $('#dropUI').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !G.drop) return; sfx('pop'); finish(b.dataset.a); });
   const dragTo = (x, y) => { const g = st && groundAt(x, y); if (g) place(snap(g.u, g.v)); };
-  return { open, frame, update, finish, crossing, dragTo, get st() { return st; } };
+  return { open, close, frame, update, finish, crossing, dragTo, get st() { return st; } };
 })();
 
 /* ================= CAMERA ================= */
@@ -3058,7 +3072,8 @@ const READ = (() => {
   function update(dt, show) {
     if (show !== on) { on = show; grid.visible = mesh.visible = show; }
     if (!on) return;
-    READ_ZS = Math.min(5, Math.max(1, camera.position.distanceTo(_gc.set(GREEN.c[0], groundHeight(GREEN.c[0], GREEN.c[1]), -GREEN.c[1])) / 26));
+    const ZC = FLY.on ? 12 : 5; /* from the drone, way up the hole, the arrows grow so the green still reads */
+    READ_ZS = Math.min(ZC, Math.max(1, camera.position.distanceTo(_gc.set(GREEN.c[0], groundHeight(GREEN.c[0], GREEN.c[1]), -GREEN.c[1])) / 26));
     { const hgt = camera.position.y - groundHeight(camLook.x, -camLook.z); F.on = G.mode === 'putt' && hgt < 22; if (F.on) { F.u = camLook.x; F.v = -camLook.z; F.r = Math.max(2.5, hgt * Math.tan(camera.fov * Math.PI / 360) * 1.15); } }
     for (let i = 0; i < N; i++) {
       const q = P[i], gd = look(q.u, q.v), sl = Math.hypot(gd.u, gd.v); q.life += dt;
@@ -3067,7 +3082,7 @@ const READ = (() => {
       const k = q.life / q.max, len = .9 + Math.min(1.4, sl * 36), cd = Math.hypot(camera.position.x - q.u, camera.position.y - gd.h, camera.position.z + q.v), fade = Math.min(1, Math.sin(Math.PI * Math.min(1, k)) * 1.6) * smooth(2.2, 5.5, cd);
       qt.setFromAxisAngle(up, Math.atan2(gd.u, -gd.v) + Math.PI / 2); // points downhill…
       qn.setFromUnitVectors(up, nrm.set(-gd.u, 1, gd.v).normalize()); qt.premultiply(qn); // …and lies flat on the slope it's describing
-      const zs = F.on ? clamp(F.r / 6.5, .42, 1) : Math.min(5, Math.max(1, cd / 26)), shown = F.on ? i < NF : i < N / Math.max(1, zs * .8); /* close-up: fewer, smaller arrows scaled to the view */ const st = clamp(sl / .04, 0, 1); sc.set(shown ? len * (.6 + .4 * fade) * zs : 0, 1, shown ? (.22 + .26 * st) * fade * zs : 0); // steeper = longer, fatter, warmer
+      const zs = F.on ? clamp(F.r / 6.5, .42, 1) : Math.min(ZC, Math.max(1, cd / 26)), shown = F.on ? i < NF : i < N / Math.max(1, Math.min(5, zs) * .8); /* close-up: fewer, smaller arrows scaled to the view */ const st = clamp(sl / .04, 0, 1); sc.set(shown ? len * (.6 + .4 * fade) * zs : 0, 1, shown ? (.22 + .26 * st) * fade * zs : 0); // steeper = longer, fatter, warmer
       mesh.setColorAt(i, st < .5 ? _rc.copy(RC0).lerp(RC1, st * 2) : _rc.copy(RC1).lerp(RC2, st * 2 - 1)); ps.set(q.u, gd.h + .02, -q.v);
       mesh.setMatrixAt(i, m4.compose(ps, qt, sc));
     }
@@ -3865,8 +3880,9 @@ function homeCam(dt) {
 }
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
+function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
 const FLY = (() => {
-  const seen = new Set(), T_IN = 1.4, T_RUN = 7.4, T_ORB = 4.6, T_HOLD = 1.9; let S = null, after = null;
+  const seen = new Set(), T_IN = 1.4, T_RUN = 7.4, T_PAUSE = .45, T_ORB = 3.2; let S = null, after = null;
   const _p = new THREE.Vector3(), _l = new THREE.Vector3(), gp = (u, v, h) => new THREE.Vector3(u, groundHeight(u, v) + h, -v);
   function start(key, done) {
     if (seen.has(key)) return false; seen.add(key); after = done;
@@ -3881,19 +3897,33 @@ const FLY = (() => {
   function step(dt, pos, look) {
     S.t += dt; const t = S.t, { C } = S;
     if (t < T_RUN) { const e = smoother(t / T_RUN); S.P.getPointAt(e, _p); S.L.getPointAt(e, _l); S.fov = 52; }
-    else { const k = smoother(clamp((t - T_RUN) / T_ORB, 0, 1)), ka = smoother(clamp((t - T_RUN) / (T_ORB + T_HOLD), 0, 1)), h = smoother(clamp((t - T_RUN - T_ORB) / T_HOLD, 0, 1));
-      const a = S.a0 + 1.85 * ka, R = lerp(S.R0, 42, k), H = lerp(S.H0, 40, k); /* swing round the left side, so the lake sits behind the green */
-      _p.set(C.u + Math.sin(a) * R, S.gy0 + H, -(C.v + Math.cos(a) * R)); _l.set(C.u, S.gy0, -C.v); S.fov = 52 - 13 * h; } /* the hold: a slow push in on the green */
+    else { const k = smoother(clamp((t - T_RUN - T_PAUSE) / T_ORB, 0, 1)); /* a beat over the green, then the turn and the push-in together */
+      const a = S.a0 + 1.6 * k, R = lerp(S.R0, 42, k), H = lerp(S.H0, 40, k); /* swing round the left side, so the lake sits behind the green */
+      _p.set(C.u + Math.sin(a) * R, S.gy0 + H, -(C.v + Math.cos(a) * R)); _l.set(C.u, S.gy0, -C.v); S.fov = 52 - 12 * k; }
     const w = smoother(Math.min(1, t / T_IN)); pos.copy(S.from).lerp(_p, w); look.copy(S.fromLook).lerp(_l, w); /* ease out of wherever the camera was */
-    if (t >= T_RUN + T_ORB + T_HOLD) end();
+    if (t >= T_RUN + T_PAUSE + T_ORB) end();
   }
   function end() {
     if (!S) return; S = null; app.classList.remove('droning'); $('#flyUI').hidden = true;
-    tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; startCamTween(2.2);
+    tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; startCamTween(2.2); settleTips(2300);
     const f = after; after = null; if (f) setTimeout(f, 1500);
   }
   $('#flyUI .fskip').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); end(); });
-  return { start, step, end, get on() { return !!S; }, get green() { return !!S && S.t > T_RUN - .6; }, get fov() { return S ? S.fov : 52; } };
+  return { start, step, end, reset() { seen.clear(); }, get on() { return !!S; }, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
+})();
+/* ---- quitting back to the home screen (the end-of-hole card and the little Home button both ask first) ---- */
+const QUIT = (() => {
+  const ui = $('#quitUI');
+  function ask() { ui.hidden = false; const k = ui.querySelector('[data-q="stay"]'); if (k) k.focus({ preventScroll: true }); }
+  function home() {
+    clearTimeout(G.resTO); if (G.drop) DROP.close(); if (FLY.on) FLY.end(); FLY.reset(); /* a new round from home gets its fly-over again */
+    $('#result').hidden = true; $('#result').classList.remove('final'); app.classList.remove('resulting', 'flying', 'previewing', 'swinging'); G.preview = null; G.camTween = null;
+    G.stroke = 1; G.log = []; G.gimmeAdd = 0; G.view = 'swing'; G.aimGoal = 0; G.aimT = 0; aimFrame = null; newWind(); setupShot(0, 0, 'tee'); updateHUD(); tracerDirty = true;
+    const el = $('#boot'); BOOT.on = true; MENU.t = 1.4; setHome(true); if (el) { el.hidden = false; void el.offsetWidth; el.classList.remove('done'); }
+  }
+  ui.addEventListener('click', e => { const b = e.target.closest('button'); if (b) sfx('pop'); if (e.target === ui || (b && b.dataset.q === 'stay')) ui.hidden = true; else if (b && b.dataset.q === 'quit') { ui.hidden = true; home(); } });
+  $('#homeBtn').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); ask(); });
+  return { ask, home };
 })();
 function setHome(on) {
   MENU.on = on; app.classList.toggle('atHome', on);
@@ -4079,7 +4109,7 @@ const ROSTER = () => Object.keys(CHARS).filter(w => AV.has(w)); // golfers whose
   if (!MENU.on) setHome(true); // switch the 3D to the home fly-over (and its render scale) now, hidden behind the cover, so the intro's exit only has the tiles to move
   INTRO.onExit = () => { if (!MENU.on) setHome(true); el.classList.add('home'); };
   try { await runIntro(); } catch (e) { INTRO.on = false; const ie = $('#intro'); if (ie) ie.remove(); } INTRO.onExit(); // warmed up: hydrate into the home screen over the live fly-over
-  $('#playBtn').addEventListener('click', () => { BOOT.on = false; setHome(false); if (!FLY.start(MENU.course + ':1', BOOT.greet)) { startCamTween(1.6); if (BOOT.greet) setTimeout(BOOT.greet, 900); } el.classList.add('done'); setTimeout(() => el.remove(), 600); }, { once: true }); /* first time on the hole: the drone fly-over, then the tee */
+  $('#playBtn').addEventListener('click', () => { if (!BOOT.on) return; BOOT.on = false; setHome(false); if (!FLY.start(MENU.course + ':1', BOOT.greet)) { startCamTween(1.6); settleTips(1700); if (BOOT.greet) setTimeout(BOOT.greet, 900); } el.classList.add('done'); setTimeout(() => { if (!BOOT.on) el.hidden = true; }, 600); }); /* first time on the hole: the drone fly-over, then the tee */
 })();
 window.__G = G; window.__AV = () => AV; window.__cup = { PIN, cupStep }; window.__RECT = RECT; window.__ph = { PHYS, lieAt, groundHW, gradUV, planShot: () => planShot() }; window.__trees = TREES; window.__treeHit = treeHit; window.__confetti = () => CONFETTI.burst(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v); window.__trEnd = () => ({ e: trPts[TR.segs].toArray().map(x => +x.toFixed(2)), s: shPts[TR.segs].toArray().map(x => +x.toFixed(2)), t: targetUV(), r: rings.position.toArray().map(x => +x.toFixed(2)), track: !!planShot().track }); window.__blk = _blk; window.__SW = SW; window.__setup = (u, v) => { setupShot(u, v); startCamTween(.01); };
 })();
