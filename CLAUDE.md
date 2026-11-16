@@ -2,7 +2,7 @@
 
 - The game is the single file `index.html`. Keep it one self-contained file (Three.js r128 from cdnjs, everything else inline).
 - Before dropping or downgrading any draw mode, effect or graphics feature, ask Neil first. Effects stay. Perf work must not reduce graphics or gameplay.
-- No audio.
+- Audio (Neil 16 Nov): only the ball strike, the ball landing, and subtle nature birds. No UI sounds. Sound must be togglable and default on.
 - Target high fps (120 where the device allows). Check perf after visual changes (`tools/perf/bench.js`).
 - In one-line JS inside the HTML, never use `//` comments where code follows on the same line. Use `/* */`.
 - The menu state is `MENU` (not `HOME`, which is the dial constant).
