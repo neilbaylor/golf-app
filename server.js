@@ -20,7 +20,13 @@ const icons = fs.existsSync(path.join(__dirname, 'icons')) ? fs.readdirSync(path
 for (const f of ['manifest.webmanifest', ...icons]) if (fs.existsSync(path.join(__dirname, f)))
   files['/' + f] = [fs.readFileSync(path.join(__dirname, f)), TYPES[path.extname(f)] || 'application/octet-stream'];
 files['/index.html'] = files['/'];
-const cache = {}; for (const [k, [buf, type]] of Object.entries(files)) cache[k] = { buf, type, gz: zlib.gzipSync(buf, { level: 9 }), br: zlib.brotliCompressSync(buf, process.env.TP_FAST_BR ? { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } } : undefined), /* TP_FAST_BR: quick local test starts only */ etag: '"' + crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16) + '"' };
+/* BR_ASYNC (Neil 11-16 14:12, "can't load the page" after a deploy): the 4 MB page's brotli (quality 11) ran synchronously before listen(), tens of seconds of CPU on a small box, so a new
+   deploy started slowly. Now gzip is made at start (well under a second) and the server listens straight away; brotli is made off the main thread and served once it's ready (gzip until then).
+   ROLLBACK: BR_ASYNC = false -> both made synchronously before listening, as before. */
+const BR_ASYNC = true, BR_OPTS = process.env.TP_FAST_BR ? { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } } : undefined; /* TP_FAST_BR: quick local test starts only */
+const cache = {}; for (const [k, [buf, type]] of Object.entries(files)) {
+  const c = cache[k] = { buf, type, gz: zlib.gzipSync(buf, { level: 9 }), br: BR_ASYNC ? null : zlib.brotliCompressSync(buf, BR_OPTS), etag: '"' + crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16) + '"' };
+  if (BR_ASYNC && type !== 'image/png') zlib.brotliCompress(buf, BR_OPTS || {}, (e, out) => { if (!e) c.br = out; else console.error('[br]', k, e.message); }); }
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
   if (url === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
@@ -29,7 +35,7 @@ const server = http.createServer((req, res) => {
   const h = { 'Content-Type': f.type, 'Cache-Control': f.type.startsWith('text/html') ? 'no-cache' : 'public, max-age=86400', ETag: f.etag, Vary: 'Accept-Encoding' };
   if (req.headers['if-none-match'] === f.etag) { res.writeHead(304, h); return res.end(); }
   const ae = req.headers['accept-encoding'] || '', pngish = f.type === 'image/png';
-  const [body, enc] = !pngish && /\bbr\b/.test(ae) ? [f.br, 'br'] : !pngish && /\bgzip\b/.test(ae) ? [f.gz, 'gzip'] : [f.buf, null];
+  const [body, enc] = !pngish && f.br && /\bbr\b/.test(ae) ? [f.br, 'br'] : !pngish && /\bgzip\b/.test(ae) ? [f.gz, 'gzip'] : [f.buf, null];
   if (enc) h['Content-Encoding'] = enc;
   res.writeHead(200, h); res.end(req.method === 'HEAD' ? undefined : body);
 });
