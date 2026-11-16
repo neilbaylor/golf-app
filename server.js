@@ -2,6 +2,7 @@
 // (doctype, viewport, app-icon and home-screen tags), plus the manifest and icons. Compressed when the browser accepts it.
 // Multiplayer: a WebSocket endpoint at /mp on the same port (a minimal hand-rolled RFC 6455, no packages), rooms in memory.
 const http = require('http'), fs = require('fs'), path = require('path'), zlib = require('zlib'), crypto = require('crypto');
+const ELD = require('perf_hooks').monitorEventLoopDelay({ resolution: 10 }); ELD.enable(); /* /mp/stats: event-loop delay (how late the server answers), for load profiling */
 const HEAD = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Tee Party</title>
@@ -53,12 +54,21 @@ const MP = (() => {
     MAX_OVER: 3,            // MAX_TRIPLE: a shot that leaves you at par + this without holing out ends your hole there, picked up (0 = off: the old par + 7 cap)
     CHAT_MAX: 40,           // characters
     FRAME_MAX: 16384,       // bytes per message
+    AIM_MAX: 1024,          // MP_AIMCAP: bytes per aim message (a real one is ~150): bigger ones are dropped, not relayed to three phones 20 times a second
+    BP_SOFT: 65536,         // MP_BP: a socket with this much unsent: aim updates to it are skipped (the next one supersedes them anyway)
+    BP_HARD: 1048576,       // MP_BP: ...and with this much it is cut (a phone that hasn't read 1 MB isn't reading): it reconnects and resyncs from the welcome
   };
+  const MP_BP = true;       /* ROLLBACK: false -> every message is queued for every socket however far behind it is (before perf2) */
+  const MP_RESTORE = true;  /* ROLLBACK: false -> a server restart (every deploy) loses every room: a phone coming back gets a new, empty lobby under the same code (before perf2).
+    true: a phone reconnecting to a room the server doesn't have sends its last copy of the room (snap: the 'room' state it was sent, plus its own player id); the server rebuilds the room from it
+    (course, phase, hole, pars, the pins seed, turn, balls, scores, seats), the phone takes its old seat back, and the others take theirs back by id when they return (meanwhile they are 'dropped', as after any blip).
+    A shot in the air at the restart is lost (its turn goes back to aiming from the ball's last spot). */
+  const MP_AIMCAP = true;   /* ROLLBACK: false -> aim messages of any size up to FRAME_MAX are relayed (before perf2) */
   for (const k in T) if (process.env['MP_' + k]) T[k] = +process.env['MP_' + k]; /* e.g. MP_IDLE=3000 for quick tests */
   const EMO = ['❤️', '😂', '🔥', '👏', '😮', '🙈'];
   const COURSES = { hunt: 'Toronto Hunt', augusta: 'Augusta National' };
   const RATE = { aim: [20, 30], chat: [1.2, 3], react: [5, 8], typing: [2, 4], act: [2, 4], who: [2, 4], course: [2, 4], hello: [1, 3], '*': [60, 90] }; /* per second, burst */
-  const rooms = new Map(), socks = new Set(); let msgsIn = 0, msgsOut = 0, bytesIn = 0, bytesOut = 0;
+  const rooms = new Map(), socks = new Set(); let msgsIn = 0, msgsOut = 0, bytesIn = 0, bytesOut = 0, bpSkip = 0, bpCut = 0, restoredN = 0;
   const now = () => Date.now();
   const rid = n => crypto.randomBytes(n).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, n);
 
@@ -97,8 +107,9 @@ const MP = (() => {
     if (c.closed || c.sock.destroyed) return; const n = data.length; let h;
     if (n < 126) { h = Buffer.from([0x80 | op, n]); } else if (n < 65536) { h = Buffer.alloc(4); h[0] = 0x80 | op; h[1] = 126; h.writeUInt16BE(n, 2); } else { h = Buffer.alloc(10); h[0] = 0x80 | op; h[1] = 127; h.writeUInt32BE(0, 2); h.writeUInt32BE(n, 6); }
     try { c.sock.write(Buffer.concat([h, data])); } catch (e) {}
+    if (MP_BP && c.sock.writableLength > T.BP_HARD) { bpCut++; c.closed = true; try { c.sock.destroy(); } catch (e) {} } /* MP_BP: not reading at all: cut (its 'close' event runs gone(), as for any drop) */
   }
-  function send(c, o) { if (!c || c.closed) return; const s = Buffer.from(JSON.stringify(o)); msgsOut++; bytesOut += s.length; frame(c, 0x1, s); }
+  function send(c, o) { if (!c || c.closed) return; if (MP_BP && o.t === 'aim' && c.sock.writableLength > T.BP_SOFT) { bpSkip++; return; } /* MP_BP: behind: skip aim frames */ const s = Buffer.from(JSON.stringify(o)); msgsOut++; bytesOut += s.length; frame(c, 0x1, s); }
   function kill(c, code = 1000) { if (c.closed) return; const d = Buffer.alloc(2); d.writeUInt16BE(code, 0); frame(c, 0x8, d); c.closed = true; try { c.sock.end(); } catch (e) {} setTimeout(() => { try { c.sock.destroy(); } catch (e) {} }, 1000); gone(c); }
   setInterval(() => { for (const c of socks) { if (!c.alive) { kill(c, 1001); continue; } c.alive = false; frame(c, 0x9, Buffer.alloc(0)); } }, 25000).unref(); /* dead sockets: no pong within 25 s */
   function rate(c, t) { /* token buckets: one per message type and one overall */
@@ -116,10 +127,27 @@ const MP = (() => {
   function setT(R, k, ms, fn) { clearT(R, k); R.timers[k] = setTimeout(() => { delete R.timers[k]; fn(); }, Math.max(0, ms)); }
   function nameFor(R, p, who, name) { let n = String(name || who || 'Golfer').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 14) || 'Golfer'; const same = R.players.filter(q => q !== p && q.name.replace(/ \d$/, '') === n).length; return same ? n + ' ' + (same + 1) : n; }
 
+  const int = (x, lo, hi, d) => typeof x === 'number' && isFinite(x) ? Math.max(lo, Math.min(hi, Math.round(x))) : d;
+  function restore(code, m) { /* MP_RESTORE: a room rebuilt from a returning phone's last copy of it, every field checked */
+    const s = m.snap, you = typeof m.you === 'string' ? m.you : null;
+    if (!s || typeof s !== 'object' || String(s.code || '').toUpperCase() !== code || !['play', 'hole', 'done'].includes(s.phase) || !Array.isArray(s.players) || !s.players.length || s.players.length > T.MAX) return null;
+    if (!Array.isArray(s.pars) || !s.pars.length || s.pars.length > 36 || !s.pars.every(x => num(x, 2, 7)) || !you || !s.players.some(q => q && q.id === you)) return null;
+    const R = room(code), np = s.pars.length; R.restored = now(); R.course = COURSES[s.course] ? s.course : 'hunt'; R.phase = s.phase; R.pars = s.pars.map(x => Math.round(x)); R.hole = int(s.hole, 1, np, 1); if (num(s.seed, 0, 4294967295)) R.seed = s.seed >>> 0; R.shotN = int(s.shotN, 0, 1e6, 0);
+    const sc = A => Array.isArray(A) ? A.slice(0, np).map(x => x && typeof x === 'object' && num(x.s, 1, 99) ? { s: Math.round(x.s), par: int(x.par, 2, 7, 4), ...(x.pu ? { pu: true } : {}), ...(x.max ? { max: true } : {}) } : null) : [];
+    const ball = b => b && typeof b === 'object' ? { u: num(b.u, -2000, 2000) ? b.u : 0, v: num(b.v, -2000, 2000) ? b.v : 0, lie: String(b.lie || 'tee').slice(0, 12), stroke: int(b.stroke, 1, 40, 1), toPin: num(b.toPin, 0, 1e4) ? b.toPin : 1e4, done: !!b.done, holed: !!b.holed, ...(b.wait ? { wait: true } : {}), ...(b.puNow ? { puNow: true } : {}), ...(b.left ? { left: true } : {}) } : null;
+    const seen = new Set(); R.players = [];
+    for (const q of s.players) { if (!q || typeof q.id !== 'string' || !/^[A-Za-z0-9]{1,12}$/.test(q.id) || seen.has(q.id)) continue; seen.add(q.id);
+      R.players.push({ id: q.id, sid: null, seat: int(q.seat, 0, T.MAX - 1, R.players.length), name: String(q.name || 'Golfer').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 14) || 'Golfer', who: /^[a-z]{2,16}$/.test(q.who || '') ? q.who : 'neil', lefty: !!q.lefty, c: null, discAt: now(), scores: sc(q.scores), ball: ball(q.ball), pu: !!q.pu, wait: !!q.wait }); }
+    R.players.sort((a, b) => a.seat - b.seat);
+    R.turn = R.phase === 'play' && R.players.some(p => p.id === s.turn) ? s.turn : null; R.tstate = R.turn ? 'aim' : null; R.shot = null; R.autoFor = null; R.idle = { start: now(), held: 0, holdAt: null };
+    if (R.phase === 'play' && !R.turn) { const live = R.players.filter(p => p.ball && !p.ball.done); if (!live.length) R.phase = 'hole'; }
+    if (R.phase === 'hole') { R.cardAt = now() + T.CARD_AUTO; setT(R, 'card', T.CARD_AUTO, () => { if (R.phase === 'hole') startHole(R, R.hole + 1); }); }
+    restoredN++; return R; }
   function hello(c, m) {
     const code = String(m.code || '').toUpperCase(); if (!/^[A-Z0-9]{1,10}$/.test(code)) return send(c, { t: 'err', code: 'code', msg: 'Room codes are 1 to 10 letters or numbers' });
     if (c.room && c.room.code === code) leave(c, true); /* the same room again: a plain rejoin */
-    const want = /^[a-z]{2,16}$/.test(m.who || '') ? m.who : 'neil', R0 = rooms.get(code), p0 = R0 && m.sid && R0.players.find(q => q.sid === String(m.sid));
+    const want = /^[a-z]{2,16}$/.test(m.who || '') ? m.who : 'neil', R0 = rooms.get(code) || (MP_RESTORE ? restore(code, m) : null), p0 = R0 && ((m.sid && R0.players.find(q => q.sid === String(m.sid))) || (MP_RESTORE && typeof m.you === 'string' && R0.players.find(q => q.sid === null && q.id === m.you)));
+    if (p0 && p0.sid === null) p0.sid = m.sid ? String(m.sid).slice(0, 32) : rid(16); /* MP_RESTORE: a seat from a rebuilt room, taken back by its own player */
     if (R0 && !p0) { const t = R0.players.find(q => q.who === want); if (t) return send(c, { t: 'err', code: 'taken', who: want, by: t.name, taken: R0.players.map(q => ({ who: q.who, name: q.name })), msg: 'That golfer is taken' }); } /* golfers are unique per room: first come, first served */
     if (R0 && !p0 && R0.players.length >= T.MAX) return send(c, { t: 'err', code: 'full', msg: 'That room is full (4 players)' });
     if (c.room) leave(c, true); /* switching rooms from the lobby: the old seat is only given up once the new room has said yes */
@@ -139,7 +167,7 @@ const MP = (() => {
     p.c = c; p.discAt = null; c.room = R; c.pid = p.id;
     if (p.pu && R.phase === 'play') { p.pu = false; if (p.ball && p.ball.done && p.ball.puNow) joinHole(R, p); } /* back from a drop: in from the next turn */
     send(c, { t: 'welcome', you: p.id, sid: p.sid, room: pub(R), T: { IDLE: T.IDLE, RING: T.RING, HOLD_CAP: T.HOLD_CAP, RECONNECT: T.RECONNECT, CHAT_MAX: T.CHAT_MAX, CARD_AUTO: T.CARD_AUTO } });
-    sync(R); if (R.phase === 'play' && R.turn === p.id) timers(R);
+    sync(R); if (R.phase === 'play' && (R.turn === p.id || (MP_RESTORE && R.restored && !R.timers.auto && !R.timers.ring && !R.timers.idle))) timers(R);
   }
   function joinHole(R, p) { p.ball = { u: 0, v: 0, lie: 'tee', stroke: 1, toPin: 1e4, done: false, holed: false }; const sc = p.scores[R.hole - 1]; if (sc && sc.pu) p.scores.length = R.hole - 1; }
   function leave(c, quiet) { const R = c.room; if (!R) return; const p = P(R, c.pid); c.room = null; c.pid = null; if (!p) return;
@@ -225,7 +253,7 @@ const MP = (() => {
       case 'lobby': if (R.phase === 'done') { R.phase = 'lobby'; sync(R); } return;
       case 'teeoff': return teeoff(R, m);
       case 'nexthole': if (R.phase === 'hole') startHole(R, R.hole + 1); return;
-      case 'aim': if (R.turn === p.id && R.tstate === 'aim' && m.d && typeof m.d === 'object') { broadcast(R, { t: 'aim', from: p.id, n: R.shotN, d: m.d }, p); if (R.idle && !R.idle.holdAt) { R.idle.start = now(); if (R.idle.ring) timers(R); } } return; /* aiming is input: it holds off the idle clock */
+      case 'aim': if (R.turn === p.id && R.tstate === 'aim' && m.d && typeof m.d === 'object' && (!MP_AIMCAP || data.length <= T.AIM_MAX)) { broadcast(R, { t: 'aim', from: p.id, n: R.shotN, d: m.d }, p); if (R.idle && !R.idle.holdAt) { R.idle.start = now(); if (R.idle.ring) timers(R); } } return; /* aiming is input: it holds off the idle clock */
       case 'act': return act(R, p, m);
       case 'shot': return shot(R, p, m);
       case 'next': return next(R, p, m);
@@ -236,8 +264,12 @@ const MP = (() => {
     }
   }
   function stats() { let players = 0, conn = 0; for (const R of rooms.values()) { players += R.players.length; conn += R.players.filter(p => p.c).length; }
-    return { rooms: rooms.size, sockets: socks.size, players, connected: conn, msgsIn, msgsOut, bytesIn, bytesOut, mem: process.memoryUsage().rss, up: Math.round(process.uptime()) }; }
-  return { upgrade, stats, T, rooms };
+    const cpu = process.cpuUsage(), mu = process.memoryUsage(); setImmediate(() => ELD.reset());
+    return { rooms: rooms.size, sockets: socks.size, players, connected: conn, bpSkip, bpCut, restored: restoredN, msgsIn, msgsOut, bytesIn, bytesOut, mem: mu.rss, heap: mu.heapUsed, cpuMs: Math.round((cpu.user + cpu.system) / 1000), lag: { p50: +(ELD.percentile(50) / 1e6).toFixed(2), p99: +(ELD.percentile(99) / 1e6).toFixed(2), max: +(ELD.max / 1e6).toFixed(2) }, up: Math.round(process.uptime()) }; } /* lag: since the previous stats read (it resets) */
+  function drain() { for (const c of [...socks]) kill(c, 1012); } /* MP_DRAIN: 1012 'service restart' to every phone: they reconnect (with their sid) to the new instance */
+  return { upgrade, stats, T, rooms, drain };
 })();
 server.on('upgrade', (req, sock) => MP.upgrade(req, sock));
+const MP_DRAIN = true; /* ROLLBACK: false -> SIGTERM (a Railway redeploy) kills the process at once: every phone sees an abrupt drop (1006) and buffered messages are lost (before perf2) */
+if (MP_DRAIN) process.on('SIGTERM', () => { console.log('SIGTERM: closing sockets (1012) and exiting'); try { server.close(); } catch (e) {} try { MP.drain(); } catch (e) {} setTimeout(() => process.exit(0), 1500); });
 server.listen(process.env.PORT || 3000, '0.0.0.0', () => console.log('Tee Party on port ' + (process.env.PORT || 3000)));
