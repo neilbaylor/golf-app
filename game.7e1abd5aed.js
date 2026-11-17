@@ -31,7 +31,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v411'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v413'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -188,7 +188,7 @@ const HOLELOAD = { /* the big loader card: only covers a page opened straight on
   show(h) { const el = document.getElementById('holeLdr'); el.querySelector('img').src = h.logo || COURSE_LOGO; el.querySelector('img').classList.toggle('thin', CID === 'augusta');el.querySelector('b').textContent = h.title || `Hole ${h.n}`; el.querySelector('b').style.fontSize = h.title ? '34px' : ''; el.querySelector('span').textContent = h.sub || `Par ${h.par} · ${h.yds} yds`; el.hidden = false; requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on'))); },
   hide() { const el = document.getElementById('holeLdr'); el.classList.remove('on'); document.documentElement.classList.remove('holeNext'); setTimeout(() => { el.hidden = true; }, 450); },
   go(n, holes) { HOLESYS.go(CID, n, holes, () => { if (n === NINE.first(CID)) FLY.reset(); playHole(); }); } }; /* (a new round gets its fly-over again, as the reload used to give it) */ /* the next hole loads in place (HOLESYS): only a small pill over the card if it isn't ready yet */
-if (ROUND.auto) HOLELOAD.show(HOLE); else if (TO_HOME) HOLELOAD.show({ title: COURSE_NAME, sub: NINE.has(CID) ? NINE.sub(CID) : CID === 'augusta' ? '18 holes · Par 72' : '9 holes · Par 35' }); else document.documentElement.classList.remove('holeNext');
+if (ROUND.auto && !(RESUME_SPLASH && !document.documentElement.classList.contains('holeNext'))) HOLELOAD.show(HOLE); else if (ROUND.auto) {} /* RESUME_SPLASH: the splash stays up until the hole starts */ else if (TO_HOME) HOLELOAD.show({ title: COURSE_NAME, sub: NINE.has(CID) ? NINE.sub(CID) : CID === 'augusta' ? '18 holes · Par 72' : '9 holes · Par 35' }); else document.documentElement.classList.remove('holeNext');
 const HP_CLEAR = true; if (HP_CLEAR) document.getElementById('app').classList.add('hpClear'); /* undo switch (Neil 11-15): the RH/LH badge clear of the big yardage (in front of it, never behind) with its text centred in the pill (CSS: #app.hpClear); false = v353 */
 const RES_BIG = true; if (RES_BIG) document.getElementById('app').classList.add('resBig'); /* undo switch (Neil 11-15): the shot card's carry / roll / total / pin / spin / apex, its labels, the swing note and tempo all bigger, the card a little wider (CSS: #app.resBig); false = v353 sizes */
 const OSM_HUNT = true; /* undo switch (Neil 11-15): the fly-over's "© OpenStreetMap contributors" credit on every Toronto Hunt hole too (hole 1 is traced on the OSM hole); false = only on holes built from data (v353) */
@@ -672,7 +672,8 @@ const CUP = { R: .16, tf: .18 };
 // one, so a shot has to cross it slower (tf) and nearer the middle (core) or it lips out, unless it is barely rolling (crawl);
 // on the fly it only drops landing well inside (land) and soft (landV), else it pops out. Putts keep CUP.
 const CUP_OFF = true; /* rollback flag: false = off-green shots use the putt-style cup (v327) */
-const CUP_SHOT = { tf: .4, core: .5, crawl: .45, land: .6, landV: 2.5 };
+const CHIP_EASIER = true; /* Neil 17 Nov 12:05 (v412): "we made it harder to chip in, which is good, but now it's too hard": the off-green cup goes about halfway back toward the old putt-style one: a rolling ball drops at a bit more pace (tf .4 -> .3), can come in nearer the edge (core .5 -> .65) and at more pace before an edge-clip lips out (crawl .45 -> .6); on the fly it drops landing within .75 of the radius (was .6) and a little firmer (3.2, was 2.5). false = v411 */
+const CUP_SHOT = CHIP_EASIER ? { tf: .3, core: .65, crawl: .6, land: .75, landV: 3.2 } : { tf: .4, core: .5, crawl: .45, land: .6, landV: 2.5 };
 const PH_RULE = { win: .006, pinYd: 5 }; /* rollback (Neil): full-swing 'pin high' power window tightened from .009 to .006 of the meter; it is only called PIN HIGH when the target is within pinYd of the pin, otherwise ON THE NUMBER. null = v342 behaviour */
 const HBUB_TAIL = -20; /* rollback (Neil): px the home speech bubble's tail sits left of the golfer's centre, so it doesn't line up exactly with the flapper. 0 = centred (v348) */
 const BUB_FIT = true; /* undo switch (Neil 11-15: a short line like "Yay" had its tail oddly near the bubble's corner): the home bubble slides so its tail lands HBUB_TAIL off the face while staying >= 14 px clear of the rounded corners (centred on a bubble too short for that), short bubbles get a min width; false = v353 placement */ if (BUB_FIT) document.getElementById('app').classList.add('bubFit');
@@ -5907,6 +5908,7 @@ const QUIT = (() => {
     const el = $('#boot'); BOOT.on = true; if (!MENU.hold) MENU.t = 1.4; /* the menu first, so whatever happens below you always land on it */
     if (el) { el.style.transition = 'none'; el.hidden = false; el.classList.remove('done'); void el.offsetWidth; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; })); } /* back at once: no fade (its visibility transition would leave the bare course showing for a moment) */
     try { setHome(true); } catch (e) { console.error(e); }
+    if (QUIT_HOME_FIX && el && !el.classList.contains('home')) { try { el.classList.add('home'); BOARD.home(); } catch (e) { console.error(e); } } /* QUIT_HOME_FIX (v413): a round resumed by a refresh never built the home screen (no titles, straight onto the hole), so Quit landed on a bare splash: build it now. false = as v412 */
     const step = f => { try { f(); } catch (e) { console.error(e); } }; /* then reset the round piece by piece: one hiccup can't strand you on the course */
     step(() => { clearTimeout(G.resTO); if (G.drop) DROP.close(); FLY.stop(); FLY.reset(); }); /* a new round from home gets its fly-over again */
     step(() => { $('#result').hidden = true; $('#result').classList.remove('final'); app.classList.remove('resulting', 'flying', 'previewing', 'swinging', 'settling'); G.preview = null; G.camTween = null; });

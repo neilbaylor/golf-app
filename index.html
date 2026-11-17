@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.9beea97dd4.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.7e1abd5aed.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -41,7 +41,9 @@ try { if (MP_SHARE) { const q = new URLSearchParams(location.search), hm = /^#ro
   if (q.has('room') || hm) { q.delete('room'); const s = q.toString(); history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + (hm ? '' : location.hash)); }
   if (r) { window.__mpRoom = r; sessionStorage.setItem('tp_home', '1'); } } } catch (e) {}
 /* coming in from "Next hole" / "Play again": the hole loader covers the very first paint */
-try { if (/^#(augusta-)?hole-\d+$/.test(location.hash) || /"go":true/.test(sessionStorage.getItem('tp_round') || '') || sessionStorage.getItem('tp_home')) document.documentElement.classList.add('holeNext'); } catch (e) {}
+/* RESUME_SPLASH (Neil 17 Nov, v413): a refresh that lands back on a hole shows the regular Tee Party splash (not the blue hole card) and goes straight onto the hole. false = the blue card, as v412 */
+const RESUME_SPLASH = true, QUIT_HOME_FIX = true;
+try { if ((!RESUME_SPLASH && /^#(augusta-)?hole-\d+$/.test(location.hash)) || /"go":true/.test(sessionStorage.getItem('tp_round') || '') || sessionStorage.getItem('tp_home')) document.documentElement.classList.add('holeNext'); } catch (e) {}
 /* iOS home-screen app: with the translucent status bar the page is laid out one status-bar short, which leaves a strip of
    page background along the bottom. Stretch the page to the full screen height there. */
 const SA_FIT_EARLY = true, SA_INSET_MEMO = true;
@@ -1170,5 +1172,5 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
 if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror="__splitFail()"><\/script>');</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.9beea97dd4.js" onerror="__splitFail()"></script>
+<script src="game.7e1abd5aed.js" onerror="__splitFail()"></script>
 
