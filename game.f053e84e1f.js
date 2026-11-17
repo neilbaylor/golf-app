@@ -27,7 +27,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v402'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v404'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1403,6 +1403,8 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
 }
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
 const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
+const SAY_DODGE = true; /* Neil 17 Nov (v404): "on long putts your character's speech bubble covers the hole ... maybe we just don't have the player talk when it's that situation": putting, if the hole is (or the putting view settles) under the bubble, the golfer doesn't say the line (one already up goes). Other shots unchanged. false = they always talk, as v403 */
+const ROUND_HOME_DIRECT = true; /* Neil 17 Nov (v403): Home on the finished-round scorecard goes straight home (the round is over: no "your score won't be kept" ask). false = it asks, as v402 */
 const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
 $('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
 function updateCull() {
@@ -2449,6 +2451,34 @@ function* teePlanCheckG(tp) { /* HUNT_TEE_PLAN: the carry fit lands it on its sp
   try { const E = yield* fin(); yield; if (E.ok) return true; if (E.tree) return false; if (!E.wet && G.D >= dmax() - .05 && Math.hypot(E.u - b.u, E.v - b.v) < Math.hypot(tp.u - b.u, tp.v - b.v) && safe(E.u, E.v)) return true; /* full power and short of it (into the wind) on the fairway: a refit can't help */ const d0 = { ...G.dir }, D0 = G.D, T = { u: E.lu + tp.u - E.u, v: E.lv + tp.v - E.v }, du = T.u - b.u, dv = T.v - b.v, L = Math.hypot(du, dv) || 1;
     G.dir = { u: du / L, v: dv / L }; G.D = clamp(L, dmin(), dmax()); yield* caddieFitG(false); planShot(true); yield; const E2 = yield* fin(); yield;
     if (!(E2.ok || (!E2.tree && E2.s < E.s))) { G.dir = d0; G.D = D0; } return !!E2.ok; } catch (e) { return false; } } /* -> the plan finishes where it should (teePlanAltG tries the alt if not) */
+const HUNT2_WIND_RIGHT = true; /* ROLLBACK: false -> as v400. Neil (17 Nov 07:11, option 2): "aim further right in a left-pushing wind, accepting the line clips the trees on mis-hits." Hunt 2's tee plan (225, left side) in a wind pushing the ball LEFT: holding the spot needs the start line aimed right, over the dogleg corner's crowns, and CADDIE_TREE_SAFE gave that wind allowance back (or the refit flew into the crowns and was dropped), so a perfect strike drifted to the bunker's lip (Neil's 20 seeded strikes in 9 mph: 1 fairway, 9 rough, 4 sand, 6 trees). With it on, only there (Hunt 2's opening tee shot with the plan's club, a left-pushing crosswind over 1 mph across the plan's line): when a PERFECT strike flown in that wind (its real, lifted flight) is clear of every tree and finishes on the 225 spot's fairway (within 6 yds of it, 2 yds in from the edge, no sand within 6 yds: the left half, clear of the bunker), that aim is kept even if the calm tracer runs over the crowns. When the check's refit didn't get there, the aim is turned toward the spot by the miss of the plan's own wind flight. Three aims are tried, stopping at the first that holds: 0.5 deg less allowance (about 2 yds left of the spot, more room from the crowns), the full allowance, 1 deg less. Each costs one wind flight and roll, plus one more wind flight launched 0.66 deg low (the low end of the launch scatter launch() deals out even on a pure strike), which must also clear every crown. None holds: as before (the 200 alt, the give-back). The held aim's calm line is drawn white, not red, and AUTO_PUNCH leaves it alone (a drag or a club change ends the hold) */
+function h2wCase(tp) { if (!HUNT2_WIND_RIGHT || !tp || tp !== TEE_PLAN[2] || HOLE.n !== 2 || G.mode !== 'full') return false; const wv = caddieWv(); if (!wv) return false; const b = G.ball, du = tp.u - b.u, dv = tp.v - b.v, L = Math.hypot(du, dv) || 1; return (wv.x * -dv - wv.z * du) / L > .447; } /* the wind's component toward the left of the tee-to-spot line, over 1 mph (wv: x = u, z = -v) */
+function h2wHeld() { const H = G.h2w; return !!(HUNT2_WIND_RIGHT && H && H.ball === G.ball && H.u === G.dir.u && H.v === G.dir.v && H.D === G.D && H.club === G.club && H.mode === G.mode); } /* the caddie's held aim, untouched since */
+function h2wLowHit(wv) { const pl = planShot(); perfectFlight(pl, wv); const spin = shotSpec(club(), G.mode, G.height, 1, G.D, G.Feff).spin * (pl.spinMul || 1), ws = pl.pfWs ?? 1, fl = PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launchL - .66 * (MODES[G.mode].risk || 1), spin, tilt: pl.tiltL, speed: pl.pfSp * (pl.speedMul || 1), wind: { x: wv.x * ws, z: wv.z * ws } }, groundHW); liftPts(fl.pts); return !!firstTreeHit(fl.pts); } /* HUNT2_WIND_RIGHT: the same perfect strike in the wind, launched at the low end launch() deals out even on a pure strike (0.66 deg down): does it clip a crown? (perfectFlight first: its speed and wind scale, memoised) */
+function* h2wAimG(tp, ok) { /* HUNT2_WIND_RIGHT: -> true when the aim is held (the alt and the give-back are skipped) */
+  const b = G.ball, d0 = { ...G.dir }, D0 = G.D, c0 = G.caddieTree, wv = caddieWv(), own = (u, v) => !AUGD || !AUGD.own || AUGD.own.some(q => inPB(u, v, q)), fw = (u, v) => lieAt(u, v) === 'fairway' && own(u, v), ring = (u, v, r, f) => [0, 1, 2, 3, 4, 5, 6, 7].every(k => f(u + Math.sin(k * .7854) * r, v + Math.cos(k * .7854) * r));
+  const good = E => !E.tree && !E.wet && Math.hypot(E.u - tp.u, E.v - tp.v) < 6 && fw(E.u, E.v) && ring(E.u, E.v, 2, fw) && ring(E.u, E.v, 6, (u, v) => lieAt(u, v) !== 'sand'); /* on the spot's fairway: within 6 yds of it, 2 yds in from the edge (the fairway narrows past the spot), no sand within 6 yds */
+  try { let aS = Math.atan2(d0.u, d0.v), DS = D0;
+    if (!ok || G.caddieTree) { /* the check didn't get there: turn the aim toward the spot by the miss of the plan's own wind flight (already flown: only its roll is new) */
+      const E = F3.slice ? yield* windEndG(wv) : windEnd(wv); yield; if (E.tree || E.wet) return false; /* no clear finish to steer from: as before */
+      const da = Math.atan2(tp.u - b.u, tp.v - b.v) - Math.atan2(E.u - b.u, E.v - b.v); if (Math.abs(da) > .12) return false; /* (more than ~7 deg off: not this case) */
+      aS += da; DS = D0 * Math.hypot(tp.u - b.u, tp.v - b.v) / (Math.hypot(E.u - b.u, E.v - b.v) || 1); }
+    for (const dl of [.5, 0, 1]) { const a = aS - dl * Math.PI / 180; G.dir = { u: Math.sin(a), v: Math.cos(a) }; G.D = clamp(DS, dmin(), dmax()); planShot(true); yield; /* aS: the aim that holds the spot; 0.5 deg less of the allowance first (about 2 yds left of it, more room from the crowns its start line runs past), then all of it, then 1 deg less */
+      const E2 = F3.slice ? yield* windEndG(wv) : windEnd(wv); yield; if (!good(E2)) continue; if (h2wLowHit(wv)) continue; yield; /* the finish on the spot's fairway, and the wind flight clear even launched a touch low */
+      const T = targetUV(); if (underCrown(T.u, T.v)) continue; G.caddieTree = false; G.h2w = { ball: G.ball, u: G.dir.u, v: G.dir.v, D: G.D, club: G.club, mode: G.mode }; return true; } /* (the marker itself never under a crown) */
+  } catch (e) {}
+  G.dir = d0; G.D = D0; G.caddieTree = c0; return false; }
+function* h2wRescueG(tp, F) { /* HUNT2_WIND_RIGHT (main, 17 Nov: the same left-wind problem): no aim held the spot, and a perfect strike of the plan as it now stands, in the wind, ends in a tree or OB (v401: the 3 woods at 8-14 mph, most golfers in a left-and-into wind). Then the first clear one of: the 200 alt with this club, then (only while the caddie sets the shot up: a club you pick is never changed) one, two, three clubs shorter down the left (at the alt, or onto the fairway at its reach). Clear: a perfect strike in the wind clear of every crown (launched a touch low too), finishing out of the trees, water and OB, the marker not under a crown. None: as before */
+  const wv = caddieWv(), bad = E => E.tree || E.wet || lieAt(E.u, E.v) === 'trees', a = tp.alt; if (!a) return false;
+  const E0 = F3.slice ? yield* windEndG(wv) : windEnd(wv); yield; if (!bad(E0)) return false; /* (the usual case: one roll of a flight already flown) */
+  const s0 = { club: G.club, mode: G.mode, Feff: G.Feff, dir: G.dir, D: G.D, ct: G.caddieTree, tp: G.teePlan ? { ...G.teePlan } : null };
+  const clear = function* () { planShot(true); yield; const E = F3.slice ? yield* windEndG(wv) : windEnd(wv); yield; if (bad(E) || h2wLowHit(wv)) return null; const T = targetUV(); return underCrown(T.u, T.v) ? null : E; };
+  const take = E => { G.caddieTree = false; if (G.teePlan) { G.teePlan.club = G.club; G.teePlan.yd = G.club === s0.club ? a.yd : Math.round(Math.hypot(E.u - G.ball.u, E.v - G.ball.v) / 5) * 5; G.teePlan.bunker = false; } let red = false; try { red = !!planShot().tree; } catch (e) {} if (red) G.h2w = { ball: G.ball, u: G.dir.u, v: G.dir.v, D: G.D, club: G.club, mode: G.mode }; return true; }; /* (a calm line over the crowns is held like the right aim: white, no punch) */
+  const plan = function* (Fc) { const T = yield* teePlanLandG(a, Fc), b = G.ball, du = T.u - b.u, dv = T.v - b.v, L = Math.hypot(du, dv) || 1; G.dir = { u: du / L, v: dv / L }; G.D = clamp(L, dmin(), Fc); yield* caddieFitG(false); yield* teePlanCheckG(a); return yield* clear(); };
+  try { let E = yield* plan(F); if (E) return take(E);
+    if (G.h2wB === G.ball) for (let i = s0.club + 1; i <= s0.club + 3 && i < CLUBS.length; i++) { if (!modeAllowed('full', i)) continue; G.club = i; G.mode = 'full'; applyModeTempo(); G.Feff = meterTop(i, 'full'); E = yield* plan(dmax()); if (E) return take(E); }
+  } catch (e) {}
+  G.club = s0.club; G.mode = s0.mode; applyModeTempo(); G.Feff = s0.Feff; G.dir = s0.dir; G.D = s0.D; G.caddieTree = s0.ct; G.teePlan = s0.tp; return false; }
 if (HUNT_TEE_PLAN) window.__TP = { windEnd: () => windEnd(caddieWv()), plan: () => teePlan(), club: tp => teePlanClub(tp), TEE_PLAN, TP_ROLL, bunkers: () => BUNKERS, own: (u, v) => !!(AUGD && AUGD.own && AUGD.own.some(q => inPB(u, v, q))) }; /* test hook */
 function pickClub() { return drainG(pickClubG()); }
 function* pickClubG() {
@@ -2517,7 +2547,7 @@ function* augFairwayAimG(b, tu, tv, F) {
     if (best) return best; }
   return null; }
 function* autoAimG() {
-  const b = G.ball, F = dmax(), pd = pinDist(); let tu, tv; const tp = HUNT_TEE_PLAN && G.club > 0 && G.mode !== 'putt' ? teePlan() : null; if (HUNT_TEE_PLAN) G.teePlan = null;
+  const b = G.ball, F = dmax(), pd = pinDist(); let tu, tv; const tp = HUNT_TEE_PLAN && G.club > 0 && G.mode !== 'putt' ? teePlan() : null; if (HUNT_TEE_PLAN) G.teePlan = null; if (HUNT2_WIND_RIGHT) G.h2w = null;
   if (tp) { const T = yield* teePlanLandG(tp, F); tu = T.u; tv = T.v; G.teePlan = { n: HOLE.n, club: G.club, yd: tp.yd, bunker: !!tp.bunker }; } /* HUNT_TEE_PLAN: the lay-up's landing spot (any club but the driver) */
   else if (pd <= F * 1.0) { tu = PIN.u; tv = PIN.v;
     if (AUGD && G.lie === 'tee' && HOLE.par >= 4 && pd > F * .8) { const hit = (u, v) => { const lz = lieAt(u, v); return lz === 'ob' || lz === 'water' || TREES.some(t => Math.abs(t.u - u) < t.r && Math.abs(t.v - v) < t.r && Math.hypot(t.u - u, t.v - v) < t.r * .85); }, clear = (a, R) => { const su = Math.sin(a), sv = Math.cos(a); for (let s = 25; s < R - 4; s += 2) if (hit(b.u + su * s, b.v + sv * s)) return false; return true; }, a0 = Math.atan2(PIN.u - b.u, PIN.v - b.v); /* a par 4 whose pin is just in reach (Hunt 8's dogleg): if the straight line crosses trees, OB or water, take the middle of the widest clear window onto this hole's own fairway, a little short so it stays on it */
@@ -2531,8 +2561,10 @@ function* autoAimG() {
   const fd0 = { ...G.dir }, fD0 = G.D; /* (CADDIE_TREE_SAFE: the aim before the fit) */
   if (CADDIE_ELEV || AIM_ROLLFIT) yield* caddieFitG(tu === PIN.u && tv === PIN.v);
   const tpOk = tp && CADDIE_CARRY ? yield* teePlanCheckG(tp) : true; /* HUNT_TEE_PLAN: the finish, in the wind */
-  if (tp && tp.alt && CADDIE_CARRY) yield* teePlanAltG(tp, F, !tpOk); /* HUNT_TEE_PLAN: the line clips a tree: the shorter lay-up, if it's clear */
-  if (CADDIE_TREE_SAFE && (CADDIE_ELEV || AIM_ROLLFIT)) yield* treeSafeG(fd0, fD0, tu === PIN.u && tv === PIN.v);
+  const h2w = tp && CADDIE_CARRY && h2wCase(tp) ? yield* h2wAimG(tp, tpOk) : false; /* HUNT2_WIND_RIGHT: Hunt 2 in a left-pushing wind: the aim that holds the spot, kept */
+  if (tp && tp.alt && CADDIE_CARRY && !h2w) yield* teePlanAltG(tp, F, !tpOk); /* HUNT_TEE_PLAN: the line clips a tree: the shorter lay-up, if it's clear */
+  if (CADDIE_TREE_SAFE && (CADDIE_ELEV || AIM_ROLLFIT) && !h2w) yield* treeSafeG(fd0, fD0, tu === PIN.u && tv === PIN.v);
+  if (tp && CADDIE_CARRY && !h2w && h2wCase(tp)) yield* h2wRescueG(tp, F); /* HUNT2_WIND_RIGHT: still into the trees or OB in the wind: the alt, then a shorter club down the left */
 }
 function autoAim() { return runG(autoAimG()); }
 /* AIM_SAFE: is the current plan wet? Aimed at OB/water, planned to fly onto it, a perfect strike finishing in it, or, across what this lie
@@ -2570,6 +2602,7 @@ function shortWarn() { /* CADDIE_SHORT_WARN: clear line, but the lie's short end
 function* autoPunchG(say = false) {
   if (!G.ball || G.modeManual || G.mode === 'punch' || G.mode === 'putt' || G.mode === 'sand' || G.lie === 'green') return false;
   try { if (!planShot().tree) return false; } catch (e) { return false; }
+  if (HUNT2_WIND_RIGHT && h2wHeld()) return false; /* HUNT2_WIND_RIGHT: the calm line clips the corner, the wind flight doesn't */
   const m0 = G.mode, c0 = G.club, F0 = G.Feff, D = G.D;
   if (PUNCH_CLUB && !say && (yield* punchClubG(m0, c0))) return true; /* PUNCH_CLUB: sized for the punch's own flight (else as before, below) */
   for (let i = CLUBS.length - 1; i >= 0; i--) { if (!modeAllowed('punch', i)) continue; const [lo, hi] = modeRange(i, 'punch'); if (D < lo - .01 || D > hi + .01) continue;
@@ -2738,8 +2771,8 @@ function setupShot(u, v, lie) { hushPre(); caddieCancel(); WSNAP = { ...G.wind }
 function setupShotW(u, v, lie) { if (CADDIE_FAST2) { HUD_HOLD++; try { setupShot0(u, v, lie); } finally { HUD_HOLD--; } updateHUD(); return; } setupShot0(u, v, lie); }
 function* setupShotG(u, v, lie) {
   if (TREE_UNSTICK) { G.treeGrace = null; if (lie !== 'tee') { const n = treeFree(u, v); if (n) { u = n.u; v = n.v; if (lie) lie = lieAt(u, v); } } }
-  G.ball = { u, v }; G.lie = lie || lieAt(u, v); if (G.lie === 'water') G.lie = 'rough';
-  G.curve = curveDefault(); G.spinX = 0; G.height = 0; const [m, ci] = F3.slice ? yield* autoModeG() : autoMode(); G.mode = m; applyModeTempo(); yield* setClubG(ci); if ((CADDIE_ELEV || CADDIE_CARRY) && G.caddieShort && G.club > 0) yield* setClubG(G.club - 1); /* CADDIE_ELEV: can't get there at full power (uphill): one more club */ else if (CADDIE_CARRY && G.caddieLong && G.club < CLUBS.length - 1 && modeAllowed(G.mode, G.club + 1)) yield* setClubG(G.club + 1); /* CADDIE_CARRY: still flies past at its shortest full swing (downhill, downwind): one less */ placeBall(); if (TREE_UNSTICK && (yield* treeEscapeG())) placeBall(); const safeMoved = AIM_SAFE && (yield* aimSafeG()); if (safeMoved) placeBall(); G.modeManual = false; G.autoPunch = null; if (AUTO_PUNCH && (yield* autoPunchG())) placeBall(); G.shortWarn = CADDIE_SHORT_WARN && !safeMoved && !G.autoPunch && shortWarn(); updateHUD(); tracerDirty = true; puttView();
+  G.ball = { u, v }; G.lie = lie || lieAt(u, v); if (G.lie === 'water') G.lie = 'rough'; if (HUNT2_WIND_RIGHT) G.h2wB = G.ball; /* HUNT2_WIND_RIGHT: the caddie's own setup (it may hand you a shorter club) */
+  G.curve = curveDefault(); G.spinX = 0; G.height = 0; const [m, ci] = F3.slice ? yield* autoModeG() : autoMode(); G.mode = m; applyModeTempo(); yield* setClubG(ci); if ((CADDIE_ELEV || CADDIE_CARRY) && G.caddieShort && G.club > 0) yield* setClubG(G.club - 1); /* CADDIE_ELEV: can't get there at full power (uphill): one more club */ else if (CADDIE_CARRY && G.caddieLong && G.club < CLUBS.length - 1 && modeAllowed(G.mode, G.club + 1)) yield* setClubG(G.club + 1); /* CADDIE_CARRY: still flies past at its shortest full swing (downhill, downwind): one less */ placeBall(); if (TREE_UNSTICK && (yield* treeEscapeG())) placeBall(); const safeMoved = AIM_SAFE && (yield* aimSafeG()); if (safeMoved) placeBall(); G.modeManual = false; G.autoPunch = null; if (AUTO_PUNCH && (yield* autoPunchG())) placeBall(); G.shortWarn = CADDIE_SHORT_WARN && !safeMoved && !G.autoPunch && shortWarn(); if (HUNT2_WIND_RIGHT) G.h2wB = null; updateHUD(); tracerDirty = true; puttView();
 }
 function setupShot0(u, v, lie) { return runG(setupShotG(u, v, lie)); }
 /* TREE_UNSTICK: a ball never rests inside a trunk or a crown that comes down to the grass: out to the nearest free spot (straight out from the trunk, else round it), never into water or OB */
@@ -4071,7 +4104,7 @@ function restorePrev() { const p = G.prev; G.ball = { u: p.u, v: p.v }; G.lie = 
   window.addEventListener('pointerdown', e => { const r = $('#result'); if (r.hidden || QUIT && !$('#quitUI').hidden) return; const go = r.querySelector('#resBtns .btn[data-a="next"][hidden]'); if (!go) return; e.stopPropagation(); e.preventDefault(); go.click(); eat = performance.now(); }, true); /* eat the tap's own click afterwards (set after, so the synthetic click gets through) */
   window.addEventListener('click', e => { const fresh = eat && performance.now() - eat < 700; eat = 0; if (fresh) { e.stopPropagation(); e.preventDefault(); } }, true); } /* only that same tap's click: a stale flag (some phones send no click after a handled touch) must never swallow a later button press */
 $('#resBtns').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return; const a = b.dataset.a; sfx('pop'); if (a === 'quit') { QUIT.ask(); return; } clearTimeout(G.resTO);
+  const b = e.target.closest('button'); if (!b) return; const a = b.dataset.a; sfx('pop'); if (a === 'quit') { if (ROUND_HOME_DIRECT && $('#result').classList.contains('round')) QUIT.home(); else QUIT.ask(); return; } clearTimeout(G.resTO);
   if (a === 'nexthole') { HOLELOAD.go(HOLE_N + 1, ROUND.holes.concat([holeStats(G.log)])); return; }
   if (a === 'finish') { ROUND.holes.push(holeStats(G.log)); showRoundCard(); return; }
   if (a === 'newround') { if (HOLE_N !== NINE.first(CID)) { HOLELOAD.go(NINE.first(CID), []); return; } ROUND.holes = []; } if (a !== 'next') G.preview = null;
@@ -4629,7 +4662,7 @@ const MINI = (() => {
     g.save(); g.translate(W / 2, H * .8); g.rotate(-th); g.scale(sc, sc); g.translate(-px(G.ball.u), -py(G.ball.v));
     g.drawImage(base, 0, 0);
     const pts = plan.track || plan.f.pts; g.beginPath(); pts.forEach((q, i) => i ? g.lineTo(px(q.x), py(-q.z)) : g.moveTo(px(q.x), py(-q.z)));
-    g.lineWidth = 4.2 / sc; g.strokeStyle = INK; g.lineCap = 'round'; g.stroke(); g.lineWidth = 2.2 / sc; g.strokeStyle = plan.tree ? '#ff6a55' : SUN; g.stroke(); /* red: a tree's in the way */
+    g.lineWidth = 4.2 / sc; g.strokeStyle = INK; g.lineCap = 'round'; g.stroke(); g.lineWidth = 2.2 / sc; g.strokeStyle = plan.tree && !(HUNT2_WIND_RIGHT && h2wHeld()) ? '#ff6a55' : SUN; g.stroke(); /* red: a tree's in the way */
     const tg = targetUV(); g.beginPath(); g.arc(px(tg.u), py(tg.v), 4.5 / sc, 0, 7); g.lineWidth = 2 / sc; g.strokeStyle = INK; g.fillStyle = SUN; g.fill(); g.stroke();
     g.beginPath(); g.moveTo(px(PIN.u), py(PIN.v)); g.lineTo(px(PIN.u), py(PIN.v) - 9 / sc); g.lineWidth = 1.6 / sc; g.strokeStyle = INK; g.stroke();
     g.beginPath(); g.moveTo(px(PIN.u), py(PIN.v) - 9 / sc); g.lineTo(px(PIN.u) + 6 / sc, py(PIN.v) - 6.5 / sc); g.lineTo(px(PIN.u), py(PIN.v) - 4 / sc); g.fillStyle = SUN; g.fill(); g.stroke();
@@ -4689,7 +4722,7 @@ function updateTracer() {
     if (Math.abs(dx) + Math.abs(dz) > 1e-3) for (let s = 1; s <= TR.segs; s++) { const k = trT[s] * trT[s] * (3 - 2 * trT[s]), x = trPts[s].x + dx * k, z = trPts[s].z + dz * k, gy = groundHW(x, z);
       trPts[s].set(x, s === TR.segs ? gy + .15 : Math.max(trPts[s].y, gy + .15), z); shPts[s].set(x, gy + .06, z); } }
   { // trees in the way: the whole line turns red and an inked X marks where it would clip one (the line still runs on to the target)
-    const hit = plan.tree; TT.red = !!hit;
+    const hit = plan.tree && !(HUNT2_WIND_RIGHT && h2wHeld()) ? plan.tree : null; TT.red = !!hit; /* (HUNT2_WIND_RIGHT: the held aim's calm line stays white) */
     if (hit) { let sH = 1; while (sH < TR.segs && trT[sH] < hit.t) sH++; const k = clamp((hit.t - trT[sH - 1]) / Math.max(1e-6, trT[sH] - trT[sH - 1]), 0, 1);
       _hp.lerpVectors(trPts[sH - 1], trPts[sH], k); }
     let wet = false; if (TRACER_WET && !hit) { const tw = targetUV(), lw = lieAt(tw.u, tw.v); wet = lw === 'water' || lw === 'ob'; } TT.wet = wet; /* TRACER_WET: aimed into water or out of bounds -> the line turns red too */
@@ -5360,6 +5393,7 @@ const AV = (() => {
   function say(text, opts = {}) {
     if (st.text && st.shown < st.text.length && !opts.force) { if (st.queue.length < 1) st.queue.push([text, opts]); return; }
     st.text = text; st.pre = !!opts.pre; st.shown = 0; st.typeAcc = 0; st.hideT = 0; bubble.hidden = false; sayA.textContent = ''; sayB.textContent = text; st.drawn = 0; if (BUB_FIT) { bubble.classList.remove('short'); bubble.classList.toggle('short', bubble.offsetWidth < 78); } /* BUB_FIT: a one-word line gets a wider, centred bubble so the tail isn't in its corner */ app.style.setProperty('--sayH', (bubble.offsetHeight + 12) + 'px'); setTalking(true);
+    if (SAY_DODGE) { st.rect = null; const c = RECT.canvas; if (c) { const r = bubble.getBoundingClientRect(), m = 16; st.rect = { l: r.left - c.left - m, r: r.right - c.left + m, t: r.top - c.top - m, b: r.bottom - c.top + m }; } if (holeUnder()) { hush(); if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } } /* SAY_DODGE: putting with the hole under where the bubble would be: no line (the mood still shows on the face) */
     bubble.style.animation = 'none'; void bubble.offsetWidth; bubble.style.animation = '';
     if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5);
   }
@@ -5368,6 +5402,12 @@ const AV = (() => {
   function setMood(m, dur = 2.5) { st.mood = m; st.moodT = dur; if (m === 'happy' || m === 'proud') st.nod = 1; if (m === 'sad' || m === 'oops') st.shake = 1; if (m === 'happy') st.hop = 1; }
   function glance(x, y, dur = 1.1) { st.lookT = { x, y }; st.glanceT = dur; }
   function focus(on) { st.focus = on; if (on) { bubble.hidden = true; st.text = ''; setTalking(false); } }
+  const _sd = new THREE.Vector3();
+  function holeUnder() { /* SAY_DODGE: putting, and the hole is under the bubble's box (read once per line, in say) */
+    if (!st.rect || G.mode !== 'putt' || typeof PIN !== 'object' || !PIN) return false; _sd.set(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v); const q = project(_sd), r = st.rect;
+    return q.z < 1 && q.x > r.l && q.x < r.r && q.y > r.t && q.y < r.b; }
+  function hush() { bubble.hidden = true; st.text = ''; st.pre = false; st.queue.length = 0; setTalking(false); } /* (lines queued behind it go too: they'd cover the hole just the same) */
+  function dodge() { if (st.text && !bubble.hidden && holeUnder()) hush(); } /* the putting view settled with the hole under a line already up: the golfer stops talking */
   function update(dt, t) {
     // talking
     let talking = false;
@@ -5382,6 +5422,7 @@ const AV = (() => {
         if (st.hideT > 1.9 + st.text.length * .02) { if (st.queue.length) { const [tx, o] = st.queue.shift(); st.text = ''; say(tx, o); } else { bubble.hidden = true; st.text = ''; setTalking(false); } }
       }
     }
+    if (SAY_DODGE) dodge();
     // mood timer
     if (st.moodT > 0) { st.moodT -= dt; if (st.moodT <= 0) st.mood = 'neutral'; }
     const flying = G.view === 'flight' && G.shot && G.shot.phase === 'air';
@@ -5702,7 +5743,7 @@ function homeCam(dt) {
 const HOMESNAP = (() => {
   const T0 = .35, SCALE = .5, LS = 'tp_hsnap:', mem = {}, cv = document.createElement('canvas'), _p = new THREE.Vector3(), _l = new THREE.Vector3(), _q = new THREE.Quaternion();
   let seen = null, at = 0, busy = false, shown = false, offAt = 0;
-  const mode = () => (REAL.on ? 'r' : 'i'), key = (cid, i) => cid + ':' + i + ':' + mode(); /* lifelike and sketch look nothing alike: a still per draw mode */
+  const mode = () => 'i', key = (cid, i) => cid + ':' + i + ':' + mode(); /* lifelike and sketch look nothing alike: a still per draw mode */
   function get(cid, i) { const k = key(cid, i); if (mem[k]) return mem[k]; try { const o = JSON.parse(localStorage.getItem(LS + k) || 'null'); if (o && o.url) return (mem[k] = { url: o.url, ar: o.ar, old: true }); } catch (e) {} return null; }
   function take(k) {
     const el = renderer.domElement, cw = el.clientWidth, chh = el.clientHeight; if (!cw || !chh || !el.width) return; const w = Math.max(2, Math.round(cw * SCALE)), h = Math.max(2, Math.round(chh * SCALE));
@@ -5711,7 +5752,7 @@ const HOMESNAP = (() => {
       if (Math.abs(camera.fov - 50) > .01) { camera.fov = 50; camera.updateProjectionMatrix(); } camera.lookAt(camLook); updateCull();
       { const ch = Math.max(0, camera.position.y - (AUGD ? groundHeight(camera.position.x, -camera.position.z) : TERRAIN_BASE)); scene.fog.near = 240 + ch * 2.4; scene.fog.far = 1050 + ch * 3.2; }
       if (bg && bg.isTexture && skyHidden()) scene.background = null;
-      renderer.clear(); renderer.render(scene, camera); if (!REAL.on) renderer.render(grain.sc, grain.cam);
+      renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam);
       cv.width = w; cv.height = h; cv.getContext('2d').drawImage(el, 0, 0, w, h); ok = true; } /* (same task as the draw: the drawing buffer is still there) */
     catch (e) {} finally { scene.background = bg; camera.position.copy(_p); camera.quaternion.copy(_q); camLook.copy(_l); if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); } scene.fog.near = fn; scene.fog.far = ff; }
     if (!ok) return; busy = true; const ar = w / h;
@@ -5782,7 +5823,7 @@ const QUIT = (() => {
   const ui = $('#quitUI');
   function ask() { ui.hidden = false; const k = ui.querySelector('[data-q="stay"]'); if (k) k.focus({ preventScroll: true }); }
   function home() {
-    if (HOLE_N !== NINE.first(CID)) { if (HOME_BG_WARM) HOMESNAP.cover(CID); MENU.hold = true; HOLESYS.go(CID, NINE.first(CID), [], () => { MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = 0; }, { pill: false }); } /* quit mid-round: back to the start: hole 1 builds behind the home screen (Play waits for it) */
+    if (HOLE_N !== NINE.first(CID)) { if (HOME_BG_WARM) try { HOMESNAP.cover(CID); } catch (e) { console.error(e); } MENU.hold = true; HOLESYS.go(CID, NINE.first(CID), [], () => { MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = 0; }, { pill: false }); } /* quit mid-round: back to the start: hole 1 builds behind the home screen (Play waits for it) */
     const el = $('#boot'); BOOT.on = true; if (!MENU.hold) MENU.t = 1.4; /* the menu first, so whatever happens below you always land on it */
     if (el) { el.style.transition = 'none'; el.hidden = false; el.classList.remove('done'); void el.offsetWidth; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; })); } /* back at once: no fade (its visibility transition would leave the bare course showing for a moment) */
     try { setHome(true); } catch (e) { console.error(e); }
@@ -6247,6 +6288,7 @@ const MP_AIM_LEAD = 1; /* watching someone aim (no extra bytes): 0 = as before (
 const MP_OPT_CHAT = true; /* your own chat bubble and reaction show at once (the server's echo of them is skipped), when a local copy of the server's checks (length, rate) says it will go through; otherwise as before, on the echo. false = on the echo */
 const MP_FLY_SKIP_ALL = true; /* Neil (11-16): in multiplayer anyone's Skip on the hole's fly-over skips it for everyone, as smoothly as their own Skip (the same glide back to the tee, tips, greet): a tiny 'flyskip' for that hole, relayed once per hole by the server; a phone whose fly-over has ended, or is on another hole, ignores it (one still loading the hole skips it as it starts). false = each phone's own fly-over */
 const MP_FLY_SHOT_GLIDE = true; /* a shot (or AUTO HIT) arriving while this phone's fly-over is still on: the Skip glide back to the tee first (0.9 s), then the shot plays from the tee view like any watched shot. false = as before: the fly-over is dropped on the spot (overlay gone in one frame, the drone's move stops dead, the view widens at once, no tips / greet) and the chase camera swoops from wherever the drone was */
+const MP_CATCHUP = true; /* Neil 17 Nov (v404): back in an MP round after more than 2 s away (app switch, lock) while the socket stayed up: jump straight to where everyone is now (the hole and turn as they stand; any shot still in the air plays), the way a reconnect does, instead of replaying every shot you missed one by one; and if it's your turn, your 30 s turn clock starts again. false = the backlog replays, as v403 */
 const MP_LIVE = true; /* connection: a dropped socket retries at once (then 1, 2, 4, 8 s); a socket that died silently (Wi-Fi <-> cell, a phone waking) is found by a tiny ping when nothing has come in for 4 s (no answer in 3 s: reconnect), and checked at once when the page comes back to the front or the network comes back; shots / results sent in the last seconds before a drop are sent again (the server counts each id once). false = retry after 1 s, no checks */
 const MP_CARD18 = 'C'; /* an 18-hole round's end card: 'A' two nines stacked | 'B' holes down, golfers across | 'C' Out / In tabs | 'D' leaderboard with a running-score line, full card on tap */
 const MP_ROUNDCARD = true; /* undo switch: false = the old end-of-round group card (leaderboard + Home / Play again) */
@@ -6306,6 +6348,7 @@ if (MULTI) try { MPX = (() => {
     if (now - (S.rxAt || 0) > K.LIVE_QUIET) { S.pingAt = now; send({ t: 'ping', at: Date.now() }); } }
   function liveCheck() { if (!MP_LIVE || !S.want) return; S.liveT = performance.now(); const ws = S.ws; if (!ws || ws.readyState >= 2) { S.ws = null; S.welcomed = false; status('reconnecting'); connect(); return; } /* back to the front / back online: check now (a ping), don't wait for the quiet timer */
     if (ws.readyState === 1 && S.welcomed && !S.pingAt) { S.pingAt = performance.now(); send({ t: 'ping', at: Date.now() }); } }
+  if (MP_CATCHUP) document.addEventListener('visibilitychange', () => { const now = performance.now(); if (document.hidden) { S.hidAt = now; return; } if (S.inRound && S.hidAt && now - S.hidAt > 2000) S.catchT = now + 600; S.hidAt = 0; }); /* (600 ms: the messages held while away all come in first) */
   if (MP_LIVE) { setInterval(liveTick, 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) liveCheck(); }); window.addEventListener('online', liveCheck); window.addEventListener('pageshow', e => { if (e.persisted) liveCheck(); }); }
   function resend() { if (!MP_FEEL || !S.sent) return; const now = performance.now(), back = S.sent.filter(x => now - x.at < K.LIVE_RESEND && !S.outbox.includes(x.o)).map(x => x.o); S.sent = []; if (back.length) { S.outbox.unshift(...back); log('resend after drop', back.map(o => o.t + ' ' + o.id).join(', ')); } } /* MP_LIVE: the shots / results that went into a socket that then died; the server drops any id it already has */
   const MP_RESTORE = true; /* ROLLBACK: false -> a reconnect sends only its sid (v355). true: it also sends its player id and its last copy of the room, so a server that has restarted (every deploy) rebuilds the room from it and the round carries on (server.js MP_RESTORE; an old server just ignores the extra fields) */
@@ -6377,7 +6420,12 @@ if (MULTI) try { MPX = (() => {
 
   /* ---------- the event queue: one thing at a time, never under a flight or a fresh card ---------- */
   function busy(hold) { if (G.view === 'flight' || FLY.on && hold === 'fly') return true; const r = $('#result'); if (!r.hidden && performance.now() - S.resAt < hold) return true; return !!G.drop && S.mine; }
+  function catchUp() { /* MP_CATCHUP: keep only what's current: the newest hole, its newest turn, its end-of-hole card, any shot after that turn (still in the air), and auto-hits this phone was asked to play */
+    const Q = S.Q; let lt = -1, lh = -1; Q.forEach((e, i) => { if (e.k === 'turn') lt = i; else if (e.k === 'hole') lh = i; });
+    const keep = Q.filter((e, i) => e.k === 'auto' || (e.k === 'hole' ? i === lh : e.k === 'turn' ? i === lt && i > lh : e.k === 'shot' ? i > lt && i > lh : e.k === 'card' ? i > lh : true)); log('catch-up', Q.length, '->', keep.length); Q.length = 0; Q.push(...keep);
+    const R = S.room; if (R && R.phase === 'play' && R.turn === S.you && R.tstate === 'aim') send({ t: 'act' }); } /* my turn: I'm here (the server's idle clock starts again) */
   function pump() {
+    if (MP_CATCHUP && S.catchT) { if (performance.now() < S.catchT) return; S.catchT = 0; catchUp(); }
     while (S.Q.length) { const e = S.Q[0];
       if (e.k === 'hole') { if (G.view === 'flight' || HOLESYS.busy || !CARD.done()) return; S.Q.shift(); CARD.hide(); loadHole(e.n, e.course); return; }
       if (!S.loaded) return;
@@ -6808,7 +6856,8 @@ if (MULTI) try { MPX = (() => {
   /* ---------- per frame (MP hook in frame()) ---------- */
   function frame(dt, now) {
     if (MP_FEEL && S.mine && (SW.phase === 'back' || SW.phase === 'down')) return; /* mid-swing on your turn: the frame is the swing's alone (the inbox, aim stream, bubbles and cards wait ~1 s for the launch) */
-    drain(); if (!S.inRound) return;
+    if (MP_CATCHUP && S.hidAt && now - S.hidAt > 2000) { S.catchT = now + 600; S.hidAt = 0; } /* the first frame back (it can come before 'visibilitychange'): hold the inbox's backlog for the catch-up */
+    drain(); if (!S.inRound) return; if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
     if (S.mine && !S.pend && !S.shootAs) { if (!(MP_EARLY_NEXT && S.room && S.room.shotN !== S.curN)) aimOut(now); } else if (!S.mine) aimIn(dt); /* (MP_EARLY_NEXT: a newer turn is waiting under the card: no aim from the old one) */
     if (MP_EARLY_NEXT && S.goN != null && $('#result').hidden) S.goN = null; /* (the card went: a tap sent 'go' as it happened, below) */
     if (MP_FLY_SKIP_ALL && S.flySkip && S.flySkip === S.hole && S.loaded && FLY.on) FLY.end(true); /* MP_FLY_SKIP_ALL: the same path as this phone's own Skip (it does nothing once the glide back has begun) */
