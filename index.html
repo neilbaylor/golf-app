@@ -51,7 +51,7 @@ if (HOME_WIDE) document.documentElement.classList.add('hwide');
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Patrick+Hand&family=Caveat:wght@700&family=Gloria+Hallelujah&family=Kalam:wght@400;700&family=Gaegu:wght@700&family=Schoolbell&family=Cabin+Sketch:wght@700&family=Indie+Flower&family=Bowlby+One+SC&family=Gochi+Hand&family=Rubik+Mono+One&family=Space+Mono:wght@700&family=Barlow:wght@600;800&family=Bangers&family=Zen+Old+Mincho:wght@700&family=Architects+Daughter&family=Press+Start+2P&family=Righteous&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Patrick+Hand&family=Caveat:wght@700&display=swap">
 <style>
 :root{
   /* Layout: full-bleed 3D course in a phone column; sticker-book HUD pinned top and bottom, swing dial centre-bottom */
@@ -76,8 +76,6 @@ body{margin:0;background:var(--night);background-image:radial-gradient(circle at
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #app{position:relative;height:100%;max-width:520px;margin:0 auto;overflow:hidden;touch-action:none;background:var(--sky);color:var(--ink)}
-#lens{position:absolute;inset:0;pointer-events:none;z-index:2;display:none;background:radial-gradient(ellipse at 50% 42%,transparent 55%,rgba(10,20,30,.35) 100%)}
-#app.th-real #lens{display:block}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 #vig{position:absolute;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse at 50% 58%,rgba(255,206,120,.16) 0%,rgba(255,206,120,0) 38%,rgba(20,32,16,0) 48%,rgba(20,32,16,.5) 100%);opacity:0;visibility:hidden;transition:opacity .35s,visibility 0s .35s}
 #app.swinging #vig{opacity:1;visibility:visible;transition:opacity .12s}
@@ -137,64 +135,6 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #say{position:absolute;z-index:8;left:12px;top:calc(112px + env(safe-area-inset-top,0px));max-width:min(230px,calc(100% - 140px));font-size:18px;line-height:1.15;padding:7px 12px 6px;pointer-events:none;transform-origin:24px -10px;animation:sayIn .28s cubic-bezier(.3,1.7,.5,1)}
 #say::before{content:"";position:absolute;left:22px;top:-11px;width:14px;height:14px;background:var(--paper);border-left:3px solid var(--ink);border-top:3px solid var(--ink);transform:rotate(45deg)}
 @keyframes sayIn{from{transform:scale(.4) rotate(-6deg);opacity:0}}
-#styleBtn{pointer-events:auto;font-size:14px;line-height:1;padding:4px 10px;border-width:2.5px;box-shadow:2px 3px 0 var(--ink);transform:rotate(-1.5deg);display:flex;align-items:center;gap:5px;color:var(--ink)}
-#styleBtn svg{width:14px;height:14px}
-#styleGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:min(52vh,430px);overflow-y:auto;padding:2px 6px 6px 2px}
-.sty{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:8px 10px;background:var(--paper);border:2.5px solid var(--ink);border-radius:var(--wob2);box-shadow:2px 3px 0 var(--ink);text-align:left;color:var(--ink)}
-.sty b{font-size:19px;line-height:1.05;font-weight:700}
-.sty span{display:flex;gap:4px}
-.sty i{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink)}
-.sty.sel{outline:3px solid var(--pink);outline-offset:2px}
-/* art styles: the 3D frame is redrawn by a shader; these restyle the HUD to match */
-#app.th-pencil{--ink:#34352f;--paper:#f6f1e4;--paper-2:#e9e2cf;--sun:#ffe14d;--pink:#ff8fb2;--grass:#6f7166;--mint:#b8f0a0;--font-display:"Caveat",cursive;--font-hand:"Gloria Hallelujah",cursive}
-#app.th-pencil #dial,#app.th-pencil #strike svg{filter:saturate(.3) sepia(.12)}
-#app.th-pencil #distNum{font-weight:700;font-size:86px}
-#app.th-pencil #aimLbl u{padding:2px 7px 3px} #app.th-pencil #aimLbl u svg{top:.06em} /* Caveat sits low in its line box (the opposite of Luckiest Guy): re-centre the elevation chip's text and arrow */
-#app.th-water{--ink:#3b2c22;--paper:#fdfbf6;--paper-2:#efe7da;--sun:#f6c945;--pink:#e86a92;--grass:#6f9f55;--mint:#8fd8c0;--font-display:"Kalam",cursive;--font-hand:"Kalam",cursive}
-#app.th-water #distNum{font-weight:700}
-#app.th-water .card{box-shadow:2px 3px 6px rgba(59,44,34,.25)}
-#app.th-crayon{--ink:#1d1a1a;--paper:#fffdf5;--paper-2:#fff1c9;--sun:#ffd400;--pink:#ff3b6b;--grass:#3dbb4f;--mint:#36d1a0;--font-display:"Gaegu",cursive;--font-hand:"Schoolbell",cursive}
-#app.th-crayon #distNum{font-weight:700;font-size:82px}
-#app.th-crayon #dial,#app.th-crayon #strike svg{filter:saturate(1.45) contrast(1.08)}
-#app.th-chalk{--ink:#f2f2ea;--paper:#26332c;--paper-2:#334239;--sun:#ffe98a;--pink:#ff9ec4;--grass:#7fbf7a;--mint:#9ff0d0;--font-display:"Cabin Sketch",cursive;--font-hand:"Indie Flower",cursive}
-#app.th-chalk #dial,#app.th-chalk #strike svg{filter:invert(.9) hue-rotate(180deg) saturate(.7)}
-#app.th-chalk #distNum{color:var(--sun);text-shadow:none}
-#app.th-chalk .outlined,#app.th-chalk #resWord,#app.th-chalk #stamp{text-shadow:none}
-#app.th-chalk .card{box-shadow:2px 3px 0 rgba(0,0,0,.4)}
-#app.th-paper{--ink:#3a2a1c;--paper:#f3e6cf;--paper-2:#e2cfae;--sun:#ffc93c;--pink:#f2617a;--grass:#6fae4f;--mint:#7fd3b8;--font-display:"Bowlby One SC",sans-serif;--font-hand:"Gochi Hand",cursive}
-#app.th-paper .card,#app.th-paper .btn,#app.th-paper .cap,#app.th-paper #clubBtn{border-width:0;box-shadow:0 3px 0 rgba(58,42,28,.18),2px 6px 10px rgba(58,42,28,.28)}
-#app.th-paper #distNum{font-size:62px}
-#app.th-riso{--ink:#1f3d8f;--paper:#f4efe6;--paper-2:#e9e1d2;--sun:#ffe800;--pink:#ff48b0;--grass:#0078bf;--mint:#5ccfe6;--font-display:"Rubik Mono One",monospace;--font-hand:"Space Mono",monospace}
-#app.th-riso #distNum{font-size:58px;color:var(--pink);text-shadow:3px 3px 0 var(--grass)}
-#app.th-riso .outlined{text-shadow:none;color:var(--ink)}
-#app.th-riso .card{box-shadow:3px 3px 0 var(--pink)}
-#app.th-real{--ink:#16202a;--paper:#ffffff;--paper-2:#eef1f4;--sun:#f2c94c;--pink:#ff4f8b;--grass:#2f8f4e;--mint:#3ed0a0;--font-display:"Barlow",system-ui,sans-serif;--font-hand:"Barlow",system-ui,sans-serif;--wob:16px;--wob2:12px}
-#app.th-real .card,#app.th-real .btn,#app.th-real .cap,#app.th-real #clubBtn,#app.th-real .ct,#app.th-real .sty,#app.th-real .chip,#app.th-real .nametag{border:none;box-shadow:0 3px 10px rgba(0,0,0,.22);font-weight:600}
-#app.th-real #distNum{font-weight:800;font-size:76px;letter-spacing:-.02em;text-shadow:0 2px 10px rgba(0,0,0,.35)}
-#app.th-real .outlined{text-shadow:0 1px 4px rgba(0,0,0,.6);font-weight:800}
-#app.th-real #resWord,#app.th-real #stamp{font-weight:800;text-shadow:0 2px 0 rgba(0,0,0,.25),0 4px 14px rgba(0,0,0,.3)}
-#app.th-real #clubBtn{transform:none}
-#app.th-real #player{border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.3)}
-#app.th-real #dial{filter:drop-shadow(0 6px 10px rgba(0,0,0,.3))}
-#app.th-comic{--ink:#111;--paper:#fffdf2;--paper-2:#fff4b8;--sun:#ffe600;--pink:#ff2e63;--grass:#1fa34a;--mint:#2fd6c9;--font-display:"Bangers",cursive;--font-hand:"Bangers",cursive}
-#app.th-comic .card,#app.th-comic .btn,#app.th-comic #clubBtn{border-width:3.5px;box-shadow:5px 5px 0 #111;letter-spacing:.04em}
-#app.th-comic #distNum{font-size:84px;letter-spacing:.03em;color:var(--sun)}
-#app.th-wood{--ink:#2a2018;--paper:#efe4cc;--paper-2:#e0d2b2;--sun:#e2a33a;--pink:#c8463a;--grass:#5f7d4a;--mint:#6fa7a0;--font-display:"Zen Old Mincho",serif;--font-hand:"Zen Old Mincho",serif;--wob:4px;--wob2:3px}
-#app.th-wood .card,#app.th-wood .btn,#app.th-wood #clubBtn{box-shadow:2px 3px 0 rgba(42,32,24,.5)}
-#app.th-wood #distNum{font-weight:700;font-size:66px}
-#app.th-blue{--ink:#e8f2ff;--paper:#123f7a;--paper-2:#1b4d8f;--sun:#ffd23f;--pink:#ff8fc0;--grass:#7fc4ff;--mint:#9ff0ff;--font-display:"Architects Daughter",cursive;--font-hand:"Architects Daughter",cursive}
-#app.th-blue .card{border-style:dashed}
-#app.th-pixel{--ink:#101010;--paper:#fff;--paper-2:#e7e7e7;--sun:#ffde3b;--pink:#ff4f7b;--grass:#3fa34d;--mint:#5fe0b5;--font-display:"Press Start 2P",monospace;--font-hand:"Press Start 2P",monospace;--wob:0;--wob2:0}
-#app.th-pixel .card,#app.th-pixel .btn,#app.th-pixel #clubBtn,#app.th-pixel .cap,#app.th-pixel .nametag{box-shadow:4px 4px 0 #101010;border-width:3px}
-#app.th-pixel #distNum{font-size:40px;line-height:1.1}
-#app.th-pixel #distLbl,#app.th-pixel #lieName,#app.th-pixel #holeTag,#app.th-pixel #styleBtn,#app.th-pixel #say,#app.th-pixel #clubName,#app.th-pixel .cap,#app.th-pixel #coach,#app.th-pixel .sty b,#app.th-pixel .btn,#app.th-pixel .st small,#app.th-pixel .st b{font-size:9px;line-height:1.5}
-#app.th-pixel #dial,#app.th-pixel #strike svg{image-rendering:pixelated}
-#app.th-neon{--ink:#f6f0ff;--paper:#140d28;--paper-2:#21163d;--sun:#ffe94a;--pink:#ff3fd0;--grass:#33f5ff;--mint:#33f5ff;--font-display:"Righteous",sans-serif;--font-hand:"Righteous",sans-serif}
-#app.th-neon .card,#app.th-neon .btn,#app.th-neon #clubBtn{box-shadow:0 0 0 1px var(--pink),0 0 14px rgba(255,63,208,.55)}
-#app.th-neon #distNum{color:#fff;text-shadow:0 0 8px var(--pink),0 0 18px var(--pink)}
-#app.dk #dial,#app.dk #strike svg{filter:invert(.9) hue-rotate(180deg) saturate(.8)}
-#app.dk .outlined,#app.dk #resWord,#app.dk #stamp{text-shadow:none}
-#app.th-blue #distNum{color:var(--sun);text-shadow:none}
 #holeTag{flex-basis:100%;box-sizing:border-box;padding-left:4px;padding-right:4px;font:12px/1 var(--font-hand);letter-spacing:-.01em;text-align:center;white-space:nowrap;padding-bottom:4px;margin-bottom:1px;border-bottom:1.5px dashed rgba(29,42,26,.3)}
 
 /* ---------- world overlays ---------- */
@@ -222,7 +162,6 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 #pinMk.off .pk{transform:translate(-50%,0)}
 #pinMk.off b{order:0;display:flex;align-items:center;gap:4px}
 #pinMk.off b::before{content:"";width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid var(--ink);transform:rotate(var(--pa,0deg))}
-#styleBtn[hidden]{display:none!important}
 #pinMk b{order:-1;margin-bottom:2px;font:13px/1 var(--font-display);letter-spacing:.06em;color:var(--ink);background:#ffd23f;border:2.5px solid var(--ink);border-radius:999px;padding:3px 8px 2px;white-space:nowrap;box-shadow:1.5px 2px 0 var(--ink)}
 @keyframes pinRing{0%{transform:scale(.6);opacity:1}100%{transform:scale(3);opacity:0}}
 @media (prefers-reduced-motion:reduce){#pinMk .ring{animation:none;opacity:.6}}
@@ -789,7 +728,6 @@ html.uiS #app #mid.grab .h{scale:calc(1.18 * var(--ui))}
 html.uiS #app .dlbl{font-size:calc(12px * var(--ui));padding:calc(4px * var(--ui)) calc(7px * var(--ui)) calc(2px * var(--ui))} /* placed by the code in screen px: bigger type instead */
 html.uiS #app .sheet{left:0;right:0;margin:0 auto;box-sizing:border-box;width:min(calc(100% / var(--ui) - 24px),496px);bottom:calc(150px * var(--ui) + env(safe-area-inset-bottom,0px));transform-origin:50% 100%;scale:var(--ui)}
 html.uiS #app #strikeSheet{left:calc(12px * var(--ui));right:auto;margin:0;width:min(310px,calc(100% / var(--ui) - 24px));transform-origin:0 100%}
-html.uiS #app #styleGrid{max-height:min(calc(52vh / var(--ui)),430px)}
 html.uiS #app #result{bottom:calc(100px * var(--ui) + max(0px,env(safe-area-inset-bottom,0px) - 22px));transform-origin:0 100%;scale:var(--ui)}
 html.uiS #app #result.final{top:calc(208px * var(--ui) + env(safe-area-inset-top,0px));bottom:auto;transform-origin:0 0}
 html.uiS #app #result.final .sc{max-height:calc(34vh / var(--ui))}
@@ -1016,7 +954,6 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
     var f = getComputedStyle(t).fontFamily.split(',')[0];
     Promise.race([document.fonts.load('62px ' + f, 'Tee Party'), new Promise(function (r) { setTimeout(r, 3000); })]).then(ok, ok); })();</script>
   <canvas id="gl"></canvas>
-  <div id="lens"></div>
   <div id="vig"></div>
 
   <div id="top">
@@ -1071,7 +1008,6 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
         <svg viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="#bfe6ff" stroke="#1d2a1a" stroke-width="2.5"/><g id="windArrow"><path d="M15 23.8 V8.8 M9.2 14.4 L15 8.6 L20.8 14.4" fill="none" stroke="#1d2a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
         <span id="windNum">12<small>mph</small></span>
       </div>
-      <button id="styleBtn" class="card" aria-label="Change art style"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 14 L3 10 L11 2 L14 5 L6 13 Z M10 3 L13 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span id="styleName">Sticker Book</span></button>
     </div>
   </div>
 
@@ -1128,7 +1064,6 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
   <canvas id="trTop" aria-hidden="true"></canvas>
 
   <div id="scrim" hidden></div>
-  <div id="styleSheet" class="card sheet" hidden><h3>Art style <span>the whole game redraws</span></h3><div id="styleGrid"></div></div>
   <div id="clubSheet" class="card sheet" hidden><h3>Pick a club <span id="clubLieNote">carry distance</span></h3><div id="modeRow"></div><div id="clubGrid"></div></div>
   <div id="strikeSheet" class="card sheet" hidden>
     <h3>Strike <span>drag the dot</span></h3>
@@ -1203,7 +1138,7 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_LOGO = 'data:image/webp;base64,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'; // The Toronto Hunt crest (used with the club's permission)
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v394'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v395'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2087,7 +2022,6 @@ const glMax = () => { const a = (innerWidth || 1) * (innerHeight || 1); return !
 let GLMAX = glMax();
 let glPR = GLMAX; renderer.setPixelRatio(glPR); renderer.info.autoReset = false;
 if (TABLET_PX_CAP) addEventListener('resize', () => { const o = GLMAX; GLMAX = glMax(); if (GLMAX === o) return; if (MENU.pr) MENU.pr = Math.min(GLMAX, MENU.pr >= o ? GLMAX : MENU.pr); if (MENU.on) { if (glPR > GLMAX) SC.pending = GLMAX; } else if (glPR > GLMAX || glPR >= o) SC.pending = GLMAX; }); /* a window resized across the line: the new ceiling at the next frame's start */
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, 1, 0.3, 2600);
 scene.fog = new THREE.Fog(0xece9dc, 240, 1050);
@@ -2154,7 +2088,7 @@ const FESCUE_FX = (() => { let tex = null, mat = null;
       for (let i = 0; i < want; i++) { const u = u0 + Rf() * (u1 - u0), v = v0 + Rf() * (v1 - v0); if (!inPoly(u, v, q.P) || !ok(u, v)) continue; fill.push([u, v, 0]); got++; if (nOk > 400) { nOk = 0; yield; } } }
     const all = E.concat(fill).slice(0, MAX), e = new THREE.Euler(), qq = new THREE.Quaternion();
     if (all.length) cullInst(geo(), material(), all.map(([u, v, ed]) => { const w = FESCUE_THICK ? .85 + Rf() * .4 : .7 + Rf() * .35, h = ed ? .85 + Rf() * .35 : FESCUE_THICK ? .62 + Rf() * .45 : .55 + Rf() * .45, p = W(u, v, groundHeight(u, v) - .04), wave = .5 + .25 * Math.sin(u * .09 + v * .05) + .25 * Math.sin(u * .041 - v * .073 + 1.3), k = .86 + .22 * wave;
-      e.set(0, Rf() * 3.14, 0); qq.setFromEuler(e); return { p, m: new THREE.Matrix4().compose(p, qq, new THREE.Vector3(w, h, w)), c: new THREE.Color(k, k * .97 + .03, k * .9 + .08), r: Math.max(w, h) }; }), { ud: { tuft: true, fescue: true }, hideBeyond: 102, realHide: true }); }
+      e.set(0, Rf() * 3.14, 0); qq.setFromEuler(e); return { p, m: new THREE.Matrix4().compose(p, qq, new THREE.Vector3(w, h, w)), c: new THREE.Color(k, k * .97 + .03, k * .9 + .08), r: Math.max(w, h) }; }), { ud: { tuft: true, fescue: true }, hideBeyond: 102 }); }
   let near = null; const NB = FESCUE_THICK ? 16 : 9, _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
   function atBall() { /* a ball in the fescue sits down among a few blades: a small clump round it (to the sides and beyond, never between the ball and the swing camera) */
     if (G.lie !== 'fescue') { if (near) near.visible = false; return; }
@@ -2173,14 +2107,14 @@ function holeMap() { /* the painted map's frame (per hole) */
   MAP = AUGD ? Object.assign({}, AUGD.MAP) : { U0: -150, U1: 90, V0: -40, V1: 390, W: 1536 };
   MAP.ppy = MAP.W / (MAP.U1 - MAP.U0); MAP.H = Math.round((MAP.V1 - MAP.V0) * MAP.ppy); }
 const NEEDLES = {}; /* the needle tile is the same on every hole (its own seed): painted once per session and kind, not on every hole's build */
-function needleTile(g, real) { /* a 384-px square of pine needles that repeats without seams (strokes crossing an edge are drawn on the far side too) */
-  const had = NEEDLES[real]; if (had && !(had.x.isContextLost && had.x.isContextLost())) return g.createPattern(had.c, 'repeat');
-  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d'), Rn = rng(real ? 91 : 90), n = T * T / 4.2; x.lineCap = 'round'; NEEDLES[real] = { c, x };
+function needleTile(g) { /* a 384-px square of pine needles that repeats without seams (strokes crossing an edge are drawn on the far side too) */
+  const had = NEEDLES.t; if (had && !(had.x.isContextLost && had.x.isContextLost())) return g.createPattern(had.c, 'repeat');
+  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d'), Rn = rng(90), n = T * T / 4.2; x.lineCap = 'round'; NEEDLES.t = { c, x };
   const set = (m, cols, l0, l1, lw) => { const by = cols.map(() => []); for (let i = 0; i < m; i++) { const px = Rn() * T, py = Rn() * T, a = Rn() * Math.PI * 2, l = l0 + Rn() * (l1 - l0); by[Math.floor(Rn() * cols.length)].push([px, py, px + Math.cos(a) * l, py + Math.sin(a) * l]); }
     by.forEach((L, k) => { x.beginPath(); for (const [a, b, e, d] of L) for (const ox of [-T, 0, T]) for (const oy of [-T, 0, T]) { if (Math.max(a, e) + ox < -2 || Math.min(a, e) + ox > T + 2 || Math.max(b, d) + oy < -2 || Math.min(b, d) + oy > T + 2) continue; x.moveTo(a + ox, b + oy); x.lineTo(e + ox, d + oy); } x.strokeStyle = cols[k]; x.lineWidth = lw; x.stroke(); }); };
-  set(n * .5, real ? ['rgba(90,60,25,.55)', 'rgba(105,72,32,.5)'] : ['#7a4a24', '#6c4120'], 4, 9, 1.4);
-  set(n * .6, real ? ['rgba(165,120,58,.6)', 'rgba(180,132,66,.55)'] : ['#b5723a', '#c8884a', '#a8672f'], 4, 10, 1.15);
-  set(n * .35, real ? ['rgba(215,178,110,.5)'] : ['#e6a865', '#f0bf80'], 4, 9, 1);
+  set(n * .5, ['#7a4a24', '#6c4120'], 4, 9, 1.4);
+  set(n * .6, ['#b5723a', '#c8884a', '#a8672f'], 4, 10, 1.15);
+  set(n * .35, ['#e6a865', '#f0bf80'], 4, 9, 1);
   return g.createPattern(c, 'repeat'); }
 /* BUILD_CHUNK2 (perf2, Neil: 'sure as long as it works!'): the next hole's background build ran some steps of tens to hundreds of ms on a phone. The biggest hid in the 2D canvas:
    Chrome records the map's drawing and rasterizes it all at the first use (the mini map's drawImage, the texture upload), one long step. true: the map is rasterized at each
@@ -2231,31 +2165,29 @@ const HATCHW = (() => { let w = null, bad = !HATCH_ASYNC, seq = 0; const jobs = 
     return j; }
   return { run, get ok() { return !bad; } }; })();
 const FESCUE_TILE = {}; /* FESCUE: the fescue tile is the same on every hole (its own seed): painted once per session and kind */
-function fescueTile(g, real) { /* FESCUE: a 384-px square of fescue that repeats without seams: green showing low down, golden-straw wisps all leaning one way, pale seed heads, a few inked blades */
-  const had = FESCUE_TILE[real]; if (had && !(had.x.isContextLost && had.x.isContextLost())) return g.createPattern(had.c, 'repeat');
-  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d'), Rn = rng(real ? 97 : 96), LEAN = -1.2; x.lineCap = 'round'; FESCUE_TILE[real] = { c, x };
-  x.fillStyle = real ? '#8d874c' : '#b2a253'; x.fillRect(0, 0, T, T);
+function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats without seams: green showing low down, golden-straw wisps all leaning one way, pale seed heads, a few inked blades */
+  const had = FESCUE_TILE.t; if (had && !(had.x.isContextLost && had.x.isContextLost())) return g.createPattern(had.c, 'repeat');
+  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d'), Rn = rng(96), LEAN = -1.2; x.lineCap = 'round'; FESCUE_TILE.t = { c, x };
+  x.fillStyle = '#b2a253'; x.fillRect(0, 0, T, T);
   const wrap = (px, py, r, fn) => { for (const ox of [-T, 0, T]) for (const oy of [-T, 0, T]) { if (px + ox + r < 0 || px + ox - r > T || py + oy + r < 0 || py + oy - r > T) continue; fn(px + ox, py + oy); } };
   const blob = (n, cols, r0, r1) => { for (let i = 0; i < n; i++) { const px = Rn() * T, py = Rn() * T, r = r0 + Rn() * (r1 - r0); x.fillStyle = cols[Math.floor(Rn() * cols.length)]; wrap(px, py, r * 1.7, (a, b) => { x.beginPath(); x.ellipse(a, b, r * 1.7, r, LEAN + 1.57, 0, 7); x.fill(); }); } };
   const TK = FESCUE_THICK ? 1.9 : 1; /* FESCUE_THICK: a denser mat of straw, less green showing through */
-  blob(FESCUE_THICK ? 30 : 46, real ? ['rgba(70,95,45,.26)', 'rgba(85,105,50,.2)'] : ['rgba(92,128,52,.3)', 'rgba(110,140,60,.24)'], 10, 30); blob(34, real ? ['rgba(205,185,125,.18)'] : ['rgba(238,216,142,.32)'], 9, 26);
+  blob(FESCUE_THICK ? 30 : 46, ['rgba(92,128,52,.3)', 'rgba(110,140,60,.24)'], 10, 30); blob(34, ['rgba(238,216,142,.32)'], 9, 26);
   const wisps = (n, cols, l0, l1, lw, heads) => { const by = cols.map(() => []); for (let i = 0; i < n; i++) { const px = Rn() * T, py = Rn() * T, a = LEAN + (Rn() - .5) * .55, l = l0 + Rn() * (l1 - l0), b = (Rn() - .5) * l * .4;
       by[Math.floor(Rn() * cols.length)].push([px, py, px + Math.cos(a) * l * .5 - Math.sin(a) * b, py + Math.sin(a) * l * .5 + Math.cos(a) * b, px + Math.cos(a) * l, py + Math.sin(a) * l, a]); }
     by.forEach((L, k) => { x.beginPath(); for (const [a, b, cx, cy, e, d] of L) wrap(a, b, l1 + 2, (pa, pb) => { x.moveTo(pa, pb); x.quadraticCurveTo(cx + pa - a, cy + pb - b, e + pa - a, d + pb - b); }); x.strokeStyle = cols[k]; x.lineWidth = lw; x.stroke();
-      if (heads) { x.fillStyle = real ? 'rgba(232,214,160,.8)' : '#f3e1a4'; for (const [a, b, , , e, d, an] of L) if (Rn() < heads) wrap(e, d, 4, (pe, pd) => { x.beginPath(); x.ellipse(pe, pd, 1.1, 2.6, an + 1.57, 0, 7); x.fill(); }); } }); };
-  wisps(T * T / 95 * TK, real ? ['#5b6e35', '#4f6330'] : ['#56712e', '#617c34', '#4b6428'], 6, 12, 1.6, 0);
-  if (!real) wisps(T * T / 420 * TK, ['rgba(29,42,26,.4)'], 7, 14, 1.05, 0);
-  wisps(T * T / 70 * TK, real ? ['#a8955a', '#b6a266', '#9a8a52'] : ['#c4a456', '#b8984a', '#d2b465', '#a88d43'], 7, 15, 1.25, 0);
-  wisps(T * T / 150 * TK, real ? ['#d2c08e'] : ['#ead08a', '#f2e0a8'], 6, 12, .95, .35);
+      if (heads) { x.fillStyle = '#f3e1a4'; for (const [a, b, , , e, d, an] of L) if (Rn() < heads) wrap(e, d, 4, (pe, pd) => { x.beginPath(); x.ellipse(pe, pd, 1.1, 2.6, an + 1.57, 0, 7); x.fill(); }); } }); };
+  wisps(T * T / 95 * TK, ['#56712e', '#617c34', '#4b6428'], 6, 12, 1.6, 0);
+  wisps(T * T / 420 * TK, ['rgba(29,42,26,.4)'], 7, 14, 1.05, 0);
+  wisps(T * T / 70 * TK, ['#c4a456', '#b8984a', '#d2b465', '#a88d43'], 7, 15, 1.25, 0);
+  wisps(T * T / 150 * TK, ['#ead08a', '#f2e0a8'], 6, 12, .95, .35);
   return g.createPattern(c, 'repeat'); }
-function paintCourse(real = false) { const it = paintCourseSteps(real); for (;;) { const r = it.next(); if (r.done) return r.value; } } /* all at once (the lifelike map) */
-function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0; /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
-  let needleP = null; /* one tile per painting (the lifelike map has its own colours) */
+function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0; /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
+  let needleP = null; /* one tile per painting */
   const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d');
   const R = rng(7), ppy = MAP.ppy; const X = u => (u - MAP.U0) * ppy, Y = v => (MAP.V1 - v) * ppy;
   const path = (pts, close = true) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); if (close) g.closePath(); };
   const sketch = (pts, lw = 2.6, a = .85) => {
-    if (real) return;
     for (let pass = 0; pass < 2; pass++) {
       g.beginPath(); const j = pass ? 1.6 : .5;
       pts.forEach((p, i) => { const x = X(p[0]) + (R() - .5) * j, y = Y(p[1]) + (R() - .5) * j; i ? g.lineTo(x, y) : g.moveTo(x, y); });
@@ -2264,13 +2196,12 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
   };
   // rough
   const AK = AUGD ? MAP.W * MAP.H / (1536 * 2752) : 1; /* Augusta's maps are bigger: the same density of marks */
-  g.fillStyle = real ? '#4f8a35' : '#5c9c3a'; g.fillRect(0, 0, MAP.W, MAP.H);
-  for (let i = 0; i < 900 * AK; i++) { g.fillStyle = real ? (R() < .5 ? `rgba(30,70,25,${.06 + R() * .08})` : `rgba(140,170,70,${.05 + R() * .07})`) : R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 10 + R() * 60, 0, 7); g.fill(); if (brk(150)) yield flushCv(cv); }
+  g.fillStyle = '#5c9c3a'; g.fillRect(0, 0, MAP.W, MAP.H);
+  for (let i = 0; i < 900 * AK; i++) { g.fillStyle = R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 10 + R() * 60, 0, 7); g.fill(); if (brk(150)) yield flushCv(cv); }
   const hatch = (n, col, lw) => { g.beginPath(); for (let i = 0; i < n; i++) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
-  if (real) { const sp = (n, col, r) => { g.fillStyle = col; for (let i = 0; i < n; i++) g.fillRect(R() * MAP.W, R() * MAP.H, r, r); }; sp(90000 * AK, 'rgba(20,55,20,.22)', 1.2); sp(60000 * AK, 'rgba(150,190,90,.18)', 1); sp(400 * AK, 'rgba(110,85,50,.25)', 2.2); }
-  let async = false; if (chunk && HATCH_ASYNC && !real && HATCHW.ok) { flushCv(cv); let turned = false; queueMicrotask(() => { turned = true; }); yield HATCH_WAIT; async = turned; } /* HATCH_ASYNC: in a build run a slice per frame (not straight through)? */
+  let async = false; if (chunk && HATCH_ASYNC && HATCHW.ok) { flushCv(cv); let turned = false; queueMicrotask(() => { turned = true; }); yield HATCH_WAIT; async = turned; } /* HATCH_ASYNC: in a build run a slice per frame (not straight through)? */
   else yield (chunk && flushCv(cv));
-  if (!real && async) { /* HATCH_ASYNC: the same strokes (the same random numbers in the same order), drawn by the worker */
+  if (async) { /* HATCH_ASYNC: the same strokes (the same random numbers in the same order), drawn by the worker */
     const segs = n => { const s = new Float64Array(Math.ceil(n) * 4); for (let i = 0, k = 0; i < n; i++, k += 4) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; s[k] = x; s[k + 1] = y; s[k + 2] = x + Math.cos(a) * l; s[k + 3] = y + Math.sin(a) * l; } return s; };
     const L = [{ s: segs(16000 * AK), col: 'rgba(25,75,25,.25)', lw: 1.2 }, { s: segs(6000 * AK), col: 'rgba(180,225,110,.2)', lw: 1 }];
     if (HATCH_LEAN) { const W = cv.width, H = cv.height, K = HATCH_TILES; /* band by band, one at a time; one the worker can't do is done here the same way */
@@ -2283,28 +2214,28 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
     try { while (j.state === 0) { yield HATCH_WAIT; if (j.state === 0 && (!j.turned || performance.now() - j.t0 > 8000)) j.drop(); } } finally { if (j.state === 0) j.drop(); }
     if (j.state === 1) { g.save(); g.globalCompositeOperation = 'copy'; g.drawImage(j.bm, 0, 0); g.restore(); j.drop(); }
     else for (let k = 0; k < 2; k++) { const s = L[k].s; g.beginPath(); for (let i = 0; i < s.length; i += 4) { g.moveTo(s[i], s[i + 1]); g.lineTo(s[i + 2], s[i + 3]); } g.strokeStyle = L[k].col; g.lineWidth = L[k].lw; g.stroke(); if (!k) yield flushCv(cv); } } }
-  else if (!real) { hatch(16000 * AK, 'rgba(25,75,25,.25)', 1.2); yield (chunk && flushCv(cv)); hatch(6000 * AK, 'rgba(180,225,110,.2)', 1); }
-  yield (chunk && flushCv(cv)); if (!real) { g.beginPath(); for (let i = 0; i < 1800 * AK; i++) { const x = R() * MAP.W, y = R() * MAP.H; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke(); }
-  if (!real) for (let i = 0; i < 380 * AK; i++) { g.fillStyle = R() < .5 ? 'rgba(255,250,240,.85)' : 'rgba(255,214,70,.9)'; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 1.3 + R(), 0, 7); g.fill(); }
+  else { hatch(16000 * AK, 'rgba(25,75,25,.25)', 1.2); yield (chunk && flushCv(cv)); hatch(6000 * AK, 'rgba(180,225,110,.2)', 1); }
+  yield (chunk && flushCv(cv)); { g.beginPath(); for (let i = 0; i < 1800 * AK; i++) { const x = R() * MAP.W, y = R() * MAP.H; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke(); }
+  for (let i = 0; i < 380 * AK; i++) { g.fillStyle = R() < .5 ? 'rgba(255,250,240,.85)' : 'rgba(255,214,70,.9)'; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 1.3 + R(), 0, 7); g.fill(); }
   yield (chunk && flushCv(cv));
   // deep rough: darker, longer grass well off the fairway (the Hunt's; Augusta's second cut is short)
   if (!AUGD) { g.save(); { const pts = []; for (let v = -40; v <= 390; v += 4) pts.push([pathU(v), v]); for (let v = 390; v >= -40; v -= 4) pts.push([bluffU(v), v]); path(pts); g.clip(); }
   { const band = (inset, col) => { for (const sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + inset), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); path(pts); g.fillStyle = col; g.fill(); } };
-    band(0, real ? 'rgba(25,60,20,.28)' : 'rgba(30,95,30,.28)'); band(1.6, real ? 'rgba(25,60,20,.22)' : 'rgba(30,95,30,.24)');
-    if (!real) { g.save(); band(1.6, 'rgba(0,0,0,0)'); g.beginPath(); for (let sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + 1.6), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); } g.clip();
+    band(0, 'rgba(30,95,30,.28)'); band(1.6, 'rgba(30,95,30,.24)');
+    { g.save(); band(1.6, 'rgba(0,0,0,0)'); g.beginPath(); for (let sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + 1.6), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); } g.clip();
       g.beginPath(); for (let i = 0; i < 9000; i++) { const x = R() * MAP.W, y = Y(60 + R() * 230), a = -1.15 + (R() - .5) * .5, l = 7 + R() * 8; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(20,60,20,.3)'; g.lineWidth = 1.3; g.stroke(); g.restore(); } } g.restore(); }
   yield (chunk && flushCv(cv));
   // FESCUE: tall fescue: golden-straw over green, broad wind-wave swaths across it, its tall edge's shadow on the mown grass and a hairy, inked rim
-  if (FESCUE && AUGD && AUGD.fescue) { const Rf = rng(4041), tile = fescueTile(g, real), lx = Math.cos(-1.2), ly = Math.sin(-1.2); /* (lx, ly): the way the grass leans on the map; the waves run across it */
+  if (FESCUE && AUGD && AUGD.fescue) { const Rf = rng(4041), tile = fescueTile(g), lx = Math.cos(-1.2), ly = Math.sin(-1.2); /* (lx, ly): the way the grass leans on the map; the waves run across it */
     for (const q of AUGD.fescue) { const P = q.P; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; P.forEach(([u, v]) => { x0 = Math.min(x0, X(u)); x1 = Math.max(x1, X(u)); y0 = Math.min(y0, Y(v)); y1 = Math.max(y1, Y(v)); });
-      g.save(); g.lineJoin = 'round'; path(P); g.lineWidth = 2.2 * ppy; g.strokeStyle = real ? 'rgba(20,45,15,.28)' : 'rgba(22,62,22,.34)'; g.stroke(); g.restore(); /* the shadow of the tall edge */
+      g.save(); g.lineJoin = 'round'; path(P); g.lineWidth = 2.2 * ppy; g.strokeStyle = 'rgba(22,62,22,.34)'; g.stroke(); g.restore(); /* the shadow of the tall edge */
       g.save(); path(P); g.clip(); { const ox = Rf() * 384, oy = Rf() * 384; g.save(); g.translate(ox, oy); g.fillStyle = tile; g.fillRect(x0 - ox - 2, y0 - oy - 2, x1 - x0 + 4, y1 - y0 + 4); g.restore(); }
       { const n = Math.ceil((x1 - x0) * (y1 - y0) / (ppy * ppy * (FESCUE_THICK ? 130 : 220))), SW = FESCUE_THICK ? 1.5 : 1; g.lineCap = 'round'; /* (FESCUE_THICK: more swaths, and stronger) */ /* wind waves: long, soft, gently wavy swaths, lighter gold and darker olive, across the lean */
         for (let i = 0; i < n; i++) { const cx = x0 + Rf() * (x1 - x0), cy = y0 + Rf() * (y1 - y0), L = (14 + Rf() * 26) * ppy, w = (2.5 + Rf() * 4.5) * ppy, ph = Rf() * 6.28, lt = Rf() < .55; g.beginPath();
           for (let k = 0; k <= 12; k++) { const s = (k / 12 - .5) * L, o = Math.sin(k / 12 * 6.28 + ph) * w * .5, px = cx + ly * -s + lx * o, py = cy + lx * s + ly * o; k ? g.lineTo(px, py) : g.moveTo(px, py); }
-          g.strokeStyle = lt ? (real ? `rgba(225,205,150,${.16 * SW})` : `rgba(246,226,156,${.26 * SW})`) : (real ? `rgba(60,80,35,${.16 * SW})` : `rgba(84,108,44,${.22 * SW})`); g.lineWidth = w; g.stroke(); } }
+          g.strokeStyle = lt ? `rgba(246,226,156,${.26 * SW})` : `rgba(84,108,44,${.22 * SW})`; g.lineWidth = w; g.stroke(); } }
       g.restore();
-      if (!real) { /* the rim: a fringe of inked blades along the outline, leaning with the rest, standing over the mown grass */
+      { /* the rim: a fringe of inked blades along the outline, leaning with the rest, standing over the mown grass */
         const ink = [], col = []; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], L = Math.hypot(X(b[0]) - X(a[0]), Y(b[1]) - Y(a[1])); for (let d = 0; d < L; d += .55 * ppy) { const t = d / L, px = X(a[0]) + (X(b[0]) - X(a[0])) * t + (Rf() - .5) * .5 * ppy, py = Y(a[1]) + (Y(b[1]) - Y(a[1])) * t + (Rf() - .5) * .5 * ppy, an = -1.2 + (Rf() - .5) * .6, l = (.8 + Rf() * .9) * ppy, bl = [px, py, px + Math.cos(an) * l, py + Math.sin(an) * l]; ink.push(bl); col.push(bl); } }
         const st = (L, c, w) => { g.beginPath(); L.forEach(([a, b, e, d]) => { g.moveTo(a, b); g.lineTo(e, d); }); g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'round'; g.stroke(); };
         st(ink, 'rgba(29,42,26,.7)', 2.4); st(col.filter((_, i) => i % 2), '#e2c67d', 1.2); st(col.filter((_, i) => !(i % 2)), '#a99246', 1.2); }
@@ -2313,14 +2244,14 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
   for (const P of PINE) { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; P.forEach(([u, v]) => { x0 = Math.min(x0, X(u)); x1 = Math.max(x1, X(u)); y0 = Math.min(y0, Y(v)); y1 = Math.max(y1, Y(v)); });
     const area = (x1 - x0) * (y1 - y0), strokeSet = (list, col, lw) => { g.beginPath(); list.forEach(([a, b, e, d]) => { g.moveTo(a, b); g.lineTo(e, d); }); g.strokeStyle = col; g.lineWidth = lw; g.lineCap = 'round'; g.stroke(); };
     { const spill = []; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], L = Math.hypot(X(b[0]) - X(a[0]), Y(b[1]) - Y(a[1])); for (let d = 0; d < L; d += 2.2) { const t = d / L, x = X(a[0]) + (X(b[0]) - X(a[0])) * t + (R() - .5) * 1.6 * ppy, y = Y(a[1]) + (Y(b[1]) - Y(a[1])) * t + (R() - .5) * 1.6 * ppy, an = R() * 6.283, l = 3 + R() * 4; spill.push([x, y, x + Math.cos(an) * l, y + Math.sin(an) * l]); } }
-      strokeSet(spill, real ? 'rgba(155,110,60,.55)' : 'rgba(210,148,78,.75)', 1.1); }
-    path(P); g.fillStyle = real ? '#926638' : '#c08045'; g.fill();
+      strokeSet(spill, 'rgba(210,148,78,.75)', 1.1); }
+    path(P); g.fillStyle = '#c08045'; g.fill();
     g.save(); path(P); g.clip();
-    for (let i = 0; i < area / 900; i++) { const x = x0 + R() * (x1 - x0), y = y0 + R() * (y1 - y0), r = 10 + R() * 26; g.fillStyle = R() < .55 ? (real ? 'rgba(70,42,20,.16)' : 'rgba(110,60,25,.16)') : (real ? 'rgba(195,150,88,.12)' : 'rgba(242,192,115,.16)'); g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); if (brk(120)) yield flushCv(cv); }
+    for (let i = 0; i < area / 900; i++) { const x = x0 + R() * (x1 - x0), y = y0 + R() * (y1 - y0), r = 10 + R() * 26; g.fillStyle = R() < .55 ? 'rgba(110,60,25,.16)' : 'rgba(242,192,115,.16)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); if (brk(120)) yield flushCv(cv); }
     /* the needles: the same strokes, density and colours, painted once into a seamless tile and laid over each bed from a random offset
        (Augusta's beds run to 40,000 sq yds: stroked one by one that was millions of strokes and seconds of load) */
-    const tile = needleP || (needleP = needleTile(g, real)), ox = R() * 384, oy = R() * 384; g.save(); g.translate(ox, oy); g.fillStyle = tile; g.fillRect(x0 - ox - 2, y0 - oy - 2, x1 - x0 + 4, y1 - y0 + 4); g.restore();
-    for (let i = 0; i < area / 2500; i++) { const x = x0 + R() * (x1 - x0), y = y0 + R() * (y1 - y0); g.save(); g.translate(x, y); g.rotate(R() * 6.28); g.fillStyle = real ? '#5a3a1e' : '#6e3f1d'; g.beginPath(); g.ellipse(0, 0, 1.7, 2.7, 0, 0, 7); g.fill(); if (!real) { g.strokeStyle = 'rgba(29,42,26,.8)'; g.lineWidth = .8; g.stroke(); } g.restore(); if (brk(150)) yield flushCv(cv); }
+    const tile = needleP || (needleP = needleTile(g)), ox = R() * 384, oy = R() * 384; g.save(); g.translate(ox, oy); g.fillStyle = tile; g.fillRect(x0 - ox - 2, y0 - oy - 2, x1 - x0 + 4, y1 - y0 + 4); g.restore();
+    for (let i = 0; i < area / 2500; i++) { const x = x0 + R() * (x1 - x0), y = y0 + R() * (y1 - y0); g.save(); g.translate(x, y); g.rotate(R() * 6.28); g.fillStyle = '#6e3f1d'; g.beginPath(); g.ellipse(0, 0, 1.7, 2.7, 0, 0, 7); g.fill(); { g.strokeStyle = 'rgba(29,42,26,.8)'; g.lineWidth = .8; g.stroke(); } g.restore(); if (brk(150)) yield flushCv(cv); }
     g.restore(); sketch(P, 2, .45); yield (chunk && flushCv(cv)); }
   yield (chunk && flushCv(cv));
   // Hunt 9's ravine (H9_RAVINE): scrub over the straw below the lip, short of the fairway: dark leafy undergrowth in overlapping dabs with lighter leaf flecks, a few patches of straw left showing
@@ -2334,59 +2265,57 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
   // water
   if (!AUGD) {
   const wp = elPts(WATER, 96);
-  path(elPts(WATER, 96, 1.08)); g.fillStyle = real ? '#5d8f3c' : '#9fd36a'; g.fill();
-  path(wp); const wg = g.createRadialGradient(X(WATER.c[0]), Y(WATER.c[1]), 5, X(WATER.c[0]), Y(WATER.c[1]), WATER.ry * ppy); wg.addColorStop(0, real ? '#1f5d73' : '#3fb2e0'); wg.addColorStop(1, real ? '#3f8a8f' : '#73d3f2'); g.fillStyle = wg; g.fill();
-  g.save(); path(wp); g.clip(); g.strokeStyle = real ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.75)'; g.lineWidth = real ? 1.2 : 2; g.lineCap = 'round';
+  path(elPts(WATER, 96, 1.08)); g.fillStyle = '#9fd36a'; g.fill();
+  path(wp); const wg = g.createRadialGradient(X(WATER.c[0]), Y(WATER.c[1]), 5, X(WATER.c[0]), Y(WATER.c[1]), WATER.ry * ppy); wg.addColorStop(0, '#3fb2e0'); wg.addColorStop(1, '#73d3f2'); g.fillStyle = wg; g.fill();
+  g.save(); path(wp); g.clip(); g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2; g.lineCap = 'round';
   for (let i = 0; i < 22; i++) { const x = X(WATER.c[0] + (R() - .5) * 34), y = Y(WATER.c[1] + (R() - .5) * 56); g.beginPath(); g.moveTo(x - 12, y); g.quadraticCurveTo(x - 6, y - 5, x, y); g.quadraticCurveTo(x + 6, y + 5, x + 12, y); g.stroke(); }
   g.restore(); sketch(wp, 3, .9);
   }
   else { /* Augusta: the other holes' greens, then Rae's Creek: a grassy bank, deep blue in the middle and lighter at the edges, ripples, an inked rim */
-    for (const q of AUGD.og) { g.save(); g.lineJoin = 'round'; path(q.P); g.lineWidth = 5.2 * ppy; g.strokeStyle = real ? '#6fae4a' : '#8fd255'; g.stroke(); path(q.P); g.fillStyle = real ? '#7dbd55' : '#a9ea6d'; g.fill(); g.restore(); sketch(q.P, 2, .55); }
-    for (const q of AUGD.water) { const P = q.P; g.save(); g.lineJoin = 'round'; path(P); g.lineWidth = 2.6 * ppy; g.strokeStyle = real ? '#5d8f3c' : '#9fd36a'; g.stroke(); g.restore();
-      path(P); g.fillStyle = real ? '#1f5d73' : '#3fb2e0'; g.fill(); g.save(); path(P); g.clip(); g.lineJoin = 'round';
-      path(P); g.lineWidth = 3.6 * ppy; g.strokeStyle = real ? 'rgba(63,138,143,.75)' : 'rgba(115,211,242,.8)'; g.stroke(); path(P); g.lineWidth = 1.6 * ppy; g.strokeStyle = real ? '#3f8a8f' : '#73d3f2'; g.stroke();
-      g.strokeStyle = real ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.75)'; g.lineWidth = real ? 1.2 : 2; g.lineCap = 'round';
+    for (const q of AUGD.og) { g.save(); g.lineJoin = 'round'; path(q.P); g.lineWidth = 5.2 * ppy; g.strokeStyle = '#8fd255'; g.stroke(); path(q.P); g.fillStyle = '#a9ea6d'; g.fill(); g.restore(); sketch(q.P, 2, .55); }
+    for (const q of AUGD.water) { const P = q.P; g.save(); g.lineJoin = 'round'; path(P); g.lineWidth = 2.6 * ppy; g.strokeStyle = '#9fd36a'; g.stroke(); g.restore();
+      path(P); g.fillStyle = '#3fb2e0'; g.fill(); g.save(); path(P); g.clip(); g.lineJoin = 'round';
+      path(P); g.lineWidth = 3.6 * ppy; g.strokeStyle = 'rgba(115,211,242,.8)'; g.stroke(); path(P); g.lineWidth = 1.6 * ppy; g.strokeStyle = '#73d3f2'; g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2; g.lineCap = 'round';
       let area = 0; for (let i = 0, j = P.length - 1; i < P.length; j = i++) area += (P[j][0] + P[i][0]) * (P[j][1] - P[i][1]); area = Math.abs(area / 2);
       for (let i = 0, n = 0; i < area * 2 && n < Math.min(500, area / 60); i++) { const u = q.b[0] + R() * (q.b[1] - q.b[0]), v = q.b[2] + R() * (q.b[3] - q.b[2]); if (!inPoly(u, v, P)) continue; n++; const x = X(u), y = Y(v); g.beginPath(); g.moveTo(x - 12, y); g.quadraticCurveTo(x - 6, y - 5, x, y); g.quadraticCurveTo(x + 6, y + 5, x + 12, y); g.stroke(); }
       g.restore(); sketch(P, 3, .9);
       const Fq = AUGD.FOUNTAIN; if (Fq && inPoly(Fq.u, Fq.v, P)) { const fx = X(Fq.u), fy = Y(Fq.v), rr = rng(77); /* the fountain's churn: a white boil at its foot, broken rings of foam round it (painted once, no cost per frame) */
-        g.save(); path(P); g.clip(); g.lineCap = 'round'; g.fillStyle = real ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.92)'; g.beginPath(); g.arc(fx, fy, 1.5 * ppy, 0, 7); g.fill();
+        g.save(); path(P); g.clip(); g.lineCap = 'round'; g.fillStyle = 'rgba(255,255,255,.92)'; g.beginPath(); g.arc(fx, fy, 1.5 * ppy, 0, 7); g.fill();
         g.globalAlpha = .5; g.strokeStyle = INK; g.lineWidth = 1.2; g.stroke(); g.globalAlpha = 1;
-        for (const [r, w, a] of [[2.3, 2.4, .9], [3.3, 1.9, .7], [4.5, 1.5, .5]]) { g.strokeStyle = `rgba(255,255,255,${real ? a * .35 : a})`; g.lineWidth = w;
+        for (const [r, w, a] of [[2.3, 2.4, .9], [3.3, 1.9, .7], [4.5, 1.5, .5]]) { g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = w;
           for (let k = 0; k < 7; k++) { const a0 = k / 7 * 6.283 + rr() * .5, a1 = a0 + .5 + rr() * .35; g.beginPath(); g.arc(fx, fy, r * ppy * (.94 + rr() * .12), a0, a1); g.stroke(); } }
         g.restore(); } } }
   yield (chunk && flushCv(cv));
   // fairway
   if (!AUGD) {
-  path(FW); g.lineWidth = 3.4 * ppy; g.strokeStyle = real ? 'rgba(98,150,58,.8)' : '#7dbb48'; g.lineJoin = 'round'; if (real) { g.filter = 'blur(3px)'; } g.stroke(); g.filter = 'none';
+  path(FW); g.lineWidth = 3.4 * ppy; g.strokeStyle = '#7dbb48'; g.lineJoin = 'round'; g.stroke();
   g.save(); path(FW); g.clip();
-  for (let v = 86, k = 0; v < 290; v += 7, k++) { g.fillStyle = real ? (k % 2 ? '#6aa646' : '#62a03f') : (k % 2 ? '#a4d75a' : '#95cb4f'); g.fillRect(0, Y(v + 7), MAP.W, 7 * ppy + 1); }
-  if (real) { g.fillStyle = 'rgba(30,70,25,.12)'; for (let i = 0; i < 26000; i++) g.fillRect(R() * MAP.W, Y(90 + R() * 195), 1, 1); }
-  g.beginPath(); for (let i = 0; i < 2600; i++) { const x = R() * MAP.W, y = Y(90 + R() * 195), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = real ? 'rgba(40,90,30,.08)' : 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
+  for (let v = 86, k = 0; v < 290; v += 7, k++) { g.fillStyle = k % 2 ? '#a4d75a' : '#95cb4f'; g.fillRect(0, Y(v + 7), MAP.W, 7 * ppy + 1); }
+  g.beginPath(); for (let i = 0; i < 2600; i++) { const x = R() * MAP.W, y = Y(90 + R() * 195), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
   g.restore(); sketch(FW, 2.6, .8);
   }
   else { /* Augusta: every fairway in view, the same stripes, first cut and inked edge */
-    for (const q of AUGD.fwy) { path(q.P); g.lineWidth = 3.4 * ppy; g.strokeStyle = real ? 'rgba(98,150,58,.8)' : '#7dbd55'; g.lineJoin = 'round'; if (real) g.filter = 'blur(3px)'; g.stroke(); g.filter = 'none'; }
+    for (const q of AUGD.fwy) { path(q.P); g.lineWidth = 3.4 * ppy; g.strokeStyle = '#7dbd55'; g.lineJoin = 'round'; g.stroke(); }
     for (const q of AUGD.fwy) { const [u0, u1, v0, v1] = q.b, x0 = X(u0) - 4, w = (u1 - u0) * ppy + 8, n = (u1 - u0) * (v1 - v0) / (240 * 195);
       g.save(); path(q.P); g.clip();
-      for (let v = Math.floor(v0 / 7) * 7, k = Math.floor(v0 / 7); v < v1; v += 7, k++) { g.fillStyle = real ? (k % 2 ? '#6aa646' : '#62a03f') : (k % 2 ? '#a4d75a' : '#95cb4f'); g.fillRect(x0, Y(v + 7), w, 7 * ppy + 1); }
-      if (real) { g.fillStyle = 'rgba(30,70,25,.12)'; for (let i = 0; i < 26000 * n; i++) g.fillRect(x0 + R() * w, Y(v0 + R() * (v1 - v0)), 1, 1); }
-      g.beginPath(); for (let i = 0; i < 2600 * n; i++) { const x = x0 + R() * w, y = Y(v0 + R() * (v1 - v0)), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = real ? 'rgba(40,90,30,.08)' : 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
+      for (let v = Math.floor(v0 / 7) * 7, k = Math.floor(v0 / 7); v < v1; v += 7, k++) { g.fillStyle = k % 2 ? '#a4d75a' : '#95cb4f'; g.fillRect(x0, Y(v + 7), w, 7 * ppy + 1); }
+      g.beginPath(); for (let i = 0; i < 2600 * n; i++) { const x = x0 + R() * w, y = Y(v0 + R() * (v1 - v0)), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
       g.restore(); sketch(q.P, 2.6, .8); yield (chunk && flushCv(cv)); } }
   yield (chunk && flushCv(cv));
   if (AUGD && COURSE_DEF[CID].obGrey) for (const q of AUGD.ob) { /* out of bounds (houses, roads): a plain grey area, faintly hatched, inked round */
-    path(q.P); g.fillStyle = real ? '#8f8c85' : '#bdbab3'; g.fill(); g.save(); path(q.P); g.clip(); g.beginPath(); const [u0, u1, v0, v1] = q.b;
+    path(q.P); g.fillStyle = '#bdbab3'; g.fill(); g.save(); path(q.P); g.clip(); g.beginPath(); const [u0, u1, v0, v1] = q.b;
     for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; g.stroke(); g.restore(); sketch(q.P, 2.2, .6); }
   // the practice green (and the cart paths: out of bounds left of the main one)
-  if (!AUGD) { path(PRACTICE); g.fillStyle = real ? '#6fae4a' : '#8fd255'; g.fill(); const pg = PRACTICE.map(([u, v]) => { const cx = -92, cy = 235; return [cx + (u - cx) * .9, cy + (v - cy) * .92]; });
-    path(pg); g.fillStyle = real ? '#7dbd55' : '#a9ea6d'; g.fill(); sketch(PRACTICE, 2.2, .7); }
-  const road = (P, w) => { g.save(); g.lineJoin = g.lineCap = 'round'; path(P, false); g.lineWidth = (w + .9) * ppy; g.strokeStyle = real ? 'rgba(60,60,55,.6)' : 'rgba(29,42,26,.85)'; g.stroke();
-    path(P, false); g.lineWidth = w * ppy; g.strokeStyle = real ? '#a9a59a' : '#d9d3c4'; g.stroke(); path(P, false); g.lineWidth = w * .25 * ppy; g.strokeStyle = 'rgba(255,255,255,.35)'; g.setLineDash([3 * ppy, 4 * ppy]); g.stroke(); g.restore(); };
+  if (!AUGD) { path(PRACTICE); g.fillStyle = '#8fd255'; g.fill(); const pg = PRACTICE.map(([u, v]) => { const cx = -92, cy = 235; return [cx + (u - cx) * .9, cy + (v - cy) * .92]; });
+    path(pg); g.fillStyle = '#a9ea6d'; g.fill(); sketch(PRACTICE, 2.2, .7); }
+  const road = (P, w) => { g.save(); g.lineJoin = g.lineCap = 'round'; path(P, false); g.lineWidth = (w + .9) * ppy; g.strokeStyle = 'rgba(29,42,26,.85)'; g.stroke();
+    path(P, false); g.lineWidth = w * ppy; g.strokeStyle = '#d9d3c4'; g.stroke(); path(P, false); g.lineWidth = w * .25 * ppy; g.strokeStyle = 'rgba(255,255,255,.35)'; g.setLineDash([3 * ppy, 4 * ppy]); g.stroke(); g.restore(); };
   if (!AUGD) { road(PATH, 2.4); road(PATH2, 2.2); } else for (const P of AUGD.PATHS) road(P, 2.2); /* Augusta's cart paths: just paths, no out of bounds */
   yield (chunk && flushCv(cv));
   // the bluff: the grass breaks over the edge, then a scrubby face with clay showing through, down to a strip of beach
   if (AUGD && AUGD.bluff) { const B = AUGD.bluff, k = B.L / 430; /* a data hole's bluff (Hunt 2): hole 1's look along its own lip */
-    path(B.band(.4, 16.5)); g.fillStyle = real ? '#5d7a3e' : '#6f9f47'; g.fill(); path(B.band(.4, 16.5)); g.save(); g.clip();
+    path(B.band(.4, 16.5)); g.fillStyle = '#6f9f47'; g.fill(); path(B.band(.4, 16.5)); g.save(); g.clip();
     for (let i = 0; i < 70 * k; i++) { const s = R() * B.L, d0 = 3 + R() * 6, len = 5 + R() * 7, a = B.at(s, d0), m = B.at(s + (R() - .5) * 4, d0 + len * .5), e = B.at(s + (R() - .5) * 6, d0 + len); g.beginPath(); g.moveTo(X(a[0]), Y(a[1])); g.quadraticCurveTo(X(m[0]), Y(m[1]), X(e[0]), Y(e[1])); g.lineWidth = (1.2 + R() * 1.6) * ppy; g.lineCap = 'round'; g.strokeStyle = 'rgba(176,132,84,.55)'; g.stroke(); } /* clay gullies */
     const clump = (u, v, r, c) => { const q = [[0, 0, 1], [.55, .25, .72], [-.5, .3, .68], [.1, -.5, .6]]; g.beginPath(); q.forEach(([a, b, sc]) => { g.moveTo(X(u + a * r) + r * sc * ppy, Y(v + b * r)); g.arc(X(u + a * r), Y(v + b * r), r * sc * ppy, 0, 7); });
       g.fillStyle = 'rgba(29,42,26,.85)'; g.save(); g.translate(.9, 1.1); g.fill(); g.restore(); g.fillStyle = c; g.fill(); g.beginPath(); g.arc(X(u - r * .25), Y(v + r * .3), r * .38 * ppy, 0, 7); g.fillStyle = 'rgba(255,255,255,.14)'; g.fill(); };
@@ -2394,9 +2323,9 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
     for (let i = 0; i < 520 * k; i++) { const s = R() * B.L, d = Math.pow(R(), 1.3) * 14, p = B.at(s, 1.2 + d); clump(p[0], p[1], (1 - d / 24) * (.8 + R() * 1.0), cs[(R() * cs.length) | 0]); if (brk(130)) yield flushCv(cv); } /* scrub, thickest just under the edge */
     g.restore();
     path(B.band(16, 23)); g.fillStyle = '#e4dccb'; g.fill(); path(B.band(21, 23)); g.fillStyle = 'rgba(79,159,208,.75)'; g.fill(); /* the beach and the wet edge of the lake */
-    if (!real) for (let pass = 0; pass < 2; pass++) { g.beginPath(); for (let s = 0; s <= B.L + .01; s += 2) { const p = B.at(s, .4), x = X(p[0]) + (R() - .5) * (pass ? 1.6 : .5), y = Y(p[1]); s === 0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineWidth = pass ? 1.4 : 2.6; g.strokeStyle = `rgba(29,42,26,${pass ? .38 : .85})`; g.lineJoin = 'round'; g.stroke(); } } /* the edge of the bluff */
+    for (let pass = 0; pass < 2; pass++) { g.beginPath(); for (let s = 0; s <= B.L + .01; s += 2) { const p = B.at(s, .4), x = X(p[0]) + (R() - .5) * (pass ? 1.6 : .5), y = Y(p[1]); s === 0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineWidth = pass ? 1.4 : 2.6; g.strokeStyle = `rgba(29,42,26,${pass ? .38 : .85})`; g.lineJoin = 'round'; g.stroke(); } } /* the edge of the bluff */
   if (!AUGD) { const band = (a, b) => { const A = [], B = []; for (let v = -40; v <= 390; v += 2) { A.push([bluffU(v) + a, v]); B.push([bluffU(v) + b, v]); } return A.concat(B.reverse()); };
-    path(band(.4, 16.5)); g.fillStyle = real ? '#5d7a3e' : '#6f9f47'; g.fill();
+    path(band(.4, 16.5)); g.fillStyle = '#6f9f47'; g.fill();
     path(band(.4, 16.5)); g.save(); g.clip();
     for (let i = 0; i < 70; i++) { const v = -40 + R() * 430, u0 = bluffU(v) + 3 + R() * 6, len = 5 + R() * 7; g.beginPath(); g.moveTo(X(u0), Y(v)); g.quadraticCurveTo(X(u0 + len * .5), Y(v + (R() - .5) * 4), X(u0 + len), Y(v + (R() - .5) * 6)); g.lineWidth = (1.2 + R() * 1.6) * ppy; g.lineCap = 'round'; g.strokeStyle = 'rgba(176,132,84,.55)'; g.stroke(); } // clay gullies
     const clump = (u, v, r, c) => { const k = [[0, 0, 1], [.55, .25, .72], [-.5, .3, .68], [.1, -.5, .6]]; g.beginPath(); k.forEach(([a, b, s]) => { g.moveTo(X(u + a * r) + r * s * ppy, Y(v + b * r)); g.arc(X(u + a * r), Y(v + b * r), r * s * ppy, 0, 7); });
@@ -2405,21 +2334,21 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
     for (let i = 0; i < 520; i++) { const v = -40 + R() * 430, d = Math.pow(R(), 1.3) * 14, u = bluffU(v) + 1.2 + d; clump(u, v, (1 - d / 24) * (.8 + R() * 1.0), cs[(R() * cs.length) | 0]); if (brk(130)) yield flushCv(cv); } // scrub, thickest just under the edge
     g.restore();
     path(band(16, 23)); g.fillStyle = '#e4dccb'; g.fill(); path(band(21, 23)); g.fillStyle = 'rgba(79,159,208,.75)'; g.fill(); // the beach and the wet edge of the lake
-    if (!real) for (let pass = 0; pass < 2; pass++) { g.beginPath(); for (let v = -40; v <= 390; v += 2) { const x = X(bluffU(v) + .4) + (R() - .5) * (pass ? 1.6 : .5), y = Y(v); v === -40 ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineWidth = pass ? 1.4 : 2.6; g.strokeStyle = `rgba(29,42,26,${pass ? .38 : .85})`; g.lineJoin = 'round'; g.stroke(); } } // the edge of the bluff (an open line: no closing stroke across the map)
+    for (let pass = 0; pass < 2; pass++) { g.beginPath(); for (let v = -40; v <= 390; v += 2) { const x = X(bluffU(v) + .4) + (R() - .5) * (pass ? 1.6 : .5), y = Y(v); v === -40 ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineWidth = pass ? 1.4 : 2.6; g.strokeStyle = `rgba(29,42,26,${pass ? .38 : .85})`; g.lineJoin = 'round'; g.stroke(); } } // the edge of the bluff (an open line: no closing stroke across the map)
   yield (chunk && flushCv(cv));
   // tee
   for (const tee of AUGD ? AUGD.tees.map(q => q.P) : [[[-5, -7], [5, -7], [5, 7], [-5, 7]]]) { /* Augusta: every tee box in view */
-  path(tee); g.fillStyle = real ? '#6fae4a' : '#98d85a'; g.fill(); g.save(); path(tee); g.clip(); const tv0 = Math.min(...tee.map(p => p[1])), tv1 = Math.max(...tee.map(p => p[1])); for (let v = tv0, k = 0; v < tv1; v += 2.5, k++) { g.fillStyle = real ? (k % 2 ? '#6aa846' : '#74b24f') : k % 2 ? '#8ccd50' : '#a3e063'; g.fillRect(0, Y(v + 2.5), MAP.W, 2.5 * ppy + 1); } g.restore(); sketch(tee, 2.4, .8); }
+  path(tee); g.fillStyle = '#98d85a'; g.fill(); g.save(); path(tee); g.clip(); const tv0 = Math.min(...tee.map(p => p[1])), tv1 = Math.max(...tee.map(p => p[1])); for (let v = tv0, k = 0; v < tv1; v += 2.5, k++) { g.fillStyle = k % 2 ? '#8ccd50' : '#a3e063'; g.fillRect(0, Y(v + 2.5), MAP.W, 2.5 * ppy + 1); } g.restore(); sketch(tee, 2.4, .8); }
   yield (chunk && flushCv(cv));
   // green
-  path(elPts(FRINGE, 96)); g.fillStyle = real ? '#6fae4a' : '#8fd255'; g.fill(); sketch(elPts(FRINGE, 96), 1.6, .4);
-  const gp = elPts(GREEN, 96); path(gp); g.fillStyle = real ? '#7dbd55' : '#a9ea6d'; g.fill();
+  path(elPts(FRINGE, 96)); g.fillStyle = '#8fd255'; g.fill(); sketch(elPts(FRINGE, 96), 1.6, .4);
+  const gp = elPts(GREEN, 96); path(gp); g.fillStyle = '#a9ea6d'; g.fill();
   g.save(); path(gp); g.clip(); for (let k = 9; k > 0; k--) { path(GREEN.sm ? elPts(GREEN, 64, k / 9) : elPts(Object.assign({}, GREEN, { rx: GREEN.rx * k / 9, ry: GREEN.ry * k / 9 }), 64)); g.fillStyle = k % 2 ? 'rgba(255,255,255,.07)' : 'rgba(40,120,40,.05)'; g.fill(); } g.restore(); sketch(gp, 2.6, .85);
   yield (chunk && flushCv(cv));
   // bunkers
   BUNKERS.forEach(b => {
-    const bp = elPts(b, 180); if (b.sm) { g.save(); g.lineJoin = 'round'; path(bp); g.lineWidth = 5.4 * ppy; g.strokeStyle = real ? '#5f9a3e' : 'rgba(46,96,34,.35)'; g.stroke(); path(bp); g.lineWidth = 2.6 * ppy; g.strokeStyle = real ? '#5f9a3e' : '#8fcf55'; g.stroke(); g.restore(); } else { path(elPts(b, 180, 1.3)); g.fillStyle = real ? '#5f9a3e' : 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = real ? '#5f9a3e' : '#8fcf55'; g.fill(); } /* the raised grass lip, with a shadow falling off it */
-    path(bp); g.fillStyle = real ? '#e3cf9c' : '#f6ecd4'; g.fill(); g.save(); path(bp); g.clip();
+    const bp = elPts(b, 180); if (b.sm) { g.save(); g.lineJoin = 'round'; path(bp); g.lineWidth = 5.4 * ppy; g.strokeStyle = 'rgba(46,96,34,.35)'; g.stroke(); path(bp); g.lineWidth = 2.6 * ppy; g.strokeStyle = '#8fcf55'; g.stroke(); g.restore(); } else { path(elPts(b, 180, 1.3)); g.fillStyle = 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = '#8fcf55'; g.fill(); } /* the raised grass lip, with a shadow falling off it */
+    path(bp); g.fillStyle = '#f6ecd4'; g.fill(); g.save(); path(bp); g.clip();
     g.fillStyle = 'rgba(205,180,130,.45)'; for (let i = 0; i < 160; i++) { g.beginPath(); g.arc(X(b.c[0] + (R() - .5) * b.rx * 2.4), Y(b.c[1] + (R() - .5) * b.ry * 2.4), .6 + R() * .9, 0, 7); g.fill(); }
     g.lineWidth = 2.4 * ppy; g.strokeStyle = 'rgba(176,146,96,.42)'; g.translate(0, 2.2 * ppy); path(bp); g.stroke(); g.restore(); /* the shaded face under the far lip */
     sketch(bp, 3, .9);
@@ -2427,7 +2356,7 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
   yield (chunk && flushCv(cv));
   // tree shadows (hatched)
   const sd = [0.62, -0.55];
-  if (!real) TREES.forEach(t => {
+  TREES.forEach(t => {
     const cx = t.u + sd[0] * t.h * .5, cy = t.v + sd[1] * t.h * .5;
     if (t.lob) { g.beginPath(); g.moveTo(X(t.u), Y(t.v)); g.lineTo(X(cx), Y(cy)); g.strokeStyle = 'rgba(18,58,22,.22)'; g.lineWidth = .6 * ppy; g.lineCap = 'round'; g.stroke(); } /* a tall loblolly: the bare trunk's thin shadow out to a small crown shadow far off */
     g.save(); g.translate(X(cx), Y(cy)); g.rotate(Math.atan2(-sd[1], sd[0]));
@@ -2437,7 +2366,7 @@ function* paintCourseSteps(real = false, chunk = false) { let brkN = 0; const br
     g.restore();
   });
   // cup
-  g.beginPath(); g.arc(X(PIN.u), Y(PIN.v), .42 * ppy, 0, 7); g.fillStyle = real ? 'rgba(40,90,30,.25)' : 'rgba(60,140,40,.28)'; g.fill();
+  g.beginPath(); g.arc(X(PIN.u), Y(PIN.v), .42 * ppy, 0, 7); g.fillStyle = 'rgba(60,140,40,.28)'; g.fill();
   return cv;
 }
 function detailTex() {
@@ -2501,7 +2430,7 @@ function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS s
   return { tex, box: new THREE.Vector4(u0, -v1, u1 - u0, v1 - v0) };
 }
 function* courseSteps() { /* the hole's painted map, then the ground it's draped on */
-courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(false, BUILD_CHUNK2)); courseTex.anisotropy = maxAniso;
+courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(BUILD_CHUNK2)); courseTex.anisotropy = maxAniso;
 const course = new THREE.Mesh(new THREE.PlaneGeometry(MAP.U1 - MAP.U0, MAP.V1 - MAP.V0), groundMat(courseTex, 1));
 course.rotation.x = -Math.PI / 2; course.position.set((MAP.U0 + MAP.U1) / 2, 0, -(MAP.V0 + MAP.V1) / 2); HS.add(course);
 yield* terrainSteps(course); }
@@ -2546,16 +2475,16 @@ function buildOuter() { /* the land round the painted map (per hole) */
 
 /* ---- culled instancing: one InstancedMesh per kind (same draw calls as before), but each frame the camera moves only the
    instances inside the view are packed to the front and drawn. What you can see is drawn exactly as before. ---- */
-let CULL = []; /* the hole on screen's (each hole scene has its own: HS.cull) */ const _cf = new THREE.Frustum(), _cmx = new THREE.Matrix4(), _csp = new THREE.Sphere(), _ck = new Float64Array(17).fill(NaN); let _cReal = null, _cPT = null; const _cb = new THREE.Vector3(1e9, 0, 0), _blk = new Set();
+let CULL = []; /* the hole on screen's (each hole scene has its own: HS.cull) */ const _cf = new THREE.Frustum(), _cmx = new THREE.Matrix4(), _csp = new THREE.Sphere(), _ck = new Float64Array(17).fill(NaN); let _cPT = null; const _cb = new THREE.Vector3(1e9, 0, 0), _blk = new Set();
 function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m: Matrix4, c?: Color, r: radius }
   const n = items.length, m = new THREE.InstancedMesh(geo, mat, n), o = opt.off || { x: 0, y: 0, z: 0 };
   const all = new Float32Array(n * 16), cols = items.length && items[0].c ? new Float32Array(n * 3) : null, sph = new Float32Array(n * 4), tid = new Int32Array(n).fill(-1);
   items.forEach((it, i) => { it.m.toArray(all, i * 16); m.setMatrixAt(i, it.m); if (cols) { it.c.toArray(cols, i * 3); m.setColorAt(i, it.c); } sph[i * 4] = it.p.x + o.x; sph[i * 4 + 1] = it.p.y + o.y; sph[i * 4 + 2] = it.p.z + o.z; sph[i * 4 + 3] = it.r; if (it.tid != null) tid[i] = it.tid; });
   m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (m.instanceColor) m.instanceColor.setUsage(THREE.DynamicDrawUsage);
   if (opt.off) m.position.copy(opt.off); if (opt.ud) Object.assign(m.userData, opt.ud);
-  const C = { m, all, cols, sph, tid, n, far: opt.hideBeyond || 1e9, realHide: !!opt.realHide, lead: null, vl: null, nv: 0, fm: null };
+  const C = { m, all, cols, sph, tid, n, far: opt.hideBeyond || 1e9, lead: null, vl: null, nv: 0, fm: null };
   { const P = HS.cull[HS.cull.length - 1], L = P && (P.lead || P); /* a twin (an ink hull, a blossom cap): same instance centres as the mesh before it, so it shares that mesh's visible list (radius: the larger of the two, so it can only draw more, never less) */
-    if (L && L.n === n && L.far === C.far && L.realHide === C.realHide && !!L.m.userData.tuft === !!m.userData.tuft) { let same = true; for (let i = 0; i < n * 4 && same; i += 4) same = sph[i] === L.sph[i] && sph[i + 1] === L.sph[i + 1] && sph[i + 2] === L.sph[i + 2] && tid[i >> 2] === L.tid[i >> 2];
+    if (L && L.n === n && L.far === C.far && !!L.m.userData.tuft === !!m.userData.tuft) { let same = true; for (let i = 0; i < n * 4 && same; i += 4) same = sph[i] === L.sph[i] && sph[i + 1] === L.sph[i + 1] && sph[i + 2] === L.sph[i + 2] && tid[i >> 2] === L.tid[i >> 2];
       if (same) { for (let i = 3; i < n * 4; i += 4) L.sph[i] = Math.max(L.sph[i], sph[i]); C.lead = L; } } }
   if (opt.lod) { const f = new THREE.InstancedMesh(opt.lod, mat, n); f.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (cols) { f.setColorAt(0, new THREE.Color()); f.instanceColor.setUsage(THREE.DynamicDrawUsage); }
     f.count = 0; f.visible = false; if (opt.off) f.position.copy(opt.off); if (opt.ud) Object.assign(f.userData, opt.ud); C.fm = f; C.fpi = new Int32Array(n).fill(-1); } /* "far trees: simple": the same instances, far off, in a simpler mesh */
@@ -2565,12 +2494,12 @@ const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 
 const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
 $('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
 function updateCull() {
-  camera.updateMatrixWorld(); const e = camera.matrixWorld.elements, real = typeof REAL !== 'undefined' && REAL.on; let same = real === _cReal;
+  camera.updateMatrixWorld(); const e = camera.matrixWorld.elements; let same = true;
   for (let i = 0; i < 16; i++) if (_ck[i] !== e[i]) { same = false; _ck[i] = e[i]; }
   if (_ck[16] !== camera.projectionMatrix.elements[5]) { same = false; _ck[16] = camera.projectionMatrix.elements[5]; }
   if (_cb.distanceToSquared(ball.position) > 1e-4) { same = false; _cb.copy(ball.position); }
   if (_cPT !== PLAN_TREE) { same = false; _cPT = PLAN_TREE; }
-  if (same) return; _cReal = real;
+  if (same) return;
   { // a tree in the way of the ball (or wrapped round the camera) steps aside
     _blk.clear(); const cx0 = camera.position.x, cy0 = camera.position.y, cz0 = camera.position.z, bx = ball.position.x, by = ball.position.y, bz = ball.position.z, dx = bx - cx0, dz = bz - cz0, L2 = dx * dx + dz * dz || 1e-6;
     const line = G.view !== 'aim' || G.aimT < .5, aimKeep = AIM_TREES_KEEP === true && !line; /* AIM_TREES_KEEP: the aim view hides no tree (only one the camera is really inside) */
@@ -2589,16 +2518,15 @@ function updateCull() {
       if (Math.hypot(qx, qz) < t.r + .8 && segY < top + .5 && t !== PLAN_TREE) _blk.add(i); } } /* never hide the tree you're about to hit */
   _cmx.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _cf.setFromProjectionMatrix(_cmx);
   const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
-  const lod = FARLOD.on && !real, FD2 = FARLOD.d2;
+  const lod = FARLOD.on, FD2 = FARLOD.d2;
   for (const C of CULL) {
     if (C.fm && !lod && C.fm.visible) { C.fm.visible = false; C.fm.count = 0; }
-    if (real && C.realHide) { C.m.visible = false; continue; }
     if (MENU.on && C.m.userData.tuft) { C.m.visible = false; continue; } // fly-over: skip the close-up grass tufts
     const S = C.sph; let V, nv = 0;
     if (C.lead) { V = C.lead.vl; nv = C.lead.nv; } /* a twin: its lead (just before it) has tested the same centres this frame */
     else { V = C.vl || (C.vl = new Int32Array(C.n));
       for (let i = 0; i < C.n; i++) {
-        if (!real) { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far + r; if (dx * dx + dy * dy + dz * dz > fr * fr) continue; } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; } /* lifelike shadows need everything */
+        { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far + r; if (dx * dx + dy * dy + dz * dz > fr * fr) continue; } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; }
         V[nv++] = i; }
       C.nv = nv; }
     const im = C.m.instanceMatrix.array, ic = C.cols && C.m.instanceColor.array, A = C.all, Cc = C.cols; let k = 0, ch = false; const pi = C.pi || (C.pi = new Int32Array(C.n).fill(-1));
@@ -2924,7 +2852,7 @@ function* buildSceneryG() { /* BUILD_CHUNK2: yields between its parts and throug
   for (const [tu, tv] of TUFTED) for (let k = 0; k < 26; k++) { const a = Rt() * 6.28, r = .7 + Rt() * 1.8; list.push([tu + Math.cos(a) * r, tv + Math.sin(a) * r]); } // the skirts of long grass round the fairway trees
   if (BUILD_CHUNK2) yield;
   const q = new THREE.Quaternion(), e = new THREE.Euler();
-  cullInst(tg, tuftMat(tt), list.map(([u, v]) => { const s = .45 + Rt() * .55; e.set(0, Rt() * 3, 0); q.setFromEuler(e); const p = W(u, v, groundHeight(u, v) - .03); return { p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(s, s * (.8 + Rt() * .5), s)), r: 1.6 }; }), { ud: { tuft: true }, hideBeyond: 88, realHide: true });
+  cullInst(tg, tuftMat(tt), list.map(([u, v]) => { const s = .45 + Rt() * .55; e.set(0, Rt() * 3, 0); q.setFromEuler(e); const p = W(u, v, groundHeight(u, v) - .03); return { p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(s, s * (.8 + Rt() * .5), s)), r: 1.6 }; }), { ud: { tuft: true }, hideBeyond: 88 });
   if (BUILD_CHUNK2) yield;
   // pine straw up close: flat clusters of needles (and the odd cone) lying on the beds, so there are real needles at your feet (fades out with distance like the tufts)
   if (PINE.length) { const mk = cone => { const c2 = document.createElement('canvas'); c2.width = c2.height = 128; const x = c2.getContext('2d'), Rn = rng(cone ? 77 : 78); x.lineCap = 'round';
@@ -2937,7 +2865,7 @@ function* buildSceneryG() { /* BUILD_CHUNK2: yields between its parts and throug
     for (const P of PINE) { if (BUILD_CHUNK2) yield; let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; P.forEach(([u, v]) => { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); });
       const want = Math.min(1000, (u1 - u0) * (v1 - v0) * .7); let got = 0; for (let i = 0; i < want * 4 && got < want && sets[0].length + sets[1].length < 2200; i++) { const u = u0 + Rp() * (u1 - u0), v = v0 + Rp() * (v1 - v0); if (!inPoly(u, v, P) || lieAt(u, v) !== 'pine') continue; sets[Rp() < .1 ? 1 : 0].push([u, v]); got++; } } /* only where it plays as straw: none on the fringe collar, sand, water or in the azaleas (a lone cone on 12's fringe read as a stray brown blob) */
     const qq = new THREE.Quaternion(), ee = new THREE.Euler();
-    sets.forEach((L, k) => { if (!L.length) return; cullInst(fg, tuftMat(mk(k === 1)), L.map(([u, v]) => { const sz = k ? .42 + Rp() * .18 : .7 + Rp() * .6; ee.set(0, Rp() * 6.28, 0); qq.setFromEuler(ee); const p = W(u, v, groundHeight(u, v) + .025); return { p, m: new THREE.Matrix4().compose(p, qq, new THREE.Vector3(sz, 1, sz)), r: sz }; }), { ud: { tuft: true }, hideBeyond: 70, realHide: true }); });
+    sets.forEach((L, k) => { if (!L.length) return; cullInst(fg, tuftMat(mk(k === 1)), L.map(([u, v]) => { const sz = k ? .42 + Rp() * .18 : .7 + Rp() * .6; ee.set(0, Rp() * 6.28, 0); qq.setFromEuler(ee); const p = W(u, v, groundHeight(u, v) + .025); return { p, m: new THREE.Matrix4().compose(p, qq, new THREE.Vector3(sz, 1, sz)), r: sz }; }), { ud: { tuft: true }, hideBeyond: 70 }); });
   }
   if (BUILD_CHUNK2) yield;
   if (FESCUE) yield* FESCUE_FX.buildG(); /* FESCUE: the hole's tall fescue tufts */
@@ -3349,7 +3277,6 @@ const VOICE = {
     stiff: ['GET IN THE HOLE!', 'Stiff! Tap-in!'], green: ['Dance floor!', 'On the green, baby.'], pured: ['Pured it.', 'That tempo though.', 'Right down Main Street.'], fairway: ['Fairway. I\'ll take it.', 'Safe and sound.'],
     rough: ['Rough. Could be worse.', 'Hmm. Little wild.', 'In the cabbage.'], holed: ['Drained it!', 'Get in there!', 'Cup. Ball. Love it.'], lip: ['Lipped out!', 'Nooo, the edge!'], hop: ['Too hot! Hopped it.', 'Way too firm.'],
     gimme: ['Your disgusting playing partners gave it to you.', 'Pick it up. Your disgusting playing partners insist.'], mulligan: ['Mulligan. Nobody saw.', 'Again. Smoother this time.'], restart: ['Back to the tee!'],
-    style: ['Ooh, fancy.', 'New look!', 'I feel drawn.', 'Sketchy. I like it.'],
     preSand: ['Sand. Stay calm, {D} out.', 'Just get it out of here.'], preDeep: ['Buried. {club} won\'t get much height.', 'Deep stuff. Just get it out.'], preRough: ['Bit of a lie. {club}, {D} yards.', 'Rough\'s thick. Swing through it.'],
     preGreen: ['Putting comes later. Nice one.'], pre: ['{D} yards. {club}. Smooth tempo.', '{club} feels right here.', 'Nice and easy… {D} out.', 'Find the fairway, {name}.'],
     home: ['Pick me. I\'ve got the short game.', 'I draw it. On purpose. Mostly.', 'Lefty power. Sort of.', 'Ready when you are.'], picked: ['Good choice.', 'Let\'s do this.'],
@@ -3361,7 +3288,6 @@ const VOICE = {
     stiff: ['Let\'s gooo! Tap-in!', 'Stuck it!'], green: ['On the dance floor!', 'Green. Easy money.'], pured: ['Pured it. You saw that, right?', 'Absolute missile.', 'Flushed.'], fairway: ['Fairway. That\'s a W.', 'Middle. Boring but good.'],
     rough: ['Little rough. It\'s fine.', 'Kinda wild. Still good.', 'Grass is long here.'], holed: ['LET\'S GOOO!', 'Drained it!', 'Too easy.'], lip: ['No way! It lipped!', 'Rigged!'], hop: ['Too hot. My bad.', 'Hit it way too hard.'],
     gimme: ['Gimme! Your disgusting playing partners said so.', 'Pick it up. Your disgusting playing partners insist.'], mulligan: ['Redo. That didn\'t count.', 'Mulligan! House rules.'], restart: ['Again! From the top.'],
-    style: ['Ooh, new look.', 'Okay, this is sick.', 'That\'s cool.'],
     preSand: ['Splash it out, {D} to go.', 'Just get out. Easy.'], preDeep: ['It\'s buried. {club} won\'t go high.', 'Deep stuff. Hack it out.'], preRough: ['Rough. {club}, {D} yards.', 'Thick grass. Swing hard.'],
     preGreen: ['Putting time.'], pre: ['{D} yards. {club}. Send it.', 'Grip it and rip it.', '{club}. Let\'s go.', 'Smooth swing, {name}.'],
     home: ['Pick me! Straight down the middle.', 'I\'ll outdrive you. Eventually.', 'Can we play already?'], picked: ['Yesss!', 'Let\'s gooo!'],
@@ -3373,7 +3299,6 @@ const VOICE = {
     stiff: ['Right in the jar! Almost.', 'Stiff! Give me that.'], green: ['Oh, she\'s on.', 'Putting for it. Lovely.'], pured: ['Right out of the screws.', 'That one\'s getting talked about at the bar.', 'Flushed it.'], fairway: ['That\'ll play.', 'Short grass. Happy days.'],
     rough: ['Bit of cabbage. Fine.', 'Hmm. Little wayward.', 'Rough. I\'ve seen worse.'], holed: ['In the jar!', 'Get in there!', 'Drinks are on me.'], lip: ['Lip out! Golf is cruel.', 'Oh, come on!'], hop: ['Too much sauce.', 'Bit firm, that.'],
     gimme: ['That\'s good. Your disgusting playing partners agree.', 'Pick it up. Your disgusting playing partners insist.'], mulligan: ['Breakfast ball.', 'Mulligan. Nobody saw.'], restart: ['Back to the tee. Again.'],
-    style: ['Fancy.', 'New look. Same swing.', 'Very artsy.'],
     preSand: ['Splash and dash, {D} out.', 'Open the face. Trust it.'], preDeep: ['Gnarly lie. {club} won\'t climb much.', 'Just get it back in play.'], preRough: ['Bit of a lie. {club}, {D} yards.', 'Rough\'s thick. Hold on tight.'],
     preGreen: ['Putter time.'], pre: ['{D} yards. {club}. Nice and easy.', '{club} here. Smooth.', 'Fairway finder, {name}.', 'Tempo. Just tempo.'],
     home: ['Big hitter. Bigger smile.', 'Fade it and forget it.', 'I\'ll pound it long.'], picked: ['Let\'s have a game.', 'Good call.'],
@@ -3385,7 +3310,6 @@ const VOICE = {
     stiff: ['Stiff! All in.', 'Tap-in. Read it like a book.'], green: ['On the dance floor.', 'Green. Now we\'re talking.'], pured: ['Pured it. Old man strength.', 'That\'s the good stuff.', 'Flushed it, baby.'], fairway: ['Fairway. Easy.', 'Down the middle, like always.'],
     rough: ['Little rough. No worries.', 'Hmm. A touch wild.', 'Bit of salad.'], holed: ['In the hole!', 'Get in there!', 'That\'s a full house.'], lip: ['Lipped it! Bad beat.', 'Oh, the edge!'], hop: ['Too hot. Bit of rust.', 'Way too firm.'],
     gimme: ['That\'s good. Your disgusting playing partners agree.', 'Pick it up. Your disgusting playing partners insist.'], mulligan: ['Breakfast ball.', 'Reshuffle. Deal again.'], restart: ['Back to the tee. New hand.'],
-    style: ['Ooh, stylish.', 'New look. I dig it.', 'Very artsy.'],
     preSand: ['Splash it out, {D} to go.', 'Open the face. Trust it.'], preDeep: ['Buried. {club} won\'t climb.', 'Just get it out, man.'], preRough: ['Bit of a lie. {club}, {D} yards.', 'Thick stuff. Swing through it.'],
     preGreen: ['Putter time. Feel it.'], pre: ['{D} yards. {club}. Easy does it.', 'Smooth {club}. No rush.', 'Little fade, {name}.', 'Fairway finder.'],
     home: ['Lefty fade. Old school.', 'Fairways and greens, my friend.', 'I\'ll take your money on the greens.', 'Smooth as you like.'], picked: ['Deal me in.', 'Let\'s play some golf.'],
@@ -3397,7 +3321,6 @@ const VOICE = {
     stiff: ['Stiff! Even I can make that.', 'Close. Very close.'], green: ['Green. Now the hard part.', 'On. Two putts, please.'], pured: ['Pured. Straight as a string.', 'Didn\'t even feel it.', 'That\'s the one.'], fairway: ['Fairway. Middle.', 'Right down Broadway.'],
     rough: ['Little rough. Still fine.', 'Bit off line. Rare.', 'In the second cut.'], holed: ['In! Somehow.', 'Holed it. Don\'t get used to it.', 'Finally!'], lip: ['Lipped. Naturally.', 'Every time.'], hop: ['Way too firm.', 'Ran right over it.'],
     gimme: ['I\'ll take it. Your disgusting playing partners agree.', 'Pick it up. Your disgusting playing partners insist.'], mulligan: ['Didn\'t happen.', 'One more. Straighter.'], restart: ['Back to the tee.'],
-    style: ['Huh. Nice.', 'New look. Sure.', 'Very fancy.'],
     preSand: ['Just get it out, {D} to go.', 'Splash and pray.'], preDeep: ['Buried. {club} won\'t climb.', 'Hack it out.'], preRough: ['Bit of a lie. {club}, {D} yards.', 'Thick. Swing through it.'],
     preGreen: ['Putter. Here we go.'], pre: ['{D} yards. {club}. Straight at it.', 'Smooth {club}. Middle of the green.', 'Just hit it straight, {name}.', 'Fairway. Then we talk.'],
     home: ['Long and straight. Putting… we\'ll see.', 'Fairways and greens. Mostly fairways.', 'Pick me if you want it in the short grass.', 'I hit it straight. Every time.'], picked: ['Let\'s go.', 'Good call.'],
@@ -3409,7 +3332,6 @@ const VOICE = {
     stiff: ['So close! Basically in!', 'Did you SEE that?'], green: ['On the green! Woo!', 'Green! I\'m good at this.'], pured: ['That was my best one EVER.', 'Rocket!', 'Whoa! It went so far!'], fairway: ['Fairway! Easy peasy.', 'Right down the middle!'],
     rough: ['It\'s in the long grass.', 'Kinda crooked. That\'s okay.', 'The grass is so tall here.'], holed: ['IT WENT IN!', 'Yes yes yes!', 'I\'m the best!'], lip: ['Nooo! It was SO close!', 'That should count!'], hop: ['Oops. Too hard.', 'It jumped right over!'],
     gimme: ['That\'s in. Your disgusting playing partners said so.', 'Pick it up! Your disgusting playing partners insist.'], mulligan: ['Do-over!', 'That one didn\'t count.'], restart: ['Again! Again!'],
-    style: ['Whoa, cool!', 'It looks different!', 'Awesome.'],
     preSand: ['Get it out of the sandbox. {D} to go.', 'Just splash it.'], preDeep: ['It\'s really stuck. {club}.', 'Deep grass. Smash it.'], preRough: ['Long grass. {club}, {D} yards.', 'Swing extra hard.'],
     preGreen: ['Putting! My favourite.'], pre: ['{D} yards. {club}. Easy.', 'Keep your eye on the ball.', '{club}. Here goes!', 'Big swing, {name}!'],
     home: ['Pick me! Pick me!', 'I\'m gonna win.', 'Can we play now?'], picked: ['Yay!', 'Let\'s go!'],
@@ -3421,7 +3343,6 @@ const VOICE = {
     stiff: ['Tap-in range!', 'Right there!'], green: ['On. Now I\'m dangerous.', 'Green. Give me the putter.'], pured: ['That\'s the one.', 'Drew it right in.', 'Sweet spot.'], fairway: ['Fairway. Easy.', 'Right where I wanted it.'],
     rough: ['A little rough. Fine.', 'Bit off. I\'ll putt it close.', 'Long grass. No stress.'], holed: ['Drained it!', 'Never in doubt.', 'Money.'], lip: ['Lipped out! Unreal.', 'How did that stay out?'], hop: ['Bit too firm.', 'Rare miss.'],
     gimme: ['That\'s good. Your disgusting playing partners agree.', 'Pick it up. Your disgusting playing partners insist.'], mulligan: ['One more go.', 'Mulligan. Friendly game.'], restart: ['From the top.'],
-    style: ['Nice.', 'Looks good.', 'Fancy!'],
     preSand: ['Splash it out, {D} to go.', 'Open it up and trust it.'], preDeep: ['Heavy stuff. {club}, just get it out.', 'Buried. Hack and go.'], preRough: ['Rough. {club}, {D} yards.', 'Thick. Swing through it.'],
     preGreen: ['My favourite part.'], pre: ['{D} yards. {club}. Little draw.', 'Nice and easy, {name}.', '{club}. Let\'s go.', 'Turn it right to left.'],
     home: ['Pick me, I\'ll putt for you.', 'Hand me the putter.', 'Let\'s play!'], picked: ['Let\'s go!', 'Nice!'],
@@ -3433,7 +3354,6 @@ const VOICE = {
     stiff: ['Stiff!', 'Right on top of it.'], green: ['On the dance floor.', 'Green. Nice.'], pured: ['That\'s the sound.', 'Drew it in. Beautiful.', 'Pure.'], fairway: ['Fairway. Cruising.', 'Right down the middle.'],
     rough: ['Bit of rough. I\'ll get it up and down.', 'Long grass. Chill.', 'Off the short stuff. Fine.'], holed: ['In the jar!', 'Yes!', 'Let\'s go!'], lip: ['Lipped out. Brutal.', 'How did that stay out?'], hop: ['Bit hot.', 'Too much juice.'],
     gimme: ['That\'s good. Your disgusting playing partners agree.', 'Pick it up. Your disgusting playing partners insist.'], mulligan: ['One more take.', 'Mulligan. Encore.'], restart: ['From the top.'],
-    style: ['Nice.', 'Looks sharp.', 'Ooh, fancy.'],
     preSand: ['Splash it out, {D} to go.', 'Open the face. Easy.'], preDeep: ['Heavy stuff. {club}, just get it out.', 'Buried. Dig it out.'], preRough: ['Rough. {club}, {D} yards.', 'Thick. Swing through it.'],
     preGreen: ['Read it and roll it.'], pre: ['{D} yards. {club}. Little draw.', 'Easy tempo, {name}.', '{club}. Let\'s go.', 'Right to left, nice and smooth.'],
     home: ['Pick me. I\'ll chip it close.', 'Let\'s rock.', 'Short game\'s on tonight.'], picked: ['Let\'s rock!', 'Nice!'],
@@ -3822,7 +3742,7 @@ function placeBall() { ballInCup(false); if (FESCUE) fescueAtBall();
   const p = W(G.ball.u, G.ball.v); const onTee = G.lie === 'tee', gh = groundHeight(G.ball.u, G.ball.v);
   ball.position.set(p.x, gh + BALL_R + (onTee ? .07 : 0) - (G.lie === 'rough' ? .03 : G.lie === 'deep' ? .05 : G.lie === 'fescue' ? .062 : G.lie === 'pine' ? .012 : 0) - (G.lie === 'sand' ? .025 : 0), p.z); ball.userData.restY = ball.position.y; ball.userData.k = 1;
   ball.quaternion.setFromUnitVectors(_UP, _fwd.set(G.dir.u, 0, -G.dir.v).normalize()); ball.scale.set(1, 1, 1); // stripe faces down the line like an alignment mark
-  peg.visible = onTee; peg.position.set(p.x, gh + .05, p.z); ballShadow.position.set(p.x, gh + .012, p.z); ballShadow.visible = !G.real;
+  peg.visible = onTee; peg.position.set(p.x, gh + .05, p.z); ballShadow.position.set(p.x, gh + .012, p.z); ballShadow.visible = true;
 }
 
 /* ================= HUD ================= */
@@ -4009,7 +3929,7 @@ function openSheet(which) {
   } else { $('#strikeSheet').hidden = false; G._dotDrawn = null; }
 }
 const PUTT_CLOSE = true; /* Neil (11-16 23:00): picking Putt in the club sheet closes it with the putter in hand (there's only one club to pick). false = the sheet re-opens on the putter tile, as v393 */
-function closeSheets() { $('#scrim').hidden = true; $('#clubSheet').hidden = true; $('#strikeSheet').hidden = true; $('#styleSheet').hidden = true; }
+function closeSheets() { $('#scrim').hidden = true; $('#clubSheet').hidden = true; $('#strikeSheet').hidden = true; }
 $('#scrim').addEventListener('click', closeSheets);
 $('#clubBtn').addEventListener('click', () => { if (G.view !== 'flight' && $('#result').hidden) openSheet('club'); });
 $('#modeRow').addEventListener('click', e => { const b = e.target.closest('.mc'); if (!b || b.disabled) return; caddieSync(); G.modeManual = true; G.autoPunch = null; /* AUTO_PUNCH: never fight a pick */ setMode(b.dataset.m); sfx('pop'); if (PUTT_CLOSE && b.dataset.m === 'putt') closeSheets(); else openSheet('club'); });
@@ -4862,7 +4782,7 @@ const SZ = (() => {
       if (S !== S0 || G.view !== 'flight' || S.phase !== 'air') stop();
       else {
         const t = Math.min(S.t, 1), tA = S.sz.tA, k = 1 - smoother(clamp((t / tA - SZ_BURN) / (1 - SZ_BURN), 0, 1)), warm = 1 - clamp(t / tA, 0, 1);
-        if (k > .002) { ribbon(S, t, k, performance.now() / 1000); fill.material.opacity = Math.min(1, k * 1.6); hull.material.opacity = Math.min(1, k * 1.6); fill.visible = true; hull.visible = !G.real; }
+        if (k > .002) { ribbon(S, t, k, performance.now() / 1000); fill.material.opacity = Math.min(1, k * 1.6); hull.material.opacity = Math.min(1, k * 1.6); fill.visible = true; hull.visible = true; }
         else fill.visible = hull.visible = false;
         tinted = ball.material; ball.material.color.setRGB(1, 1 - .2 * warm, 1 - .45 * warm); halo.material.color.setRGB(1, 1 - .32 * warm, 1 - .7 * warm); /* glows orange off the face, cools to white by the apex */
         if (k > .2) { acc += dt; let n = 0; while (acc > .05 && n++ < 2) { acc -= .05; spawn(); } if (acc > .05) acc = 0; }
@@ -4978,10 +4898,10 @@ function updateFlight(dt) {
   const want = S.phase === 'air' ? clamp(rMin / BALL_R, 1, 14) : CAM_SMART && S.lcam ? clamp(rMin * CAM_BALL_GND / BALL_R, 1, 14) : 1; S.vs = lerp(S.vs || ball.userData.k || 1, want, 1 - Math.exp(-dt * 10));
   let qs = 0; if (S.squash > 0) { S.squash = Math.max(0, S.squash - dt * 5); qs = Math.sin(S.squash * Math.PI) * .35; }
   ball.scale.set(S.vs * (1 + qs * .6), S.vs * (1 - qs), S.vs * (1 + qs * .6));
-  halo.visible = S.phase === 'air' && !G.real; if (halo.visible) { halo.position.copy(pos); halo.scale.setScalar(BALL_R * S.vs * 4.2); }
+  halo.visible = S.phase === 'air'; if (halo.visible) { halo.position.copy(pos); halo.scale.setScalar(BALL_R * S.vs * 4.2); }
   ball.position.copy(pos); const sk = WATER_ROLLIN && S.sinkT != null && S.phase !== 'air' ? clamp((S.rollT - S.sinkT) / .4, 0, 1) : 0; /* WATER_ROLLIN: rolled into the water: sinking */ if (CAM_SMART && S.lcam && !(S.lieLand === 'water' && S.phase !== 'air')) ball.position.y = Math.max(pos.y, groundHW(pos.x, pos.z) + S.vs * BALL_R);
   if (sk > 0) { ball.position.y = lerp(ball.position.y, groundHW(pos.x, pos.z) - S.vs * BALL_R * 1.4, sk); if (!S.splashed) { S.splashed = true; for (let i = 0; i < 12; i++) puff(pos.clone().setY(groundHW(pos.x, pos.z) + .2), .8 + Math.random(), .9, 0x8fd3ff, new THREE.Vector3((Math.random() - .5) * 3, 2 + Math.random() * 3, (Math.random() - .5) * 3)); sfx('splash'); } } /* the miss cameras keep the ball readable on the ground too: sit the bigger ball on the turf */ ballShadow.position.set(pos.x, groundHW(pos.x, pos.z) + .012, pos.z); ballShadow.scale.setScalar(1 + pos.y * .02); ballShadow.material.opacity = clamp(.35 - pos.y * .006, .08, .35);
-  ballShadow.visible = !G.real && !(S.lieLand === 'water' && S.phase !== 'air') && !(sk > 0);
+  ballShadow.visible = !(S.lieLand === 'water' && S.phase !== 'air') && !(sk > 0);
   // chase cam
   // camera: chase off the tee, then swing round to a broadcast angle at the landing zone looking back up the shot
   const fd = _fd.set(G.dir.u, 0, -G.dir.v).normalize(), rgt = _rg.set(-fd.z, 0, fd.x);
@@ -6528,243 +6448,8 @@ const grain = (() => {
 })();
 renderer.autoClear = false;
 
-/* ---- art styles: one full-screen shader that redraws the rendered course ---- */
-const THEMES = [
-  { id: 'sticker', name: 'Sticker Book', mode: 0, cls: '', font: '"Luckiest Guy"', sw: ['#ffd23f', '#ff4f9a', '#5fe0b5'] },
-  { id: 'real', name: 'Lifelike', mode: 0, cls: 'th-real', font: '"Barlow"', sw: ['#2f6b2a', '#7fb6e6', '#f2c94c'] },
-  { id: 'pencil', name: 'Pencil Sketch', mode: 1, cls: 'th-pencil', font: '"Caveat"', sw: ['#f6f1e4', '#34352f', '#ffe14d'] },
-  { id: 'water', name: 'Watercolour', mode: 2, cls: 'th-water', font: '"Kalam"', sw: ['#9ccfe8', '#8cc06a', '#e86a92'] },
-  { id: 'crayon', name: 'Wax Crayon', mode: 3, cls: 'th-crayon', font: '"Gaegu"', sw: ['#4aa8ff', '#3dbb4f', '#ffd400'] },
-  { id: 'chalk', name: 'Chalkboard', mode: 4, cls: 'th-chalk', font: '"Cabin Sketch"', sw: ['#26332c', '#f2f2ea', '#ffe98a'] },
-  { id: 'paper', name: 'Cut Paper', mode: 5, cls: 'th-paper', font: '"Bowlby One SC"', sw: ['#c9a77c', '#a8d8f0', '#6fae4f'] },
-  { id: 'riso', name: 'Riso Print', mode: 6, cls: 'th-riso', font: '"Rubik Mono One"', sw: ['#ff48b0', '#0078bf', '#ffe800'] },
-  { id: 'comic', name: 'Comic Book', mode: 7, cls: 'th-comic', font: '"Bangers"', sw: ['#ffe600', '#ff2e63', '#111111'] },
-  { id: 'wood', name: 'Woodblock', mode: 8, cls: 'th-wood', font: '"Zen Old Mincho"', sw: ['#1f3d73', '#efe4cc', '#c8463a'] },
-  { id: 'blue', name: 'Blueprint', mode: 9, cls: 'th-blue dk', font: '"Architects Daughter"', sw: ['#123f7a', '#e8f2ff', '#ffd23f'] },
-  { id: 'pixel', name: 'Pixel Art', mode: 10, cls: 'th-pixel', font: '"Press Start 2P"', sw: ['#3fa34d', '#5fc8ff', '#ffde3b'] },
-  { id: 'neon', name: 'Neon Night', mode: 11, cls: 'th-neon dk', font: '"Righteous"', sw: ['#120c24', '#ff3fd0', '#33f5ff'] }];
-const POST = (() => {
-  const N = 256, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), img = g.createImageData(N, N), Rn = rng(91);
-  for (let i = 0; i < N * N * 4; i++) img.data[i] = Rn() * 255; g.putImageData(img, 0, 0);
-  const noise = new THREE.CanvasTexture(c); noise.wrapS = noise.wrapT = THREE.RepeatWrapping; noise.generateMipmaps = false; noise.minFilter = noise.magFilter = THREE.LinearFilter;
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { tColor: { value: null }, tDepth: { value: null }, tNoise: { value: noise }, hasDepth: { value: 1 }, res: { value: new THREE.Vector2(1, 1) }, dpr: { value: 1 }, time: { value: 0 }, mode: { value: 0 } },
-    depthTest: false, depthWrite: false,
-    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy * 2.0, 0.0, 1.0); }',
-    fragmentShader: `precision highp float;
-uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tNoise;
-uniform vec2 res; uniform float dpr; uniform float time; uniform int mode; uniform int hasDepth;
-varying vec2 vUv;
-float lum(vec3 c){ return dot(c, vec3(.299, .587, .114)); }
-vec4 nz(vec2 p){ return texture2D(tNoise, p / 256.0); }
-vec3 C(vec2 uv){ return texture2D(tColor, uv).rgb; }
-float edges(vec2 uv, float w){
-  vec2 o = vec2(w) / res;
-  float a = lum(C(uv + vec2(-o.x, o.y))), b = lum(C(uv + vec2(o.x, o.y))), c = lum(C(uv + vec2(-o.x, -o.y))), d = lum(C(uv + vec2(o.x, -o.y)));
-  float gx = (b + d) - (a + c), gy = (a + b) - (c + d);
-  return smoothstep(.1, .32, sqrt(gx * gx + gy * gy));
-}
-float dots(vec2 p, float ang, float cell, float amt){
-  float s = sin(ang), co = cos(ang); vec2 q = mat2(co, -s, s, co) * p / cell; vec2 f = fract(q) - .5;
-  float r = sqrt(clamp(amt, 0.0, 1.0)) * .64; return 1.0 - smoothstep(r - .1, r + .1, length(f));
-}
-vec3 poster(vec3 c, float n){ return floor(c * n + .5) / n; }
-void main(){
-  vec2 p = gl_FragCoord.xy / dpr;
-  float st = floor(time * 6.0);
-  vec2 wob = (texture2D(tNoise, p / 900.0 + vec2(st * .137, st * .291)).rg - .5) * 3.0 * dpr / res;
-  vec3 c = C(vUv); float L = lum(c);
-  bool sky = hasDepth == 1 ? texture2D(tDepth, vUv).x > .99999 : (c.b > .62 && c.b >= c.g && c.g >= c.r - .02 && c.b - c.r > .12 && vUv.y > .25);
-  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = (mx - mn) / (mx + .001);
-  vec3 col = c;
-  if (mode == 1) {
-    vec3 paper = vec3(.965, .947, .898) * (.965 + .045 * nz(p * .5).b);
-    float d = 1.0 - L;
-    float h1 = smoothstep(.55, .85, sin((p.x + p.y) * .9 + nz(p * .3).r * 3.0) * .5 + .5) * smoothstep(.22, .4, d);
-    float h2 = smoothstep(.55, .85, sin((p.x - p.y) * .9 + nz(p * .3 + 50.0).g * 3.0) * .5 + .5) * smoothstep(.48, .62, d);
-    float h3 = smoothstep(.5, .8, sin(p.y * 1.1) * .5 + .5) * smoothstep(.7, .84, d);
-    vec3 gr = vec3(.22, .22, .21);
-    col = mix(paper, gr, clamp(h1 * .4 + h2 * .38 + h3 * .3 + d * .14, 0.0, 1.0));
-    col = mix(col, gr * .85, edges(vUv + wob, 1.3 * dpr) * .9);
-    float warm = smoothstep(.5, .72, sat) * step(c.g * .8, c.r) * step(c.b, c.r * .85);
-    col *= mix(vec3(1.0), c * 1.05 + .18, warm * .8);
-    if (sky) { float rl = 1.0 - smoothstep(0.0, 1.1, abs(fract(p.y / 26.0) * 26.0 - 1.0)); col = mix(col, vec3(.66, .78, .88), rl * .55); }
-  } else if (mode == 2) {
-    vec3 acc = c; float a0 = nz(p * .7).r * 6.28;
-    for (int i = 0; i < 6; i++) { float a = a0 + float(i) * 1.047; acc += C(vUv + vec2(cos(a), sin(a)) * (3.0 + 4.0 * nz(p * .3 + float(i)).g) * dpr / res); }
-    vec3 wc = acc / 7.0; wc = mix(wc, poster(wc, 6.0), .6);
-    vec3 paper = vec3(.99, .98, .955);
-    float gran = nz(p * .25).r * .5 + nz(p * .9).g * .5;
-    col = mix(paper, wc * 1.04, .72 + .14 * gran);
-    col *= 1.0 - edges(vUv, 4.0 * dpr) * .16;
-    col = mix(col, vec3(.25, .18, .13), edges(vUv + vec2(2.5, -2.0) * dpr / res + wob * .5, 1.0 * dpr) * .75);
-    col = mix(col, paper, smoothstep(.83, .96, nz(p * .11).b) * .55);
-  } else if (mode == 3) {
-    vec3 cc = poster(clamp(mix(vec3(L), c, 1.55), 0.0, 1.0), 4.0);
-    vec2 q = vec2(p.x * .7 + p.y * .7, -p.x * .7 + p.y * .7);
-    float w = nz(vec2(q.x * .18, q.y * 1.9)).r * .7 + nz(p * .6).g * .3;
-    vec3 paper = vec3(.995, .985, .955);
-    col = mix(cc, paper, smoothstep(.6, .82, w) * .75);
-    col = mix(col, vec3(.13, .1, .1) * (.8 + .5 * w), edges(vUv + wob * 1.4, 2.3 * dpr));
-  } else if (mode == 4) {
-    vec3 board = vec3(.15, .21, .18) + (nz(p * .04).r - .5) * .07 + (nz(p * .015 + 9.0).g - .5) * .06;
-    vec3 pastel = mix(c, vec3(1.0), .32);
-    float dust = nz(p).r * .7 + nz(p * .35).g * .3;
-    float dens = sky ? 0.0 : .1 + .45 * L;
-    float fill = smoothstep(1.0 - dens - .2, 1.0 - dens + .2, nz(p * .5).r * .6 + nz(vec2(p.x * .15, p.y * .6)).g * .4);
-    col = mix(board, pastel, fill * .7 + smoothstep(.93, 1.0, dust) * .15);
-    float e = edges(vUv + wob, 1.5 * dpr) * (.55 + .45 * nz(p * .8).g);
-    col = mix(col, vec3(.95, .96, .92), e * .92);
-  } else if (mode == 5) {
-    vec3 cq = poster(c, 5.0) * .92 + .06;
-    vec2 so = vec2(-3.0, 3.0) * dpr / res;
-    float sh = edges(vUv + so, 2.0 * dpr), hi = edges(vUv, 1.2 * dpr);
-    col = cq * (1.0 - .3 * sh * (1.0 - hi));
-    col = mix(col, vec3(1.0, .99, .96), hi * .45);
-    col *= .93 + .07 * (nz(p * .5).r * .6 + nz(vec2(p.x * .08, p.y * 1.2)).g * .4);
-  } else if (mode == 7) {
-    vec3 cq = poster(clamp(mix(vec3(L), c, 1.35), 0.0, 1.0), 3.0);
-    float tone = dots(p, .785, 5.0, clamp((.6 - L) * 1.9, 0.0, 1.0));
-    col = mix(cq, cq * .3, tone * (sky ? 0.0 : 1.0));
-    if (sky) col = mix(cq, vec3(1.0), dots(p, .785, 7.0, clamp((L - .55) * 1.4, 0.0, 1.0)) * .5);
-    col = mix(col, vec3(.04), smoothstep(.15, .55, edges(vUv + wob * .4, 1.7 * dpr)));
-  } else if (mode == 8) {
-    vec3 cq = poster(c, 4.0); cq = mix(vec3(lum(cq)), cq, .7) * vec3(1.03, 1.0, .9) + vec3(.03, .02, -.01);
-    if (sky) { float b = smoothstep(.45, 1.0, vUv.y); cq = mix(vec3(.93, .88, .76), vec3(.12, .24, .45), b * b); }
-    float grain = nz(vec2(p.x * .02, p.y * .7)).r * .65 + nz(vec2(p.x * .05, p.y * 1.4)).g * .35;
-    col = cq * (.9 + .14 * grain);
-    col = mix(col, vec3(.95, .92, .84), smoothstep(.86, .98, nz(p * .4).b) * .35);
-    col = mix(col, vec3(.16, .12, .1), edges(vUv + wob * .5, 1.9 * dpr) * (.7 + .3 * nz(p * .5).g));
-  } else if (mode == 9) {
-    vec3 bg = vec3(.07, .26, .52) * (.95 + .08 * nz(p * .2).r);
-    float gmi = 1.0 - smoothstep(0.0, 1.0, min(abs(fract(p.x / 8.0) - .5), abs(fract(p.y / 8.0) - .5)) * 8.0);
-    float gma = 1.0 - smoothstep(0.0, 1.2, min(abs(fract(p.x / 40.0) - .5), abs(fract(p.y / 40.0) - .5)) * 40.0);
-    col = bg + vec3(.6, .8, 1.0) * (gmi * .04 + gma * .1);
-    float hat = smoothstep(.6, .9, sin((p.x - p.y) * 1.1) * .5 + .5) * smoothstep(.35, .7, 1.0 - L) * (sky ? 0.0 : 1.0);
-    col += vec3(.75, .88, 1.0) * hat * .16;
-    col = mix(col, vec3(.9, .96, 1.0), edges(vUv + wob * .3, 1.2 * dpr) * .95);
-    float warm = smoothstep(.5, .72, sat) * step(c.g * .8, c.r) * step(c.b, c.r * .85);
-    col = mix(col, c, warm * .85);
-  } else if (mode == 10) {
-    float px = 4.0 * dpr; vec2 cell = floor(gl_FragCoord.xy / px);
-    vec2 uq = (cell + .5) * px / res; vec3 cc = C(uq);
-    vec2 a = mod(cell, 4.0);
-    float b1 = mod(a.x, 2.0) * 2.0 + mod(a.y, 2.0) * 3.0; b1 = mod(b1, 4.0) / 4.0;
-    float b2 = mod(floor(a.x * .5), 2.0) * 2.0 + mod(floor(a.y * .5), 2.0) * 3.0; b2 = mod(b2, 4.0) / 4.0;
-    float bay = b1 + b2 * .25;
-    cc = floor(clamp(mix(vec3(lum(cc)), cc, 1.25), 0.0, 1.0) * 5.0 + bay) / 5.0;
-    col = mix(cc, cc * .35, smoothstep(.2, .5, edges(uq, px)));
-  } else if (mode == 11) {
-    vec3 bg = sky ? mix(vec3(.05, .02, .12), vec3(.25, .06, .32), smoothstep(1.0, .35, vUv.y)) : vec3(.02, .015, .05);
-    vec3 neon = clamp(mix(vec3(L), c, 2.3) * 1.5, 0.0, 1.0); neon = mix(neon, vec3(.2, .95, 1.0), .25);
-    float e = edges(vUv, 1.2 * dpr), g2 = edges(vUv, 3.5 * dpr), g3 = edges(vUv, 7.0 * dpr);
-    col = bg + c * .1 + neon * (e * 1.1 + g2 * .35 + g3 * .15);
-    if (!sky) { float gl = 1.0 - smoothstep(0.0, 1.5, abs(fract(p.y / 28.0 + time * .05) - .5) * 28.0); col += vec3(.9, .2, .8) * gl * .05; }
-    col *= .92 + .08 * sin(gl_FragCoord.y * 1.6);
-    float warm = smoothstep(.5, .72, sat) * step(c.g * .8, c.r) * step(c.b, c.r * .85); col = mix(col, c * 1.3, warm * .9);
-  } else if (mode == 6) {
-    vec3 paper = vec3(.96, .94, .9) * (.97 + .03 * nz(p).r);
-    vec3 cT = C(vUv + vec2(1.6, -1.0) * dpr / res), cP = C(vUv + vec2(-1.2, .8) * dpr / res), cY = C(vUv + vec2(.4, 1.6) * dpr / res);
-    float teal = clamp(1.0 - cT.r * 1.08, 0.0, 1.0), pink = clamp(1.0 - cP.g * 1.02, 0.0, 1.0) * .9, yel = clamp(1.0 - cY.b * 1.1, 0.0, 1.0) * .85;
-    col = paper;
-    col *= mix(vec3(1.0), vec3(.0, .47, .75), dots(p, .26, 4.2, teal));
-    col *= mix(vec3(1.0), vec3(1.0, .28, .69), dots(p, 1.3, 4.2, pink));
-    col *= mix(vec3(1.0), vec3(1.0, .91, .0), dots(p, .79, 4.2, yel));
-    col = mix(col, vec3(.12, .24, .56), edges(vUv + wob * .6, 1.2 * dpr) * .8);
-  }
-  gl_FragColor = vec4(col, 1.0);
-}`
-  });
-  const sc = new THREE.Scene(), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  const quad = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); quad.frustumCulled = false; sc.add(quad);
-  let rt = null; const sz = new THREE.Vector2();
-  const msaa = renderer.capabilities.isWebGL2 && THREE.WebGLMultisampleRenderTarget;
-  function ensure() {
-    renderer.getDrawingBufferSize(sz);
-    if (rt && rt.width === sz.x && rt.height === sz.y) return;
-    if (rt) { rt.depthTexture && rt.depthTexture.dispose(); rt.dispose(); }
-    const opts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat };
-    if (msaa) { rt = new THREE.WebGLMultisampleRenderTarget(sz.x, sz.y, opts); rt.samples = 4; mat.uniforms.hasDepth.value = 0; }
-    else { rt = new THREE.WebGLRenderTarget(sz.x, sz.y, opts); rt.depthTexture = new THREE.DepthTexture(sz.x, sz.y); rt.depthTexture.type = THREE.UnsignedIntType; mat.uniforms.tDepth.value = rt.depthTexture; mat.uniforms.hasDepth.value = 1; }
-    mat.uniforms.tColor.value = rt.texture; mat.uniforms.res.value.copy(sz);
-  }
-  return {
-    mode: 0,
-    warm() { try { renderer.compile(sc, cam); } catch (e) {} },
-    render(t) {
-      ensure(); mat.uniforms.time.value = t; mat.uniforms.dpr.value = renderer.getPixelRatio(); mat.uniforms.mode.value = this.mode;
-      renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, camera);
-      renderer.setRenderTarget(null); renderer.clear(); renderer.render(sc, cam);
-    }
-  };
-})();
-/* ---- Lifelike: same course, real lighting — no ink, lit materials, cast shadows, natural turf ---- */
-const REAL = (() => {
-  let built = false, on = false; const swap = new Map(), saved = new Map(); let mats = null, sky0 = null;
-  const hemi = scene.children.find(o => o.isHemisphereLight);
-  function build() {
-    built = true;
-    const ct = new THREE.CanvasTexture(paintCourse(true)); ct.anisotropy = maxAniso;
-    const oc = document.createElement('canvas'); oc.width = oc.height = 256; const g = oc.getContext('2d'), Rr = rng(13); g.fillStyle = '#4f8a35'; g.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 5000; i++) { g.fillStyle = Rr() < .5 ? 'rgba(20,55,20,.25)' : 'rgba(150,190,90,.2)'; g.fillRect(Rr() * 256, Rr() * 256, 1.2, 1.2); }
-    const ot = new THREE.CanvasTexture(oc); ot.wrapS = ot.wrapT = THREE.RepeatWrapping; ot.repeat.set(3400 / 30, 3400 / 30); ot.anisotropy = maxAniso;
-    const sk = document.createElement('canvas'); sk.width = 4; sk.height = 256; const sg = sk.getContext('2d'), gr = sg.createLinearGradient(0, 0, 0, 256);
-    gr.addColorStop(0, '#3d7fc4'); gr.addColorStop(.5, '#8fbfe6'); gr.addColorStop(.85, '#d8e8f0'); gr.addColorStop(1, '#eef2ee'); sg.fillStyle = gr; sg.fillRect(0, 0, 4, 256);
-    const pc = document.createElement('canvas'); pc.width = pc.height = 64; const pg = pc.getContext('2d'), rg2 = pg.createRadialGradient(32, 32, 0, 32, 32, 32); rg2.addColorStop(0, 'rgba(255,255,255,.9)'); rg2.addColorStop(1, 'rgba(255,255,255,0)'); pg.fillStyle = rg2; pg.fillRect(0, 0, 64, 64);
-    // close-up turf grain, faded out with distance (like the sketch detail, but blades instead of pencil)
-    const dc = document.createElement('canvas'); dc.width = dc.height = 256; const dg = dc.getContext('2d'), Rd = rng(17); dg.fillStyle = '#c8c8c8'; dg.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 2600; i++) { const x = Rd() * 256, y = Rd() * 256, a = -1.57 + (Rd() - .5) * .9, l = 2 + Rd() * 5, v = Rd() < .55 ? 90 + Rd() * 60 : 215 + Rd() * 40; dg.strokeStyle = `rgb(${v},${v},${v})`; dg.lineWidth = .8 + Rd() * .8; dg.beginPath(); dg.moveTo(x, y); dg.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); dg.stroke(); }
-    const dt = new THREE.CanvasTexture(dc); dt.wrapS = dt.wrapT = THREE.RepeatWrapping; dt.anisotropy = maxAniso;
-    const turf = m => { m.onBeforeCompile = sh => {
-      sh.uniforms.turf = { value: dt };
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vWXZ; varying float vDist;').replace('#include <project_vertex>', '#include <project_vertex>\nvWXZ = (modelMatrix * vec4(transformed, 1.0)).xz; vDist = -mvPosition.z;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D turf; varying vec2 vWXZ; varying float vDist;').replace('#include <map_fragment>', '#include <map_fragment>\nfloat tk = smoothstep(60.0, 3.0, vDist); diffuseColor.rgb *= mix(1.0, .55 + .62 * texture2D(turf, vWXZ * .9).r, tk);');
-    }; return m; };
-    const cl = document.createElement('canvas'); cl.width = 256; cl.height = 128; const clg = cl.getContext('2d');
-    [[70, 80, 40], [118, 60, 50], [168, 74, 42], [204, 88, 30], [46, 92, 28], [130, 92, 36]].forEach(([x, y, r]) => { const gr = clg.createRadialGradient(x, y, r * .2, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(.7, 'rgba(250,252,255,.75)'); gr.addColorStop(1, 'rgba(240,246,252,0)'); clg.fillStyle = gr; clg.beginPath(); clg.arc(x, y, r, 0, 7); clg.fill(); });
-    const cloudTex = new THREE.CanvasTexture(cl);
-    mats = { cloud: cloudTex, green: turf(new THREE.MeshLambertMaterial({ map: ct, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })), course: turf(new THREE.MeshLambertMaterial({ map: ct })), outer: turf(new THREE.MeshLambertMaterial({ map: ot })), sky: new THREE.CanvasTexture(sk), puff: new THREE.CanvasTexture(pc) };
-    sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 10; sc.far = 400; sc.updateProjectionMatrix(); sun.shadow.bias = -.0006; sun.shadow.normalBias = .04;
-    scene.add(sun.target);
-  }
-  function lit(m) { if (!swap.has(m)) swap.set(m, new THREE.MeshStandardMaterial({ color: m.color.clone(), map: m.map || null, roughness: m.map ? .5 : .92, metalness: 0 })); return swap.get(m); }
-  function set(v) {
-    if (v === on) return; if (v && !built) build(); on = v; G.real = v;
-    scene.traverse(o => {
-      if (o.isSprite && o.userData.lowCloud) { if (!o.userData.inkMap) o.userData.inkMap = o.material.map; o.material.map = v ? mats.cloud : o.userData.inkMap; o.material.opacity = v ? .85 : .92; return; }
-      if (o.isSprite) { if (o.material.fog === false) o.visible = !v; else if (o.material.map === puffTex || (mats && o.material.map === mats.puff)) o.material.map = v ? mats.puff : puffTex; return; }
-      if (!o.isMesh) return;
-      if (o.material === inkMat || o.userData.ink) { o.visible = !v; return; }
-      if (o.userData.tuft) { o.visible = !v; return; }
-      if (o.userData.courseTile || o === scene.userData.outer || o.userData.courseLike) { if (!saved.has(o)) saved.set(o, o.material); o.material = v ? (o.userData.courseTile ? mats.course : o.userData.courseLike ? mats.green : mats.outer) : saved.get(o); o.receiveShadow = v; return; }
-      if (v && o.material && o.material.isMeshToonMaterial) { saved.set(o, o.material); o.material = lit(o.material); o.castShadow = true; }
-      else if (!v && saved.has(o)) { o.material = saved.get(o); o.castShadow = false; }
-    });
-    ballShadow.visible = !v; ball.castShadow = v; renderer.shadowMap.needsUpdate = true;
-    sun.castShadow = v; sun.intensity = v ? 1.25 : .95; if (hemi) hemi.intensity = v ? .7 : .55;
-    if (!sky0) sky0 = scene.background;
-    scene.background = v ? mats.sky : sky0; scene.fog.color.set(v ? 0xdfe9ee : 0xece9dc);
-  }
-  const off = new THREE.Vector3(-55, 110, -60).normalize().multiplyScalar(160), f = new THREE.Vector3();
-  const lastF = new THREE.Vector3(1e9, 0, 0);
-  function follow() { if (!on) return; f.copy(G.view === 'flight' ? ball.position : camLook); f.y = 0; f.x = Math.round(f.x * 2) / 2; f.z = Math.round(f.z * 2) / 2; // snap to half-yards so the shadow map doesn't shimmer
-    if (G.view === 'flight' || f.distanceToSquared(lastF) > .01) { sun.position.copy(f).add(off); sun.target.position.copy(f); sun.target.updateMatrixWorld(); renderer.shadowMap.needsUpdate = true; lastF.copy(f); } }
-  function hole() { if (!built) return; const was = on; if (was) set(false); built = false; if (was) set(true); } /* a new hole: its lifelike map is painted afresh when next needed */
-  return { set, follow, hole, get on() { return on; } };
-})();
-let theme = THEMES[0]; // style picker hidden for now: always Sticker Book
-$('#styleBtn').hidden = true;
-function setTheme(th) {
-  theme = th; store.set('theme', th.id); REAL.set(th.id === 'real'); POST.mode = th.mode;
-  THEMES.forEach(t => t.cls && t.cls.split(' ').forEach(c => app.classList.remove(c))); if (th.cls) th.cls.split(' ').forEach(c => app.classList.add(c));
-  $('#styleName').textContent = th.name;
-  $('#styleGrid').innerHTML = THEMES.map((t, i) => `<button class="sty${t === th ? ' sel' : ''}" data-i="${i}"><b style="font-family:${t.font},sans-serif">${t.name}</b><span>${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span></button>`).join('');
-  G._dotDrawn = null; setTimeout(measure, 400);
-}
-$('#styleBtn').addEventListener('click', () => { if (G.view === 'flight') return; sfx('pop'); $('#scrim').hidden = false; $('#styleSheet').hidden = false; });
-$('#styleGrid').addEventListener('click', e => { const b = e.target.closest('.sty'); if (!b) return; setTheme(THEMES[+b.dataset.i]); sfx('pop'); closeSheets(); AV.say(line('style'), { mood: 'happy', moodFor: 1 }); });
-setTheme(theme);
-(window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => POST.warm());
+/* ART_STYLES removed (Neil, 16 Nov 2026): the 12 alternate looks (Lifelike, Pencil, Watercolour, Crayon, Chalk, Cut Paper, Riso, Comic, Woodblock, Blueprint, Pixel, Neon), their post shader, the style picker, voice lines and fonts. Last in git at 3e380d6 (v382) if they're ever wanted back. */
+setTimeout(measure, 400); /* the HUD re-measured once after boot (it used to ride on the style set-up) */
 
 /* ================= HOLESYS: holes built, prebuilt, swapped and disposed in place =================
    A hole is HD = { cid, i (its place in the round), key, v (its globals: holeVars), it (its build, a generator), n (steps run), ready }.
@@ -6818,7 +6503,7 @@ const HOLESYS = (() => {
     const old = cur; if (old && old !== HD) { old.v = holeVars(); scene.remove(old.v.HS.group); }
     cur = HD; jobs.delete(HD.key); setHoleVars(HD.v); scene.add(HS.group); CULL = HS.cull; _ck.fill(NaN);
     scene.userData.outer = HS.ud.outer; scene.userData.lowClouds = HS.ud.lowClouds;
-    READ.use(HS.read); MINI.use(HS.mini); flag.setHole(); CRITTERS.hole(); REAL.hole(); holeUI();
+    READ.use(HS.read); MINI.use(HS.mini); flag.setHole(); CRITTERS.hole(); holeUI();
     if (old && old !== HD) { let home = false; try { home = MENU.on; } catch (e) {} if (home && old.i === NINE.first(old.cid) && old.cid !== HD.cid && old.v) { jobs.set(old.key, old); old.ready = true; } else drop(old); TURF.wipe(); } /* a first hole switched away from on the home screen stays built, for switching back */
     try { const hh = CID === 'hunt' && HOLE_N === 1 ? '' : '#' + holeHash(HOLE_N); if (HOLE_URL) history.replaceState(null, '', location.pathname + location.search + hh); else sessionStorage.setItem('tp_at', hh); } catch (e) {} /* a reload lands back on this hole (HOLE_URL false: kept in the tab, not the address) */
     ahead(); }
@@ -6923,14 +6608,14 @@ function frame(now) {
     flag.wave(t);
     updateCull(); { const ch = Math.max(0, camera.position.y - (AUGD ? groundHeight(camera.position.x, -camera.position.z) : TERRAIN_BASE)); scene.fog.near = 240 + ch * 2.4; scene.fog.far = 1050 + ch * 3.2; }
     const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null;
-    try { renderer.clear(); renderer.render(scene, camera); if (!REAL.on) renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
+    try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
     requestAnimationFrame(frame); return; }
   { const ff = G.ff && G.view === 'flight'; if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
   if (G.view === 'flight') updateFlight(dt * 1.15 * (G.ff ? 3 : 1)); else updateCamera(dt); // flight plays 15% quicker than real time
   if (G.shake > 0) { G.shake -= dt; const k = G.shake * .06; camera.position.x += (Math.random() - .5) * k; camera.position.y += (Math.random() - .5) * k; }
   updateTracer(); dashTex.offset.x = -(t * .9) % 1;
   { const show = G.aimT < .35 || G.view === 'flight', lc = scene.userData.lowClouds;
-    for (const c of lc) { const near = camera.position.distanceTo(c.sp.position) / c.sp.scale.x, k = smooth(.9, 2.2, near); c.sp.visible = show && k > .01; c.sp.material.opacity = (G.real ? .85 : .92) * k; if (show && !RM) { c.sp.position.x = c.u0 + Math.sin(t * .03 * c.sp0 + c.ph) * 14; c.sp.position.y = c.y0 + Math.sin(t * .2 + c.ph) * 1.2; } } }
+    for (const c of lc) { const near = camera.position.distanceTo(c.sp.position) / c.sp.scale.x, k = smooth(.9, 2.2, near); c.sp.visible = show && k > .01; c.sp.material.opacity = .92 * k; if (show && !RM) { c.sp.position.x = c.u0 + Math.sin(t * .03 * c.sp0 + c.ph) * 14; c.sp.position.y = c.y0 + Math.sin(t * .2 + c.ph) * 1.2; } } }
   flag.g.visible = G.mode !== 'putt' && !(G.view === 'flight' && G.shot && G.shot.putt); flag.g.scale.setScalar(1 + smoother(G.aimT) * (shortGame() ? 1 : 2.6)); if (flag.jiggle > 0) { flag.jiggle = Math.max(0, flag.jiggle - dt * 1.6); flag.g.rotation.z = Math.sin(t * 38) * .05 * flag.jiggle; } else if (flag.g.rotation.z) flag.g.rotation.z = 0;
   { const ea = smoother(G.aimT), ms = { putt: .045, chip: .3, pitch: .45, flop: .4, sand: .4 }[G.mode] || 1, base = G.mode === 'putt' ? ms : ms * (1 + ea * Math.max(.7, camera.position.distanceTo(rings.position) / 105 * (ms < 1 ? 1.6 : 1) - 1)); // bullseye grows with camera height in aim view
     rings.scale.setScalar(base * (1 + (RM ? 0 : Math.sin(t * 3) * .04))); } rings.rotation.y = t * .2;
@@ -6945,10 +6630,10 @@ function frame(now) {
     if (G.view === 'flight') { const S = G.shot; if (!S || S.phase === 'air') G._rdG = false; else if ((G._rdF = ((G._rdF || 0) + 1) % 6) === 1) G._rdG = lieAt(ball.position.x, -ball.position.z) === 'green'; onG = !!S && (S.putt || !!G._rdG); } // lie check only every 6th frame
     else G._rdG = false;
     READ.update(dt, onG || FLY.green || (G.view !== 'flight' && (G.aimT > .4 || ['putt', 'pitch', 'flop', 'sand'].includes(G.mode)))); }
-  REAL.follow(); updateCull();
+  updateCull();
   { const ch = Math.max(0, camera.position.y - (AUGD ? groundHeight(camera.position.x, -camera.position.z) : TERRAIN_BASE)); scene.fog.near = 240 + ch * 2.4; scene.fog.far = 1050 + ch * 3.2; } // the higher the camera, the thinner the haze
   const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null; /* sky fully hidden by the ground: skip its pass */
-  try { if (POST.mode) POST.render(t); else if (REAL.on) { renderer.clear(); renderer.render(scene, camera); } else { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } } finally { scene.background = _bg; }
+  try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
   edgePanStep(dt); updateOverlays(); drawTrTop(); if (G.drop) DROP.update();
   fpsAcc += Math.min(rawDt, 1); fpsN++; perfT += Math.min(rawDt, 1); // real frame times, not the capped game step
   scaler(now);
