@@ -31,7 +31,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v408'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v410'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -6207,7 +6207,7 @@ const BOARD = (() => {
 })();
 (async function boot() { // warm everything the first swing touches, behind the cover, then lift it
   const el = $('#boot');
-  document.title = GAME_NAME; $('#bootTitle').setAttribute('aria-label', GAME_NAME); $('#bootTitle').innerHTML = [...GAME_NAME].map((ch, i) => ch === ' ' ? '<span class="gap"></span>' : `<span aria-hidden="true" style="--i:${i}">${ch}</span>`).join('');
+  document.title = GAME_NAME; $('#bootTitle').setAttribute('aria-label', GAME_NAME); { const th = [...GAME_NAME].map((ch, i) => ch === ' ' ? '<span class="gap"></span>' : `<span aria-hidden="true" style="--i:${i}">${ch}</span>`).join(''); if ($('#bootTitle').innerHTML !== th) $('#bootTitle').innerHTML = th; } /* SPLASH_STILL (v410): the splash markup already has these letters, so the title isn't re-laid out (its spacing shifted a touch when plain text became letters) */
   try { const ids = ROSTER(), board = $('#bunch'); BOARD.build(ids); BOARD.home(); /* one looping row of golfers, the picked one big in the middle (laid out now, under the splash, so the intro lands on it) */
     const LV = ['Average', 'Good', 'Great'], stats = (w = G.who) => { const c = CHARS[w] || ME(); if ($('#stats').dataset.who === w) return; $('#stats').dataset.who = w; $('#stats').innerHTML = [['Power', c.pow], ['Accuracy', c.acc], ['Short game', c.sg], ['Putting', c.putt]].map(([k, l]) =>
         `<span class="k">${k}</span><span class="v"><span class="pips l${l}">${[0, 1, 2].map(i => `<i class="${i <= l ? 'on' : ''}"></i>`).join('')}</span><b>${LV[l]}</b></span>`).join('') +
