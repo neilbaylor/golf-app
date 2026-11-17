@@ -31,7 +31,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v415'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v417'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -685,9 +685,10 @@ const PUTT_LINE_LBL = true; /* rollback (Neil): putt 'pulled it'/'pushed it' fol
 const CONFETTI_SCALE = true; /* rollback (Neil): confetti scales with the score: bogey or worse none, par 40, birdie 170, eagle 340, ace/albatross 420. false = 170 every time (v345) */
 const PUTT_LEN = true; /* rollback flag (Neil): the putt cup's forgiveness (falling in from the side, dying at the rim, toppling off the lip) scales with putt length: more forgiving on short putts, less on long ones. false = the same forgiveness at every length (v341) */
 const PUTT_LF = { near: 2, far: 10, hi: 1.25, lo: .6 }; /* putt length in yards (2 yd = 6 ft, 10 yd = 30 ft) → forgiveness multiplier, linear in between */
+const PUTT_HELP_K = .95; /* Neil 17 Nov 17:18 (v416, then 5% not 10% in v417): "just barely reduce the thresholds (fewer putts go in), but just barely": the putt cup's near-miss help (toppling in from a stop, dying at the rim, the widened catch) is 5% smaller, about a quarter to half an inch less. The cup itself is unchanged. 1 = v415 */
 function puttLenF(d) { return PUTT_LEN ? PUTT_LF.hi + (PUTT_LF.lo - PUTT_LF.hi) * clamp((d - PUTT_LF.near) / (PUTT_LF.far - PUTT_LF.near), 0, 1) : 1; }
 function cupStep(u, v, vu, vv, st) { // → 'holed' | 'lip' | 'hop' | null; may change st.vu/st.vv. st.kind = 'putt' is forgiving: near-misses drop in
-  const dc = Math.hypot(u - PIN.u, v - PIN.v), s = Math.hypot(vu, vv), soft = st.kind === 'putt', ca = soft ? att('cup', 'putt') * (st.lf ?? 1) : 1, RR = CUP.R + (soft ? .04 * ca : 0);
+  const dc = Math.hypot(u - PIN.u, v - PIN.v), s = Math.hypot(vu, vv), soft = st.kind === 'putt', ca = soft ? att('cup', 'putt') * (st.lf ?? 1) * PUTT_HELP_K : 1, RR = CUP.R + (soft ? .04 * ca : 0);
   if (dc < CUP.R + (soft ? .11 * ca : .03) && s < (soft ? .42 : .32)) return 'holed';                 // dying at the rim: gravity wins
   if (dc >= RR) { st.inCup = false; return null; }
   if (st.inCup) return null; st.inCup = true;
@@ -3728,7 +3729,7 @@ function rollPutt(u0, v0, vu, vv) {
       if (r) { ev.push({ t, type: r }); vu = cst.vu; vv = cst.vv; } }
     if (i % 2 === 0) out.push({ t, x: u, y: groundHeight(u, v), z: -v });
   }
-  if (!holed && Math.hypot(u - PIN.u, v - PIN.v) < CUP.R + .13 * att('cup', 'putt') * cst.lf) { holed = true; ev.push({ t, type: 'holed' }); out.push(...cupDrop(t, u, v, .3)); } // stopped on the lip: it topples in
+  if (!holed && Math.hypot(u - PIN.u, v - PIN.v) < CUP.R + .13 * att('cup', 'putt') * cst.lf * PUTT_HELP_K) { holed = true; ev.push({ t, type: 'holed' }); out.push(...cupDrop(t, u, v, .3)); } // stopped on the lip: it topples in
   if (!holed) out.push({ t: t + .01, x: u, y: groundHeight(u, v), z: -v });
   return { pts: out, events: ev, lie: holed ? 'green' : lieAt(u, v), holed };
 }
