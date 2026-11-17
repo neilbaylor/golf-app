@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.fd7d634fc9.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.bf06c1c1fb.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -44,14 +44,19 @@ try { if (MP_SHARE) { const q = new URLSearchParams(location.search), hm = /^#ro
 try { if (/^#(augusta-)?hole-\d+$/.test(location.hash) || /"go":true/.test(sessionStorage.getItem('tp_round') || '') || sessionStorage.getItem('tp_home')) document.documentElement.classList.add('holeNext'); } catch (e) {}
 /* iOS home-screen app: with the translucent status bar the page is laid out one status-bar short, which leaves a strip of
    page background along the bottom. Stretch the page to the full screen height there. */
-const SA_FIT_EARLY = true;
+const SA_FIT_EARLY = true, SA_INSET_MEMO = true;
 (function () { const SA = navigator.standalone || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches; window.__SA = SA; if (!SA) return; const H = document.documentElement;
   const st = document.createElement('style'); st.textContent = 'html,body{height:100lvh!important;overflow:hidden}'; document.head.appendChild(st); /* lvh reaches the bottom of the screen even when the layout is short */
   const fit = () => { const portrait = innerHeight >= innerWidth, full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
     const h = full > innerHeight ? full + 'px' : '';
     if (SA_FIT_EARLY) { const css = 'html,body{height:' + (h || '100lvh') + '!important;overflow:hidden}'; if (st.textContent !== css) st.textContent = css; return; } /* SA_FIT_EARLY (v408, Neil 17 Nov: "the splash title still jumps down a touch, home-screen app only"): the full height goes in the style sheet, so the body has it from its very first paint (before, the body only got it at DOMContentLoaded, a beat after the splash showed, and the extra height dropped the title a few px). false = per-element styles as v407 */
     for (const el of [H, document.body]) if (el) { if (h) el.style.setProperty('height', h, 'important'); else el.style.removeProperty('height'); } };
-  fit(); addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); document.addEventListener('DOMContentLoaded', fit); })();
+  fit(); addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); document.addEventListener('DOMContentLoaded', fit);
+  /* SA_INSET_MEMO (v408, Neil 17 Nov, from the layout probe on his iPhone: the home-screen app reports a 0 safe area until ~0.4 s in, then 62 top / 34 bottom, so the splash's padding grew under the title and it dropped ~15 px): the last launch's safe area is kept and used as the splash's floor (--sat0 / --sab0 in #boot's paddings and its top buttons) until the real one arrives, which then matches. The first launch on a phone can still move once. false = as v407 */
+  if (SA_INSET_MEMO) { try { const m = /^(\d+)\/(\d+)$/.exec(localStorage.getItem('tp_sa_in') || ''); if (m) { H.style.setProperty('--sat0', m[1] + 'px'); H.style.setProperty('--sab0', m[2] + 'px'); } } catch (e) {}
+    const probe = () => { try { const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)'; document.body.appendChild(d); const cs = getComputedStyle(d), t = Math.round(parseFloat(cs.paddingTop)) || 0, b = Math.round(parseFloat(cs.paddingBottom)) || 0; d.remove();
+      if (t > 0) { H.style.setProperty('--sat0', t + 'px'); H.style.setProperty('--sab0', b + 'px'); localStorage.setItem('tp_sa_in', t + '/' + b); } } catch (e) {} };
+    addEventListener('load', () => setTimeout(probe, 1500)); } })();
 </script>
 <script>
 /* LAYOUT_PROBE (Neil 17 Nov 10:33, v407: "on iOS the splash's Tee Party shifts up ~40px after a second"): a record of the page's geometry over the first seconds (sizes, scroll, safe area, where the title sits), shown by tapping the version label in the home screen's corner 3 times. Nothing on screen changes otherwise. false = none */
@@ -199,7 +204,7 @@ button:focus-visible{outline:3px dashed var(--pink);outline-offset:3px}
 @keyframes pinRing{0%{transform:scale(.6);opacity:1}100%{transform:scale(3);opacity:0}}
 @media (prefers-reduced-motion:reduce){#pinMk .ring{animation:none;opacity:.6}}
 /* boot cover: hides the warm-up (shader compile, dial bakes, a silent practice backswing); the loader only appears if it's slow */
-#boot{--cardH:clamp(100px,calc(17vh - 8.4px),147px);--tile:94px;--ts:96px;--tb:136px;--tg:8px;--bpad:12px;--broom:32px;--boardW:calc(3 * var(--tile) + 2 * 7px + 2 * 7px + 8px);position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(4vh,calc(env(safe-area-inset-top,0px) + 30px),58px);padding-bottom:calc(1.8vh + env(safe-area-inset-bottom,0px));gap:clamp(10px,2.2vh,26px);background:#bfe6ff;overflow:hidden;transition:opacity .35s,visibility 0s .35s;touch-action:none}
+#boot{--cardH:clamp(100px,calc(17vh - 8.4px),147px);--tile:94px;--ts:96px;--tb:136px;--tg:8px;--bpad:12px;--broom:32px;--boardW:calc(3 * var(--tile) + 2 * 7px + 2 * 7px + 8px);position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(4vh,calc(max(env(safe-area-inset-top,0px),var(--sat0,0px)) + 30px),58px);padding-bottom:calc(1.8vh + max(env(safe-area-inset-bottom,0px),var(--sab0,0px)));gap:clamp(10px,2.2vh,26px);background:#bfe6ff;overflow:hidden;transition:opacity .35s,visibility 0s .35s;touch-action:none}
 #boot.done{opacity:0;visibility:hidden;pointer-events:none}
 #boot .bscene{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
 #boot .bt{position:relative;font:clamp(48px,15.5vw,62px)/1 var(--font-display);color:var(--sun);letter-spacing:.02em;text-shadow:3px 0 0 var(--ink),-3px 0 0 var(--ink),0 3px 0 var(--ink),0 -3px 0 var(--ink),2.2px 2.2px 0 var(--ink),-2.2px -2.2px 0 var(--ink),2.2px -2.2px 0 var(--ink),-2.2px 2.2px 0 var(--ink),4px 6px 0 var(--ink);transform:rotate(-3deg)}
@@ -450,7 +455,7 @@ html.nineOv #boot #mpLobby .course .nineBtns,html.nineOvAll #boot .course .nineB
 .dlbl{position:absolute;left:0;top:0;z-index:8;pointer-events:none;font:12px/1 var(--font-display);letter-spacing:.04em;color:var(--ink);background:var(--paper);border:2px solid var(--ink);border-radius:8px;padding:4px 7px 2px;white-space:nowrap;box-shadow:2px 2px 0 var(--ink)}
 .dlbl.x{background:#ff6a55;color:#fffaf0}
 #app.dropping :is(#bottom,#mid,#aimLbl,#aimTip,#ballView,#pinMk,#coach,#trTop,#slopeKey,#ffTip){visibility:hidden!important}
-#boot .appBtns{position:absolute;top:max(6px,calc(env(safe-area-inset-top,0px) - 10px));left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));display:flex;gap:6px;z-index:3;opacity:0;transition:opacity .35s .2s;pointer-events:none}
+#boot .appBtns{position:absolute;top:max(6px,calc(max(env(safe-area-inset-top,0px),var(--sat0,0px)) - 10px));left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));display:flex;gap:6px;z-index:3;opacity:0;transition:opacity .35s .2s;pointer-events:none}
 #boot.home .appBtns{opacity:1}
 #boot.home .appBtns .appBtn{pointer-events:auto}
 #boot .appBtns #fsBtn{margin-left:auto} /* (Neil 11-16: on a home-screen iPhone the row sat on the title; it now rides 10px up into the safe area, and the title sits 8px lower there) install sits top-left, full screen top-right: neither covers the title */
@@ -773,7 +778,7 @@ html.uiS #app #flyUI .fskip{right:calc(14px * var(--ui));bottom:calc(24px * var(
    covers it all and the column (title, golfer band, stats, courses, Play) keeps its phone proportions. vh-based sizes are taken
    back to that layout's own height. */
 html.uiS #app #boot,html.uiS #app #intro{right:auto;bottom:auto;box-sizing:border-box;width:calc(100% / var(--ui));height:calc(100% / var(--ui));transform-origin:0 0;scale:var(--ui)}
-html.uiS #app #boot{--cardH:clamp(100px,calc(17vh / var(--ui) - 8.4px),147px);padding-top:max(calc(4vh / var(--ui)),calc(env(safe-area-inset-top,0px) + 30px),58px);padding-bottom:calc(1.8vh / var(--ui) + env(safe-area-inset-bottom,0px));gap:clamp(10px,calc(2.2vh / var(--ui)),26px)}
+html.uiS #app #boot{--cardH:clamp(100px,calc(17vh / var(--ui) - 8.4px),147px);padding-top:max(calc(4vh / var(--ui)),calc(max(env(safe-area-inset-top,0px),var(--sat0,0px)) + 30px),58px);padding-bottom:calc(1.8vh / var(--ui) + max(env(safe-area-inset-bottom,0px),var(--sab0,0px)));gap:clamp(10px,calc(2.2vh / var(--ui)),26px)}
 html.uiS #app #boot .stats{margin-top:calc(-1 * clamp(10px,calc(2.2vh / var(--ui)),26px) - 18px)}
 html.uiS #app #boot::before{margin-bottom:calc(-1 * clamp(10px,calc(2.2vh / var(--ui)),26px))}
 /* ---------- multiplayer (MULTI): home button, code modal, lobby, watching strip + chat, bubbles, ring, group card ---------- */
@@ -1165,5 +1170,5 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
 if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror="__splitFail()"><\/script>');</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.fd7d634fc9.js" onerror="__splitFail()"></script>
+<script src="game.bf06c1c1fb.js" onerror="__splitFail()"></script>
 
