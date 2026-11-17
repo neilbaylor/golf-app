@@ -65,7 +65,8 @@ const MP = (() => {
     PF_WAIT: 20000,         // MP_KICK: a PLAY FOR not played by then is stale: the modal comes back and someone else may take over (the first phone's shot is still taken if it comes)
     MIN_PLAYERS: 2,         // MP_MIN2 (Neil 12:24): a round starts only with this many golfers in the room (1 = off: anyone can tee off alone, as before). Only starting is gated: a round carries on if golfers leave
     FRAME_MAX: 16384,       // bytes per message
-    AIM_MAX: 1024,          // MP_AIMCAP: bytes per aim message (a real one is ~150): bigger ones are dropped, not relayed to three phones 20 times a second
+    HOLD_MAX: 3000,         // NEXT_HOLD: the most a 'next' may hold off the next golfer's idle clock (the result card is 2.75 s)
+    AIM_MAX: 1024,         // MP_AIMCAP: bytes per aim message (a real one is ~150): bigger ones are dropped, not relayed to three phones 20 times a second
     BP_SOFT: 65536,         // MP_BP: a socket with this much unsent: aim updates to it are skipped (the next one supersedes them anyway)
     BP_HARD: 1048576,       // MP_BP: ...and with this much it is cut (a phone that hasn't read 1 MB isn't reading): it reconnects and resyncs from the welcome
   };
@@ -74,6 +75,9 @@ const MP = (() => {
     true: a phone reconnecting to a room the server doesn't have sends its last copy of the room (snap: the 'room' state it was sent, plus its own player id); the server rebuilds the room from it
     (course, phase, hole, pars, the pins seed, turn, balls, scores, seats), the phone takes its old seat back, and the others take theirs back by id when they return (meanwhile they are 'dropped', as after any blip).
     A shot in the air at the restart is lost (its turn goes back to aiming from the ball's last spot). */
+  const NEXT_HOLD = true;   /* mplag (MP_EARLY_NEXT on the phones): a 'next' sent while its result card is still up says how long (hold, ms, at most HOLD_MAX); the next golfer's idle / away clock starts when the card goes, as it did when 'next' came after the card.
+    ROLLBACK: false -> the clock starts at the 'next' (an early one would start it up to 2.75 s before the turn shows). An old phone sends no hold: as before */
+  const FLY_SKIP_ALL = true; /* Neil (11-16): a Skip on the hole's fly-over on any phone skips it for everyone: its 'flyskip' (for this hole) is relayed once per hole to the others; a second press anywhere is dropped. ROLLBACK: false -> not relayed (each phone's own fly-over) */
   const MP_AIMCAP = true;   /* ROLLBACK: false -> aim messages of any size up to FRAME_MAX are relayed (before perf2) */
   for (const k in T) if (process.env['MP_' + k]) T[k] = +process.env['MP_' + k]; /* e.g. MP_IDLE=3000 for quick tests */
   const EMO = ['❤️', '😂', '🔥', '👏', '😮', '🙈'];
@@ -215,7 +219,7 @@ const MP = (() => {
     R.players = R.players.filter(p => !p.out && (p.c || now() - (p.discAt || 0) < T.LOBBY_DROP)); R.away = null; startHole(R, 1); }
   const unout = R => { R.players = R.players.filter(p => !p.out); }; /* MP_KICK: back to the lobby: removed golfers' rows go */
   function startHole(R, n) {
-    R.hole = n; R.phase = 'play'; R.cardAt = null; clearT(R, 'card');
+    R.hole = n; R.phase = 'play'; R.cardAt = null; clearT(R, 'card'); R.flyskip = 0; /* (FLY_SKIP_ALL: a new hole, a new fly-over) */
     for (const p of R.players) { p.wait = false; /* late joiners are in from this hole */ if (p.out) { p.ball = { u: 0, v: 0, lie: 'tee', stroke: 1, done: true, holed: false, out: true }; continue; } /* MP_KICK: removed: no more holes (blank on the card) */ if (!p.c && p.discAt && R.hole > 1) p.pu = true; /* still gone at the end of the last hole: picked up from here on */
       p.ball = p.pu ? { u: 0, v: 0, lie: 'tee', stroke: 1, done: true, holed: false, puNow: true } : { u: 0, v: 0, lie: 'tee', stroke: 1, toPin: 1e4, done: false, holed: false };
       if (p.pu) p.scores[n - 1] = { s: R.pars[n - 1] + T.PU_OVER, par: R.pars[n - 1], pu: true }; }
@@ -225,7 +229,7 @@ const MP = (() => {
     if (!live.length) return endHole(R);
     const tee = live.filter(p => p.ball.stroke === 1 && p.ball.lie === 'tee' && !p.ball.left);
     const pick = tee.length ? tee[0] : live.slice().sort((a, b) => (b.ball.toPin - a.ball.toPin) || (a.seat - b.seat))[0]; /* tee shots in seat order, then farthest from the hole */
-    R.turn = pick.id; R.tstate = 'aim'; R.shotN++; R.idle = { start: now(), held: 0, holdAt: null }; sync(R); timers(R); }
+    R.turn = pick.id; R.tstate = 'aim'; R.shotN++; R.idle = { start: now() + (NEXT_HOLD ? R.hold || 0 : 0), held: 0, holdAt: null }; R.hold = 0; sync(R); timers(R); }
   function timers(R) { /* the active golfer's clock: idle ring, auto-hit, or a dropped golfer's reconnect wait */
     clearT(R, 'idle'); clearT(R, 'ring'); clearT(R, 'auto'); clearT(R, 'nudge');
     const p = P(R, R.turn); if (!p || R.phase !== 'play') return;
@@ -268,6 +272,7 @@ const MP = (() => {
     broadcast(R, { t: 'shot', from: as, by: p.id, n: R.shotN, auto: !!m.auto, d: m.d }, p); timers(R); }
   function next(R, p, m) { const as = m.as || p.id, q = P(R, as); if (!q || R.turn !== as || R.tstate !== 'flight' || !R.shot || R.shot.by !== p.id) return; /* only from the phone that played the shot */
     if (!num(m.stroke, 1, 40)) return; const b = m.ball || {}; if (!num(b.u, -2000, 2000) || !num(b.v, -2000, 2000)) return;
+    if (NEXT_HOLD) { R.hold = num(m.hold, 0, T.HOLD_MAX) ? m.hold : 0; R.go = R.hold ? { by: p.id, n: R.shotN } : null; } /* NEXT_HOLD: the result card is still up for this long on the phones: the next golfer's idle clock starts after it (or at the hitter's 'go') */
     apply(R, q, { u: b.u, v: b.v, lie: String(m.lie || 'rough').slice(0, 12), stroke: Math.round(m.stroke), toPin: num(m.toPin, 0, 5000) ? m.toPin : 999, holed: !!m.holed, strokes: Math.round(m.strokes || m.stroke) }); }
   function fallbackNext(R) { const S = R.shot, q = S && P(R, S.as); if (!q || R.tstate !== 'flight') return; const b = q.ball, r = S.res;
     if (r.water) apply(R, q, { u: b.u, v: b.v, lie: b.lie, stroke: b.stroke + 2, toPin: b.toPin, holed: false });
@@ -302,6 +307,8 @@ const MP = (() => {
       case 'nexthole': if (R.phase === 'hole') startHole(R, R.hole + 1); return;
       case 'aim': if (R.turn === p.id && R.tstate === 'aim' && m.d && typeof m.d === 'object' && (!MP_AIMCAP || data.length <= T.AIM_MAX)) { broadcast(R, { t: 'aim', from: p.id, n: R.shotN, d: m.d }, p); if (R.idle && !R.idle.holdAt && (!T.KICK || m.in)) { R.idle.start = now(); if (R.idle.ring) timers(R); } } return; /* aiming is input: it holds off the idle clock (MP_KICK: only the player's own aim, in:1; wind updates don't) */
       case 'act': return act(R, p, m);
+      case 'flyskip': if (FLY_SKIP_ALL && R.phase === 'play' && m.hole === R.hole && R.flyskip !== R.hole) { R.flyskip = R.hole; broadcast(R, { t: 'flyskip', hole: R.hole, from: p.id }, p); } return; /* FLY_SKIP_ALL: once per hole */
+      case 'go': if (NEXT_HOLD && R.go && R.go.by === p.id && m.n === R.go.n) { R.go = null; broadcast(R, { t: 'go', n: m.n, from: p.id }, p); if (R.phase === 'play' && R.tstate === 'aim' && R.idle && R.idle.start > now()) { R.idle.start = now(); timers(R); } } return; /* NEXT_HOLD: the hitter tapped their result card away early (only that phone, once): the others may move on after 1.7 s, and the next golfer's clock starts now, as when that tap sent 'next' */
       case 'playfor': return playFor(R, p, m);
       case 'kick': return remove(R, p, m);
       case 'shot': return shot(R, p, m);
