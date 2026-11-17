@@ -27,7 +27,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v399'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v401'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1400,7 +1400,7 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
   HS.cull.push(C); HS.add(m); if (C.fm) HS.add(C.fm); return m;
 }
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
-const AZALEA_FAR = false; /* PROPOSAL (perf3, needs Neil's OK): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
+const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
 const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
 $('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
 function updateCull() {
@@ -2706,6 +2706,7 @@ function* setClubG(i, reaim = true) {
   if (G.view === 'aim' && !G.drop && typeof startCamTween === 'function') { aimFrame = null; startCamTween(.7); }
 }
 function setClub(i, reaim = true) { return runG(setClubG(i, reaim)); }
+const WIND_CALMER = true; /* Neil (11-17 07:22): "Let's make strong wind not happen too often. Most times it should be 10 mi/h or less." Each hole's prevailing wind = 2 + 14*r^2.2 mph (one random draw, as before, so MP rooms stay in step): about 80% of holes 10 mph or less, about 20% 11-16 (9% at 14 or more), average about 6; the Hunt's 1st, off the lake, 10 (was 12). Gusts and drift unchanged. false = 4-14 uniform, the Hunt's 1st 12 */
 /* wind: each hole has a prevailing wind that stays put; it breathes a little all the time (a few degrees, a mph or two) and now and then gusts,
    always from about the same quarter. The shot takes whatever is blowing at the moment it's struck */
 const WIND = (() => { let R = Math.random; const ph = [0, 0, 0, 0].map(() => R() * 6.283); /* (R: MP hook, see rng) */ let base = { mph: 12, ang: Math.PI * .95 }, T = 0, g = { at: 14 + R() * 18, t: -1, dur: 0, amp: 0, da: 0 }, shown = null;
@@ -2716,7 +2717,7 @@ const WIND = (() => { let R = Math.random; const ph = [0, 0, 0, 0].map(() => R()
     const e = env(), tw = 6.283;
     G.wind = { mph: Math.max(0, base.mph * (1 + .1 * Math.sin(T * tw / 33 + ph[2]) + .05 * Math.sin(T * tw / 11 + ph[3])) + g.amp * e), ang: base.ang + .15 * Math.sin(T * tw / 47 + ph[0]) + .07 * Math.sin(T * tw / 19 + ph[1]) + g.da * e };
     const m = Math.round(G.wind.mph); if (m !== shown) { shown = m; const el = document.getElementById('windNum'); if (el) el.innerHTML = `${m}<small>mph</small>`; } if (!MENU.on && G.dir) updateWindArrow(); } /* only ever called from the frame loop, after MENU exists */
-  function hole(n) { base = n === 1 ? { mph: 12, ang: Math.PI * .95 } : { mph: Math.round(4 + R() * 10), ang: R() * 6.283 }; shown = null; G.wind = { mph: base.mph, ang: base.ang }; flag.aim(base); } /* no update() here: it runs at boot, before MENU and the HUD exist */ /* the Hunt's 1st: off the lake, as it always was */
+  function hole(n) { base = n === 1 ? { mph: WIND_CALMER ? 10 : 12, ang: Math.PI * .95 } : { mph: WIND_CALMER ? Math.round(2 + 14 * Math.pow(R(), 2.2)) : Math.round(4 + R() * 10), ang: R() * 6.283 }; shown = null; G.wind = { mph: base.mph, ang: base.ang }; flag.aim(base); } /* no update() here: it runs at boot, before MENU and the HUD exist */ /* the Hunt's 1st: off the lake, as it always was */
   return { update, hole, gusting: () => g.t >= 0, rng(f) { R = f || Math.random; } /* MP hook: a room seeds each hole's wind */, get base() { return base; } /* base: the hole's prevailing wind (CADDIE_WIND) */ }; })();
 function newWind() {} /* retired: the wind no longer re-rolls every shot (WIND keeps the hole's prevailing wind, with drift and gusts) */
 /* CART PATHS: a ball that comes to rest on a cart path gets a free drop at the nearest spot off it that's no nearer the hole, silently (Neil: no message). */
