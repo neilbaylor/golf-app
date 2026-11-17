@@ -1,6 +1,6 @@
 # Tee Party: working notes
 
-- The game is the single file `index.html`. Keep it one self-contained file (Three.js r128 from cdnjs, everything else inline).
+- The game source is the single file `/home/claude/golf/sketchy-golf.html` (Three.js r128 from cdnjs, everything else inline). Deploy with `python3 /home/claude/golf/tools/split_build.py sketchy-golf.html <golf-app>`: it writes `index.html` + content-hashed `game/crew/hunt/aug.<hash>.js` (cached forever; server.js SPLIT_FILES). `--single` = the old one-file page (rollback). Top-level code that patches AUG_HOLES must be a one-line `{ ... }` block (the split runs it once aug.js has loaded); the build stops on any other top-level AUG_HOLES read.
 - Before dropping or downgrading any draw mode, effect or graphics feature, ask Neil first. Effects stay. Perf work must not reduce graphics or gameplay.
 - Audio (Neil 16 Nov): only the ball strike, the ball landing, and subtle nature birds. No UI sounds. Sound must be togglable and default on.
 - Target high fps (120 where the device allows). Check perf after visual changes (`tools/perf/bench.js`).

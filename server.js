@@ -20,6 +20,10 @@ const icons = fs.existsSync(path.join(__dirname, 'icons')) ? fs.readdirSync(path
 for (const f of ['manifest.webmanifest', ...icons]) if (fs.existsSync(path.join(__dirname, f)))
   files['/' + f] = [fs.readFileSync(path.join(__dirname, f)), TYPES[path.extname(f)] || 'application/octet-stream'];
 files['/index.html'] = files['/'];
+/* SPLIT_FILES (perf2, Neil 16 Nov): tools/split_build.py writes the page as index.html plus content-hashed scripts (game/crew/hunt/aug.<hash>.js). They are served with
+   a cache-forever header (a new build means new names), compressed like the page (gzip at start, brotli off the main thread). ROLLBACK: false (or a --single build) -> as before. */
+const SPLIT_FILES = true, HASHED = /^\/(game|crew|hunt|aug)\.[0-9a-f]{10}\.js$/;
+if (SPLIT_FILES) for (const n of fs.readdirSync(__dirname)) if (HASHED.test('/' + n)) files['/' + n] = [fs.readFileSync(path.join(__dirname, n)), 'text/javascript; charset=utf-8'];
 /* BR_ASYNC (Neil 11-16 14:12, "can't load the page" after a deploy): the 4 MB page's brotli (quality 11) ran synchronously before listen(), tens of seconds of CPU on a small box, so a new
    deploy started slowly. Now gzip is made at start (well under a second) and the server listens straight away; brotli is made off the main thread and served once it's ready (gzip until then).
    ROLLBACK: BR_ASYNC = false -> both made synchronously before listening, as before. */
@@ -32,7 +36,7 @@ const server = http.createServer((req, res) => {
   if (url === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
   if (url === '/mp/stats') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify(MP.stats())); } /* rooms, sockets, message and byte counts (for profiling) */
   const f = cache[url]; if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-  const h = { 'Content-Type': f.type, 'Cache-Control': f.type.startsWith('text/html') ? 'no-cache' : 'public, max-age=86400', ETag: f.etag, Vary: 'Accept-Encoding' };
+  const h = { 'Content-Type': f.type, 'Cache-Control': f.type.startsWith('text/html') ? 'no-cache' : SPLIT_FILES && HASHED.test(url) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400', ETag: f.etag, Vary: 'Accept-Encoding' };
   if (req.headers['if-none-match'] === f.etag) { res.writeHead(304, h); return res.end(); }
   const ae = req.headers['accept-encoding'] || '', pngish = f.type === 'image/png';
   const [body, enc] = !pngish && f.br && /\bbr\b/.test(ae) ? [f.br, 'br'] : !pngish && /\bgzip\b/.test(ae) ? [f.gz, 'gzip'] : [f.buf, null];
