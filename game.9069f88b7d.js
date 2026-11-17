@@ -31,7 +31,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v416'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v418'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -685,7 +685,7 @@ const PUTT_LINE_LBL = true; /* rollback (Neil): putt 'pulled it'/'pushed it' fol
 const CONFETTI_SCALE = true; /* rollback (Neil): confetti scales with the score: bogey or worse none, par 40, birdie 170, eagle 340, ace/albatross 420. false = 170 every time (v345) */
 const PUTT_LEN = true; /* rollback flag (Neil): the putt cup's forgiveness (falling in from the side, dying at the rim, toppling off the lip) scales with putt length: more forgiving on short putts, less on long ones. false = the same forgiveness at every length (v341) */
 const PUTT_LF = { near: 2, far: 10, hi: 1.25, lo: .6 }; /* putt length in yards (2 yd = 6 ft, 10 yd = 30 ft) → forgiveness multiplier, linear in between */
-const PUTT_HELP_K = .9; /* Neil 17 Nov 17:18 (v416): "just barely reduce the thresholds (fewer putts go in), but just barely": the putt cup's near-miss help (toppling in from a stop, dying at the rim, the widened catch) is 10% smaller, about half an inch to an inch less. The cup itself is unchanged. 1 = v415 */
+const PUTT_HELP_K = .95; /* Neil 17 Nov 17:18 (v416, then 5% not 10% in v417): "just barely reduce the thresholds (fewer putts go in), but just barely": the putt cup's near-miss help (toppling in from a stop, dying at the rim, the widened catch) is 5% smaller, about a quarter to half an inch less. The cup itself is unchanged. 1 = v415 */
 function puttLenF(d) { return PUTT_LEN ? PUTT_LF.hi + (PUTT_LF.lo - PUTT_LF.hi) * clamp((d - PUTT_LF.near) / (PUTT_LF.far - PUTT_LF.near), 0, 1) : 1; }
 function cupStep(u, v, vu, vv, st) { // → 'holed' | 'lip' | 'hop' | null; may change st.vu/st.vv. st.kind = 'putt' is forgiving: near-misses drop in
   const dc = Math.hypot(u - PIN.u, v - PIN.v), s = Math.hypot(vu, vv), soft = st.kind === 'putt', ca = soft ? att('cup', 'putt') * (st.lf ?? 1) * PUTT_HELP_K : 1, RR = CUP.R + (soft ? .04 * ca : 0);
@@ -4481,7 +4481,7 @@ function updateCamera(dt) {
     pos.lerp(P.pos, w); look.lerp(P.look, w); if (P.t >= P.r + P.h + P.f || w < .002 && (P.cancel || P.t > P.r)) G.preview = null;
     const pv = !!G.preview && !P.cancel && P.t < P.r + P.h + P.f * .35; if (pv !== G._pv) { app.classList.toggle('previewing', pv); G._pv = pv; } }
   else if (G._pv) { app.classList.remove('previewing'); G._pv = false; }
-  if (FLY.on) FLY.step(dt, pos, look); /* the hole's opening fly-over drives the camera */
+  if (FLY.on) FLY.step(dt * (FLY_FF && G.ff ? 3 : 1), pos, look); /* the hole's opening fly-over drives the camera */
   camera.position.copy(pos); camLook.copy(look);
   const fovT = 52 + 13 * Math.max(0, SP.z || 0) * (1 - e) - (SW.phase === 'back' || SW.phase === 'down' ? clamp(SW.vis, 0, 1.1) * 8.2 : 0) * (1 - e); /* backswing push-in */
   { // backswing light: edges dim and a warm glow settles on the ball as you load up (a cheap alpha overlay, no blend modes)
@@ -4982,7 +4982,8 @@ app.addEventListener('pointerdown', e => {
   const go = r.querySelector('#resBtns .btn.go'); if (!go || r.classList.contains('final')) return; e.stopPropagation(); e.preventDefault(); go.click(); /* the end-of-hole card waits for a real button */
 }, true);
 // hold anywhere while the ball is moving = 3× fast-forward
-app.addEventListener('pointerdown', () => { if (G.view === 'flight') { G.ff = true; if (!store.get('ffUsed', false)) store.set('ffUsed', true); $('#ffTip').classList.remove('on'); } });
+const FLY_FF = true; /* Neil 17 Nov 17:20 (v418): hold anywhere during the hole's fly-over = 3x fast-forward too, like a ball in flight (same 3x badge). Just a time scale on the fly-over: no extra work. false = holding does nothing in the fly-over (v417) */
+app.addEventListener('pointerdown', e => { if (G.view === 'flight' || (FLY_FF && FLY.on && !(e.target && e.target.closest && e.target.closest('button, .fskip, #flyUI a')))) { G.ff = true; if (!store.get('ffUsed', false)) store.set('ffUsed', true); $('#ffTip').classList.remove('on'); } });
 // "hold to fast-forward" tip: 2 s into a flight, at most twice ever, never once you've used it
 function ffTipMaybe() { if (store.get('ffUsed', false)) return; const n = store.get('ffTips', 0); if (n >= 2) return;
   clearTimeout(G.ffTipTO); G.ffTipTO = setTimeout(() => { if (G.view !== 'flight' || G.ff || store.get('ffUsed', false)) return; store.set('ffTips', n + 1); const t = $('#ffTip'); t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 2600); }, 2000); }
@@ -5788,7 +5789,7 @@ function frame(now) {
     const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null;
     try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
     requestAnimationFrame(frame); return; }
-  { const ff = G.ff && G.view === 'flight'; if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
+  { const ff = G.ff && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
   if (G.view === 'flight') updateFlight(dt * 1.15 * (G.ff ? 3 : 1)); else updateCamera(dt); // flight plays 15% quicker than real time
   if (G.shake > 0) { G.shake -= dt; const k = G.shake * .06; camera.position.x += (Math.random() - .5) * k; camera.position.y += (Math.random() - .5) * k; }
   updateTracer(); dashTex.offset.x = -(t * .9) % 1;
