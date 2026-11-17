@@ -31,7 +31,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v414'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v416'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -685,9 +685,10 @@ const PUTT_LINE_LBL = true; /* rollback (Neil): putt 'pulled it'/'pushed it' fol
 const CONFETTI_SCALE = true; /* rollback (Neil): confetti scales with the score: bogey or worse none, par 40, birdie 170, eagle 340, ace/albatross 420. false = 170 every time (v345) */
 const PUTT_LEN = true; /* rollback flag (Neil): the putt cup's forgiveness (falling in from the side, dying at the rim, toppling off the lip) scales with putt length: more forgiving on short putts, less on long ones. false = the same forgiveness at every length (v341) */
 const PUTT_LF = { near: 2, far: 10, hi: 1.25, lo: .6 }; /* putt length in yards (2 yd = 6 ft, 10 yd = 30 ft) → forgiveness multiplier, linear in between */
+const PUTT_HELP_K = .9; /* Neil 17 Nov 17:18 (v416): "just barely reduce the thresholds (fewer putts go in), but just barely": the putt cup's near-miss help (toppling in from a stop, dying at the rim, the widened catch) is 10% smaller, about half an inch to an inch less. The cup itself is unchanged. 1 = v415 */
 function puttLenF(d) { return PUTT_LEN ? PUTT_LF.hi + (PUTT_LF.lo - PUTT_LF.hi) * clamp((d - PUTT_LF.near) / (PUTT_LF.far - PUTT_LF.near), 0, 1) : 1; }
 function cupStep(u, v, vu, vv, st) { // → 'holed' | 'lip' | 'hop' | null; may change st.vu/st.vv. st.kind = 'putt' is forgiving: near-misses drop in
-  const dc = Math.hypot(u - PIN.u, v - PIN.v), s = Math.hypot(vu, vv), soft = st.kind === 'putt', ca = soft ? att('cup', 'putt') * (st.lf ?? 1) : 1, RR = CUP.R + (soft ? .04 * ca : 0);
+  const dc = Math.hypot(u - PIN.u, v - PIN.v), s = Math.hypot(vu, vv), soft = st.kind === 'putt', ca = soft ? att('cup', 'putt') * (st.lf ?? 1) * PUTT_HELP_K : 1, RR = CUP.R + (soft ? .04 * ca : 0);
   if (dc < CUP.R + (soft ? .11 * ca : .03) && s < (soft ? .42 : .32)) return 'holed';                 // dying at the rim: gravity wins
   if (dc >= RR) { st.inCup = false; return null; }
   if (st.inCup) return null; st.inCup = true;
@@ -2325,6 +2326,7 @@ const handFor = who => CHARS[who].lefty; /* every round starts with each golfer'
 G.lefty = handFor(G.who);
 const right = d => ({ u: d.v, v: -d.u });
 const club = () => CLUBS[G.club];
+const SAND_EASY = true; /* Neil 17 Nov 14:36 (v415): "make bunker shots less punishing, it's too easy to blade them". The explosion's perfect tempo window .066 -> .085 (a pitch is .1034), swing flaws cost less (risk 1.45 -> 1.2, tight .82 -> .9); it only blades or chunks when the tempo is well off (.26 past the window, was .17), a blade from sand flies 10% hot with some spin left (was 18%, a third of the spin) and a chunk goes 60% (was half). Flops unchanged. false = v414 */
 // ---- shot types. rate = backswing meter speed, tempo = target back:down ratio, perf = ± perfect window (log) ----
 const MODES = {
   full:  { name: 'Full',  rate: 2.2,  tempo: 4.25, perf: 0.0846 },
@@ -2333,7 +2335,7 @@ const MODES = {
   pitch: { name: 'Pitch', rate: 1.55, tempo: 3.4,  perf: 0.1034 },
   chip:  { name: 'Chip',  rate: 1.35, tempo: 3.2,  perf: 0.1128 },
   flop:  { name: 'Flop',  rate: 1.45, tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* risk: swing flaws cost more, and a bad tempo blades or chunks it */
-  sand:  { name: 'Sand',  rate: 1.5,  tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* the explosion: as touchy as a flop (and a mistimed one blades or chunks it) */
+  sand:  SAND_EASY ? { name: 'Sand', rate: 1.5, tempo: 3.4, perf: 0.085, tight: .9, risk: 1.2 } : { name: 'Sand',  rate: 1.5,  tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* the explosion: as touchy as a flop (and a mistimed one blades or chunks it). SAND_EASY: a wider window, smaller penalties */
   putt:  { name: 'Putt',  rate: 1.25, tempo: 3.1,  perf: .6, tight: 3 } };
 const MODE_ORDER = ['power', 'full', 'punch', 'pitch', 'flop', 'sand', 'putt'];
 /* CLUB_DIFF (Neil): the longer the club, the harder a good shot. Each club scales the tempo window (perfect and good bands) and the dead-straight line window;
@@ -3727,7 +3729,7 @@ function rollPutt(u0, v0, vu, vv) {
       if (r) { ev.push({ t, type: r }); vu = cst.vu; vv = cst.vv; } }
     if (i % 2 === 0) out.push({ t, x: u, y: groundHeight(u, v), z: -v });
   }
-  if (!holed && Math.hypot(u - PIN.u, v - PIN.v) < CUP.R + .13 * att('cup', 'putt') * cst.lf) { holed = true; ev.push({ t, type: 'holed' }); out.push(...cupDrop(t, u, v, .3)); } // stopped on the lip: it topples in
+  if (!holed && Math.hypot(u - PIN.u, v - PIN.v) < CUP.R + .13 * att('cup', 'putt') * cst.lf * PUTT_HELP_K) { holed = true; ev.push({ t, type: 'holed' }); out.push(...cupDrop(t, u, v, .3)); } // stopped on the lip: it topples in
   if (!holed) out.push({ t: t + .01, x: u, y: groundHeight(u, v), z: -v });
   return { pts: out, events: ev, lie: holed ? 'green' : lieAt(u, v), holed };
 }
@@ -3801,9 +3803,9 @@ function launch(sw) {
   const wob = G.lastSwing && G.lastSwing.wob ? G.lastSwing.wob.rms : 0;
   const q = clamp(1 - Math.min(1, terr / .3) * .45 - Math.min(1, Math.abs(th) / 15) * .3 - Math.min(1, wob / 3) * .12 - Math.max(0, p - 1) * 2.5, 0, 1);
   const plan = planShot(), part = clamp(D / F, .5, 1);
-  const flub = mrisk > 1 && terr > PERFECT + .17 ? (quick ? 'blade' : 'chunk') : null; // a mistimed flop: quick catches it thin (low, hot, no spin), slow digs in (fat, way short)
-  const spin = shotSpec(cl, G.mode, h, q, D, F).spin * (plan.spinMul || 1) * (flub === 'blade' ? .35 : 1);
-  if (flub === 'blade') carry *= 1.18; else if (flub === 'chunk') carry *= .5;
+  const sEz = SAND_EASY && G.mode === 'sand', flub = mrisk > 1 && terr > PERFECT + (sEz ? .26 : .17) ? (quick ? 'blade' : 'chunk') : null; // a mistimed flop: quick catches it thin (low, hot, no spin), slow digs in (fat, way short)
+  const spin = shotSpec(cl, G.mode, h, q, D, F).spin * (plan.spinMul || 1) * (flub === 'blade' ? (sEz ? .55 : .35) : 1);
+  if (flub === 'blade') carry *= sEz ? 1.1 : 1.18; else if (flub === 'chunk') carry *= sEz ? .6 : .5;
   if (G.mode === 'chip') carry *= plan.cf || .45;                              // chip: meter = total, fly only the carry part
   if (G.mode === 'sand' && SAND_TOTAL) carry *= plan.cf || 1;                 /* sand: meter = where it finishes, fly only the carry part */
   if (G.mode === 'sand' && G.lieRoll < 1) carry /= G.lieRoll; // explosion shot: the sand is already priced in
