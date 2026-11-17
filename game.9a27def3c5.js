@@ -2,9 +2,18 @@
 'use strict';
 const CADDIE_FAST = true; /* ROLLBACK: false -> as v350. Perf (Neil 22:43, "optimize caddie check"): the same caddie decisions, bit for bit, with less work. (1) AIM_SAFE's lie-range variants only ask 'did a tree knock it down into OB/water', so they stop after the tree test instead of also rolling out a finish they never look at. (2) caddieEnd remembers its answer for the plan object and carry table it was given (and every other input), so the same plan asked twice (caddieFit's last check, then caddieWet's first) is worked out once. (3) the ground roll takes the slope only on steps that use it and reuses the height it just read at the same spot. (4) the lie lookups the roll makes every step: big outlines test only the edges in the point's band (inPoly), and the 'within 2.6 yds of the green' / bunker-lip tests only the outline segments near the point (gapTo). Up here so inPoly can read it from the first call */
 const CADDIE_FAST2 = true; /* ROLLBACK: false -> as before. Neil (via main): "Caddie needs to be faster than that." The same picks, less work: (1) carry tables and plans are kept in small recent-use caches (a plan is the same plan when its key, its table and the hole/pin/tree-grace/golfer match; a table is reused only when it would be built from the same inputs), so AIM_SAFE's and the tree escape's back-and-forth between clubs and shot types stop rebuilding them; (2) caddieEnd's remembered answers live on each plan, not in one slot; (3) the perfect strike a plan already flew (TRACER_TREE) and its tree test are reused by caddieEnd and the CADDIE_CARRY fit instead of being flown again; (4) setupShot draws the HUD once, at the end */
+const CADDIE_FAST3 = true; /* ROLLBACK: false -> as v397. Neil (17 Nov 01:29): "Let's run a caddie perf pass to improve speed." The same caddie decisions bit for bit (club, shot type, aim, power, punch, tee plan, warnings: 299 seeded setups identical), less work: (1) the flight and roll maths take Math.hypot's exact result by a faster route (the same sums the browser does, inline); (2) the tree test looks only at trees in the flight's grid cells (the same trees, in the same order, so the same first hit); (3) a plan's calm perfect strike, its tree test and the tracer's lift are worked out only when something reads them (the wind fit's in-between plans never do); (4) the lie-range looks reuse the plan's launch-speed fit, and a plan's wind flight is flown once; (5) each hole's lookup tables (green collar, outlines, tree grid, tree heights) are built with the hole, in the background, not in the first setup; (6) more pause points, so no slice of the setup runs long */
+const F3 = { lazy: CADDIE_FAST3, grid: CADDIE_FAST3, memo: CADDIE_FAST3, table: CADDIE_FAST3, hyp: CADDIE_FAST3, warm: CADDIE_FAST3, slice: CADDIE_FAST3 }; /* CADDIE_FAST3's parts (each false -> that part as v397) */
+const hyp2 = (a, b) => { a = Math.abs(a); b = Math.abs(b); const m = a > b ? a : b; if (m === 0) return 0; const x = a / m, y = b / m; return Math.sqrt(x * x + y * y) * m; }; /* CADDIE_FAST3: === Math.hypot(a, b) bit for bit (the engine's own scaled sum; finite inputs), without the builtin call */
+const hyp3 = (a, b, c) => { a = Math.abs(a); b = Math.abs(b); c = Math.abs(c); let m = a; if (b > m) m = b; if (c > m) m = c; if (m === 0) return 0; const x = a / m, y = b / m, z = c / m, s = x * x, s2 = y * y, s3 = s + s2; return Math.sqrt(s3 + (z * z - ((s3 - s) - s2))) * m; }; /* === Math.hypot(a, b, c): the same compensated sum */
+/* CADDIE_FAST3 (lazy plans, see plForce) */ let PL_LAZY = 0, PT_PL = null; /* PL_LAZY: inside a caddie run; PT_PL: the plan whose tree PLAN_TREE would hold now (set as the run ends) */ const PL_SN = ['club', 'mode', 'D', 'height', 'Feff', 'lie', 'curve', 'spinX', 'lefty', 'ball', 'treeGrace']; /* everything in G the deferred sums read */ const PL_K1 = ['f', 'track', 'bendRef'], PL_K2 = ['tree', 'pf', 'pfHit', 'ptree']; /* (the tracer's part; the perfect strike and tree part) */ const PL_PROTO = {}; for (const k of PL_K1.concat(PL_K2)) { const all = PL_K2.includes(k); Object.defineProperty(PL_PROTO, k, { get() { plForce(this, true, all); return Object.prototype.hasOwnProperty.call(this, k) ? this[k] : undefined; }, configurable: true }); }
 const F2 = { tab: new Map(), plan: new Map(), n: 0, ctx: null, put(M, k, v, max) { M.delete(k); M.set(k, v); if (M.size > max) M.delete(M.keys().next().value); } }; /* CADDIE_FAST2: recent-use caches (a Map keeps insertion order: the oldest goes first) */
 const _pIdx = new WeakMap(); /* CADDIE_FAST: big outline -> its edges bucketed by height (built once it's been asked a few times) */
-const $ = s => document.querySelector(s);
+const HUD_FAST = true; /* ROLLBACK: false -> as v397. The end-of-setup HUD refresh (part of the caddie's last slice: Neil feels it as caddie time) gives the same DOM with less work: (1) the page runs in quirks mode, where querySelector('#id') can't use the id index and walks the whole document (~30 us each, ~25 per refresh): a plain '#id' is looked up with getElementById (the same element: no two ids differ only by case); (2) text and markup that already read the same aren't written again, so the layout the label fits read isn't thrown away for nothing */
+const ID_SEL = /^#[A-Za-z_][\w-]*$/; const FIT_C = new Map(); /* HUD_FAST: label fits seen (the label's markup, its padding, the room it has, the screen, the fonts' state) -> font size */
+const $ = s => HUD_FAST && ID_SEL.test(s) ? document.getElementById(s.slice(1)) : document.querySelector(s);
+const setTx = (el, t) => { if (!HUD_FAST || el.textContent !== String(t)) el.textContent = t; }; /* HUD_FAST: write only a change */
+const setIH = (el, h) => { if (HUD_FAST && el._ih === h && el._ihN === el.firstChild && el.firstChild) return; el.innerHTML = h; el._ih = h; el._ihN = el.firstChild; }; /* (markup: what this set last, while it's still there) */
 const app = $('#app'), VIG = $('#vig');
 if (typeof THREE === 'undefined') {
   const d = document.createElement('div'); d.id = 'err'; d.className = 'card';
@@ -18,7 +27,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v398'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v400'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -540,11 +549,14 @@ const shapeR = (th, s) => 1 + 0.09 * Math.sin(3 * th + s) + 0.05 * Math.sin(5 * 
 // a bunker with tongues: big soft scallops, and grass fingers pushing into the sand
 function shR(th, e) { if (!e.f) return shapeR(th, e.s); let r = 1 + .1 * Math.sin(2 * th + e.s) + .06 * Math.sin(3 * th + e.s * 1.7);
   for (const [a, d, w] of e.f) { const x = wrapA(th - a) / w; r -= d * Math.exp(-x * x); } return r; }
+const elCS = e => { if (e._rot !== e.rot) { e._rot = e.rot; e._cs = Math.cos(-e.rot); e._sn = Math.sin(-e.rot); } return e._cs; }; /* CADDIE_FAST3: an outline's rotation, worked out once (the same numbers) */
+const elRB = e => e._rb ?? (e._rb = (e.f ? 1.16 + e.f.reduce((m, q) => m + Math.max(0, -q[1]), 0) : 1.17) + 1e-9); /* CADDIE_FAST3: shR never reaches past this (1 + the wave amplitudes, + any outward fingers) */
 function inEl(u, v, e, pad = 1) {
   if (e.sm) { if (u < e.box[0] - 12 || u > e.box[1] + 12 || v < e.box[2] - 12 || v > e.box[3] + 12) return false; return inPoly(e.c[0] + (u - e.c[0]) / pad, e.c[1] + (v - e.c[1]) / pad, e.sm); }
-  const du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot);
-  const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry;
-  return Math.hypot(x, y) < shR(Math.atan2(y, x), e) * pad;
+  const du = u - e.c[0], dv = v - e.c[1], cs = F3.memo ? elCS(e) : Math.cos(-e.rot), sn = F3.memo ? e._sn : Math.sin(-e.rot);
+  const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry, hh = F3.memo ? hyp2(x, y) : Math.hypot(x, y);
+  if (F3.memo && hh >= elRB(e) * pad) return false; /* (CADDIE_FAST3: past the widest the outline can reach: outside, without the shape sums) */
+  return hh < shR(Math.atan2(y, x), e) * pad;
 }
 function elPts(e, n = 72, pad = 1) {
   if (e.sm) return e.sm.map(([u, v]) => [e.c[0] + (u - e.c[0]) * pad, e.c[1] + (v - e.c[1]) * pad]);
@@ -718,12 +730,12 @@ const PHYS = (() => {
     const ax = rx * Math.cos(ta), ay = -Math.sin(ta), az = rz * Math.cos(ta);
     let w = o.spin * RPM; const wx = o.wind ? o.wind.x : 0, wz = o.wind ? o.wind.z : 0;
     const out = [{ t: 0, x: x / YD, y: y / YD, z: z / YD }]; let t = 0, apex = y; const gTop = groundH === groundHW ? groundTop() * YD : Infinity; /* the hole's highest ground (the Hunt: 9, its max is 7.6 yd) */
-    const windy = wx !== 0 || wz !== 0, spinDecay = Math.exp(-dt / 25);
+    const windy = wx !== 0 || wz !== 0, spinDecay = Math.exp(-dt / 25), H3 = F3.hyp ? hyp3 : Math.hypot, py = o.p.y * YD; /* CADDIE_FAST3: the same numbers, a faster hypot */
     for (let i = 0; i < 4000; i++) {
-      const wk = windy ? Math.min(1.35, Math.pow(Math.max(.5, y - o.p.y * YD) / 10, 1 / 7)) : 0, ux = vx - wx * wk, uy = vy, uz = vz - wz * wk, sp = Math.hypot(ux, uy, uz) || 1e-6;
+      const wk = windy ? Math.min(1.35, Math.pow(Math.max(.5, y - py) / 10, 1 / 7)) : 0, ux = vx - wx * wk, uy = vy, uz = vz - wz * wk, sp = H3(ux, uy, uz) || 1e-6;
       const S = R * w / sp, CL = .37 * (1 - Math.exp(-8 * S)), CD = Math.min(.42, .22 + .3 * S);
       // lift direction = axis × velocity (normalised)
-      let lx = ay * uz - az * uy, ly = az * ux - ax * uz, lz = ax * uy - ay * ux; const ll = Math.hypot(lx, ly, lz) || 1; lx /= ll; ly /= ll; lz /= ll;
+      let lx = ay * uz - az * uy, ly = az * ux - ax * uz, lz = ax * uy - ay * ux; const ll = H3(lx, ly, lz) || 1; lx /= ll; ly /= ll; lz /= ll;
       const kd = K * CD * sp, kl = K * CL * sp * sp;
       vx += (-kd * ux + kl * lx) * dt; vy += (-kd * uy + kl * ly - GR) * dt; vz += (-kd * uz + kl * lz) * dt;
       x += vx * dt; y += vy * dt; z += vz * dt; t += dt; w *= spinDecay; if (y > apex) apex = y;
@@ -733,7 +745,8 @@ const PHYS = (() => {
     return { pts: out, t, v: { x: vx, y: vy, z: vz }, spin: w / RPM, apex: apex / YD, axis: { x: ax, y: ay, z: az } };
   }
   // ground: bounces + roll. lieAt(u,v) and grad(u,v) work in yards (u = x, v = -z)
-  function ground(f, lieAt, groundH, grad, dt = 1 / 120, cup = false, lastOnly = false) { /* lastOnly (CADDIE_FAST, the caddie's look-ahead): pts holds just the final point */
+  function ground(...a) { const g = groundG(...a); let r; while (!(r = g.next()).done); return r.value; } /* CADDIE_FAST3: the roll below, run straight through (the caddie's look-aheads run it with pauses) */
+  function* groundG(f, lieAt, groundH, grad, dt = 1 / 120, cup = false, lastOnly = false) { /* lastOnly (CADDIE_FAST, the caddie's look-ahead): pts holds just the final point */
     const last = f.pts[f.pts.length - 1];
     let x = last.x * YD, z = last.z * YD, y = last.y * YD, vx = f.v.x, vy = f.v.y, vz = f.v.z, spin = f.spin;
     const SS = SAND_SPIN && f.sand; /* SAND_SPIN: out of a bunker it checks harder where it lands (Neil, 14 Nov) */
@@ -745,6 +758,7 @@ const PHYS = (() => {
     const out = lastOnly ? { a: [], push(...q) { if (q.length) this.a[0] = q[q.length - 1]; } } : [], events = []; let t = 0, air = false, first = true, lie = CADDIE_FAST ? null : lieAt(x / YD, -z / YD), rolling = false, holed = false; const cst = { inCup: false }; /* CADDIE_FAST: the loop reads the lie first thing anyway */
     let hX = NaN, hZ = NaN, hY = 0; const gH = (a, b) => { if (Object.is(a, hX) && Object.is(b, hZ)) return hY; hX = a; hZ = b; return hY = groundH(a, b); }; /* CADDIE_FAST: the height at the spot it just stopped on is the height at the top of the next step */
     for (let i = 0; i < 2400; i++) {
+      if (F3.slice && (i & 255) === 255) yield; /* CADDIE_FAST3: a pause point every 256 steps (the numbers don't change) */
       lie = lieAt(x / YD, -z / YD);
       if (lie === 'water' && !(WATER_HOP && air)) { events.push({ t, type: 'water' }); break; }
       const L = LIE[lie] || LIE.rough, gu0 = x / YD, gv0 = -z / YD; let g = CADDIE_FAST ? null : grad(gu0, gv0); // dh/du, dh/dv (unitless)
@@ -769,7 +783,7 @@ const PHYS = (() => {
       }
       // rolling: friction opposes motion, backspin tugs back along the landing line (fading), slope pulls downhill
       if (!g) g = grad(gu0, gv0);
-      const sp = Math.hypot(vx, vz), pull = L.grip * Math.pow(Math.max(0, spin - 4600) / 3500, 1.1) * 6.5;
+      const sp = (F3.hyp ? hyp2 : Math.hypot)(vx, vz), pull = L.grip * Math.pow(Math.max(0, spin - 4600) / 3500, 1.1) * 6.5;
       let sx = -GR * g.u, sz = GR * g.v;   // downhill acceleration (world z = -v)
       if (SS && sx * vx + sz * vz > 0) { sx *= SAND_DOWNHILL; sz *= SAND_DOWNHILL; } /* SAND_SPIN: and it runs out less down a slope */
       const side = tilt > .02 ? L.grip * Math.pow(Math.max(0, spin) / 3500, 1.1) * 6.5 * tilt * .36 : 0; // side spin keeps tugging sideways while it lasts
@@ -800,7 +814,13 @@ const PHYS = (() => {
     for (let sp = 10; sp <= 96; sp += 6.6) { const f = fly({ ...o, speed: sp, wind: null }, groundH, 1 / 60); const L = f.pts[f.pts.length - 1]; tbl.push([sp, Math.hypot(L.x - o.p.x, L.z - o.p.z)]); }
     return tbl;
   }
+  function carryTableL(o, groundH) { /* CADDIE_FAST3: carryTable's rows flown only when speedFromTable reaches them (its scan stops at the first row that carries far enough): each row the very flight carryTable flies */
+    const sps = []; if (SHORT_TBL) sps.push(4, 7); for (let sp = 10; sp <= 96; sp += 6.6) sps.push(sp);
+    const r = new Array(sps.length); return { lz: true, n: sps.length, at(i) { let e = r[i]; if (!e) { const sp = sps[i], f = fly({ ...o, speed: sp, wind: null }, groundH, 1 / 60), L = f.pts[f.pts.length - 1]; e = r[i] = [sp, Math.hypot(L.x - o.p.x, L.z - o.p.z)]; } return e; } }; }
   function speedFromTable(tbl, carry) {
+    if (tbl.lz) { const e0 = tbl.at(0); if (carry <= e0[1]) return e0[0] * carry / Math.max(1, e0[1]); /* CADDIE_FAST3: the same scan and sums on the lazy table */
+      for (let i = 1; i < tbl.n; i++) { const b = tbl.at(i); if (carry <= b[1]) { const a = tbl.at(i - 1); return a[0] + (b[0] - a[0]) * (carry - a[1]) / (b[1] - a[1] || 1); } }
+      return tbl.at(tbl.n - 1)[0]; }
     if (carry <= tbl[0][1]) return tbl[0][0] * carry / Math.max(1, tbl[0][1]);
     for (let i = 1; i < tbl.length; i++) if (carry <= tbl[i][1]) { const a = tbl[i - 1], b = tbl[i]; return a[0] + (b[0] - a[0]) * (carry - a[1]) / (b[1] - a[1] || 1); }
     return tbl[tbl.length - 1][0];
@@ -816,12 +836,12 @@ const PHYS = (() => {
   function launchFor(loft, h) { const s = clamp01((loft - 10) / 20); return loft * (.5 + .6 * (1 - s * s * (3 - 2 * s))) + wedgeLift(loft) + 3 * h; }
   function wedgeLift(loft) { const d = Math.max(0, loft - 42); return d * .15 + d * d * .035; } // full wedges climb to ~90 ft like the long clubs
   const clamp01 = v => Math.max(0, Math.min(1, v));
-  return { fly, ground, speedFor, carryTable, speedFromTable, spinFor, launchFor, YD };
+  return { fly, ground, groundG, groundTop, speedFor, carryTable, carryTableL, speedFromTable, spinFor, launchFor, YD };
 })();
 
 /* ---- green contours: raised, rising toward the back with a small tier, shedding off the edges ---- */
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-function fringeD(u, v) { const e = FRINGE, du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); }
+function fringeD(u, v) { const e = FRINGE, du = u - e.c[0], dv = v - e.c[1], cs = F3.memo ? elCS(e) : Math.cos(-e.rot), sn = F3.memo ? e._sn : Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); }
 // the green: about a third of the way on it tips downhill toward the back right, so balls in the middle run back-right;
 // the back is flatter and breaks less to the right, least of all on the back-left
 function greenH(u, v) { /* the green's own shape on top of the real ground: a faint crown, and the fringe beside the deep bunker falling away into it. The tilt (and how putts break) is the real green's, from the lidar */
@@ -836,10 +856,10 @@ function greenH(u, v) { /* the green's own shape on top of the real ground: a fa
 function realH(u, v) { const G = REAL_H, x = clamp((u - G.u0) / G.d, 0, G.nu - 1.001), y = clamp((v - G.v0) / G.d, 0, G.nv - 1.001), i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, k = j * G.nu + i, h = G.h;
   return (h[k] * (1 - fx) + h[k + 1] * fx) * (1 - fy) + (h[k + G.nu] * (1 - fx) + h[k + G.nu + 1] * fx) * fy; }
 const TERRAIN_BASE = 2.6, TERRAIN_AMP = .72;
-function waterD(u, v) { const e = WATER, du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); }
+function waterD(u, v) { const e = WATER, du = u - e.c[0], dv = v - e.c[1], cs = F3.memo ? elCS(e) : Math.cos(-e.rot), sn = F3.memo ? e._sn : Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); }
 const BLUFF_D = -66; // yards below the course
 function bunkerD(u, v, e) { if (e.sm) { if (u < e.box[0] - 6 || u > e.box[1] + 6 || v < e.box[2] - 6 || v > e.box[3] + 6) return 9; let d2 = 1e9; const P = e.sm; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const ax = P[j][0], ay = P[j][1], bx = P[i][0] - ax, by = P[i][1] - ay, t = clamp(((u - ax) * bx + (v - ay) * by) / (bx * bx + by * by || 1), 0, 1), dx = u - ax - bx * t, dy = v - ay - by * t; d2 = Math.min(d2, dx * dx + dy * dy); }
-  const d = Math.sqrt(d2) / 6; return inPoly(u, v, P) ? 1 - d : 1 + d; } /* traced shape: 1 at the edge, 0.83 two yards in, 1.17 one yard out */ const du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shR(Math.atan2(y, x), e); }
+  const d = Math.sqrt(d2) / 6; return inPoly(u, v, P) ? 1 - d : 1 + d; } /* traced shape: 1 at the edge, 0.83 two yards in, 1.17 one yard out */ const du = u - e.c[0], dv = v - e.c[1], cs = F3.memo ? elCS(e) : Math.cos(-e.rot), sn = F3.memo ? e._sn : Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry; return Math.hypot(x, y) / shR(Math.atan2(y, x), e); }
 function terrainH(u, v) {
   if (AUGD) { let h = AUGD.relief(u, v, AUGD.hAt(u, v)); const w = AUGD.wAt(u, v); if (w > -1.4) h += AUGD.dig(w); /* the creek bed */
     return h; } /* bunkers: no dig here (Neil's call) - their depth is the real lidar hollows */
@@ -855,7 +875,8 @@ function terrainH(u, v) {
 const COLLAR = { on: true, band: 4, tabs: new Map() };
 const groundRaw = (u, v) => terrainH(u, v) + greenH(u, v);
 if (PINS.late.on) { PINS.late.on = false; PIN = PINS.pick(); holeUI(); } /* the page's first hole (Hunt 1): its pin picked again now its ground exists (nothing has used PIN yet) */
-function collarTab() { /* per green: along 72 rays from its middle, where the green ends, where the fringe ends, and how much room before sand or water */
+function collarTab() { const T = COLLAR.tabs.get(GREEN); if (T) return T; const g = collarTabG(); let r; while (!(r = g.next()).done); return r.value; } /* (CADDIE_FAST3: the build below as a generator, so a hole's warm-up can pause in it) */
+function* collarTabG() { /* per green: along 72 rays from its middle, where the green ends, where the fringe ends, and how much room before sand or water */
   const key = GREEN; let T = COLLAR.tabs.get(key); if (T) return T;
   const N = 72, cu = GREEN.c ? GREEN.c[0] : PIN.u, cv = GREEN.c ? GREEN.c[1] : PIN.v, sg = new Float32Array(N), sf = new Float32Array(N), lb = new Float32Array(N); let rmax = 0;
   const hz = L => L === 'sand' || L === 'water';
@@ -865,8 +886,16 @@ function collarTab() { /* per green: along 72 rays from its middle, where the gr
       if (f < 0) { if (L !== 'fringe') { f = s; if (hz(L)) { h = s; break; } } continue; }
       if (hz(L)) { h = s; break; } if (s > f + COLLAR.band + 1) break; }
     if (g < 0) g = 90; if (f < 0) f = g;
-    sg[k] = g; sf[k] = f; lb[k] = clamp(h - f - .3, 0, COLLAR.band); rmax = Math.max(rmax, f + lb[k] + .5); }
+    sg[k] = g; sf[k] = f; lb[k] = clamp(h - f - .3, 0, COLLAR.band); rmax = Math.max(rmax, f + lb[k] + .5); if (k % 9 === 8) yield; }
   T = { N, cu, cv, sg, sf, lb, rmax }; COLLAR.tabs.set(key, T); return T; }
+function* caddieWarmG() { /* CADDIE_FAST3: the lookups the caddie's first setup on a hole used to build (the green collar's table, the big outlines' row index, the tree grid, each tree's ground height and reach, the hole's top height), built with the hole by the background builder, a little at a time: the same tables, made earlier */
+  if (GREEN) { try { yield* collarTabG(); } catch (e) {} } yield;
+  try { PHYS.groundTop(); } catch (e) {}
+  const P = [], add = L => { if (L) for (const q of L) { const pp = q && (q.P || q.sm || q); if (Array.isArray(pp) && pp.length > 24 && Array.isArray(pp[0])) P.push(pp); } };
+  try { if (AUGD) for (const k of ['water', 'ob', 'own', 'fwy', 'pine', 'tees', 'og', 'fescue']) add(AUGD[k]); add(BUNKERS); add([GREEN, FRINGE, PRACTICE, FW]); } catch (e) {}
+  for (let i = 0; i < P.length; i++) { for (let n = 0; n < 8 && !polyIdx(P[i]); n++); if (i % 6 === 5) yield; } yield;
+  try { treeGrid(); treesNearWet(); } catch (e) {} yield;
+  for (let i = 0; i < TREES.length; i++) { const t = TREES[i]; if (t.gy == null) t.gy = groundHeight(t.u, t.v); treeExt(t); if (i % 40 === 39) yield; } }
 function groundHeight(u, v) {
   if (!COLLAR.on) return groundRaw(u, v);
   const T = collarTab(), du = u - T.cu, dv = v - T.cv, r = Math.hypot(du, dv); if (r > T.rmax || r < 1) return groundRaw(u, v);
@@ -1371,7 +1400,7 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
   HS.cull.push(C); HS.add(m); if (C.fm) HS.add(C.fm); return m;
 }
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
-const AZALEA_FAR = false; /* PROPOSAL (perf3, needs Neil's OK): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
+const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
 const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
 $('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
 function updateCull() {
@@ -2304,7 +2333,7 @@ const CLUB_DIFF = true;
 const CLUB_K = { Dr: .7, '3w': .76, '5w': .82, '4h': .87, '5i': .91, '6i': .955, '7i': 1, '8i': 1.04, '9i': 1.08, PW: 1.12, GW: 1.16, SW: 1.2, LW: 1.25 }, CLUB_K_SPREAD = .4, CLUB_K_MODES = ['full', 'power', 'punch'];
 const clubK = (m = G.mode, c = CLUBS[G.club]) => CLUB_DIFF && c && CLUB_K_MODES.includes(m) ? 1 + ((CLUB_K[c.id] || 1) - 1) * CLUB_K_SPREAD : 1;
 // yards from the ball to the edge of the green (0 on it)
-function greenGap(u = G.ball.u, v = G.ball.v) { if (GREEN.sm) return outlineGap(u, v, GREEN); const e = GREEN, du = u - e.c[0], dv = v - e.c[1], cs = Math.cos(-e.rot), sn = Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry, d = Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); return Math.max(0, (d - 1) * Math.min(e.rx, e.ry)); }
+function greenGap(u = G.ball.u, v = G.ball.v) { if (GREEN.sm) return outlineGap(u, v, GREEN); const e = GREEN, du = u - e.c[0], dv = v - e.c[1], cs = F3.memo ? elCS(e) : Math.cos(-e.rot), sn = F3.memo ? e._sn : Math.sin(-e.rot); const x = (du * cs - dv * sn) / e.rx, y = (du * sn + dv * cs) / e.ry, d = Math.hypot(x, y) / shapeR(Math.atan2(y, x), e.s); return Math.max(0, (d - 1) * Math.min(e.rx, e.ry)); }
 const canPutt = (lie = G.lie) => lie === 'green' || ((lie === 'fringe' || lie === 'fairway' || lie === 'rough') && greenGap() <= 10); /* off the green you may putt from within 10 yds (not from sand or deep rough); the caddie only hands you the putter on the green or fringe */
 // which shot types to offer right now (chip is retired for now; power hides near the green)
 const modesHere = () => MODE_ORDER.filter(m => (m !== 'sand' || G.lie === 'sand') && (m !== 'putt' || canPutt()) && (m !== 'power' || (!canPutt() && greenGap() > 100)));
@@ -2349,12 +2378,13 @@ function modeRange(i, m = G.mode, f = LIES[G.lie].f || 1) {
 }
 const clubMin = (i) => modeRange(i, 'full')[0];
 const dmin = () => modeRange(G.club, G.mode)[0];
-function autoMode() { // what a sensible caddie would hand you for this lie and distance
+function autoMode() { return drainG(autoModeG()); }
+function* autoModeG() { // what a sensible caddie would hand you for this lie and distance (CADDIE_FAST3: a generator, with pauses between the club pick's flights)
   const pd = pinDist();
   if (G.lie === 'green' || G.lie === 'fringe') { G.puttMax = puttScale(pd); return ['putt', 12]; }
   if (G.lie === 'sand' && pd <= 36) return ['sand', pd <= 26 ? 12 : 11];
   if (pd <= PITCH_MAX[9] || pd < clubMin(12)) return ['pitch', pd <= 42 ? 12 : pd <= 47 ? 11 : pd <= 52 ? 10 : 9]; // never hand over a club whose shortest full swing flies the green
-  return ['full', pickClub()];
+  return ['full', yield* pickClubG()];
 }
 function setMode(m, keepClub) {
   if (!keepClub && !modeAllowed(m, G.club)) { const pd = pinDist(), opts = CLUBS.map((c, i) => i).filter(i => modeAllowed(m, i)); if (!opts.length) return; G.club = opts.slice().reverse().find(i => modeRange(i, m)[1] >= pd) ?? opts[0]; } // most loft that still reaches
@@ -2382,29 +2412,30 @@ function teePlan() { return HUNT_TEE_PLAN && CID === 'hunt' && HOLE && TEE_PLAN[
 function teePlanClub(tp) { const yd = Math.hypot(tp.u - G.ball.u, tp.v - G.ball.v); for (let i = 8; i >= 1; i--) if (modeRange(i, 'full')[1] >= yd - TP_ROLL[i]) return i; return 1; } /* the shortest non-driver club whose full carry plus its run-out gets there; else the 3 wood */
 function* teePlanLandG(tp, F) { /* HUNT_TEE_PLAN: where to LAND it so a perfect strike runs out to the spot: the spot less the club's run-out (TP_ROLL) */
   const b = G.ball, du = tp.u - b.u, dv = tp.v - b.v, L = Math.hypot(du, dv) || 1, c0 = L - (TP_ROLL[G.club] || 0), k = Math.min(c0, F) / L; let T = { u: b.u + du * k, v: b.v + dv * k };
-  if (c0 > F) { const fw = AUGD ? augFairwayAim(b, tp.u, tp.v, F) : null; return fw || T; } /* can't get there: full, onto the fairway at its reach, the side of the plan's line (down the line itself it runs into the dogleg's corner) */
+  if (c0 > F) { const fw = AUGD ? (F3.slice ? yield* augFairwayAimG(b, tp.u, tp.v, F) : augFairwayAim(b, tp.u, tp.v, F)) : null; return fw || T; } /* can't get there: full, onto the fairway at its reach, the side of the plan's line (down the line itself it runs into the dogleg's corner) */
   return T; } /* (the spot less this club's TP_ROLL run-out: teePlanCheckG measures the real finish in the wind and refits if it's off) */
 const CADDIE_WIND_WIDE = true; /* ROLLBACK: false -> as v390. The wind fit (caddieCarryG's fitTo) aims off at most 0.1 rad (about 16 yds at 160): in a 20 mph crosswind on Hunt 3 a perfect strike of the caddie's default still drifted OB. With it on, only when the fit ran into that cap and a perfect strike in the wind still finishes wet, OB or in a tree, it fits once more allowing 0.25 rad and keeps that if it lands nearer the spot. CADDIE_TREE_SAFE still looks at the result, so a wider aim-off can't put the marker under a crown */
 const CADDIE_TREE_SAFE = true; /* ROLLBACK: false -> as v390. Neil (21:57, MP, Hunt 3): "3 tee caddie aimed us all in the trees." The caddie's slope/wind fit (CADDIE_CARRY with CADDIE_WIND_SHOWN) aims off for the wind: on Hunt 3's par 3 a stiff crosswind slid the marker 15-25 yds sideways into the crowns right of the green, and a headwind's longer fit put it behind the green under the trees, with the calm-air tracer flying into them (red) - for everyone in the room, who all get the same wind. With it on, when the fit leaves the marker under a crown or turns the tracer red where the plan before the fit was clear, the caddie gives back some of the fit (3/4, 1/2, 1/4, none): the most that keeps the marker clear of every crown, the tracer white, and a perfect strike in the wind finishing clear of trees, water and OB. If none does, the fit stands as before. And off the tee, when the line to the pin itself clips a tree before any fit (Neil 22:40: Hunt 3, 'trees on the left, pin on the left'), the caddie aims at the first clear spot on the green from the pin toward its middle (0.35, 0.7, the middle), fitted like any spot; none clear: as before (AUTO_PUNCH may punch it) */
 function caddieWv() { try { const W = CADDIE_WIND ? (CADDIE_WIND_SHOWN ? (WSNAP || G.wind) : WIND.base) : null; if (W && W.mph > .5) return { x: Math.cos(W.ang) * W.mph * .447, z: -Math.sin(W.ang) * W.mph * .447 }; } catch (e) {} return null; } /* the wind caddieCarryG fits in (WIND exists from the first hole on) */
 const underCrown = (u, v, m = .5) => TREES.some(t => Math.abs(t.u - u) < t.r + m && Math.abs(t.v - v) < t.r + m && Math.hypot(t.u - u, t.v - v) < t.r + m);
 const wvKey = wv => wv ? wv.x.toFixed(5) + ',' + wv.z.toFixed(5) : '-';
-function windEnd(wv) { /* a perfect strike of the current plan in wind wv: where it finishes (one flight, one roll) */
+function windEnd(wv) { return drainG(windEndG(wv)); }
+function* windEndG(wv) { /* a perfect strike of the current plan in wind wv: where it finishes (one flight, one roll) */
   const pl = planShot(), c = G.caddieFl, re = c && c.pl === pl && c.wk === wvKey(wv), fl = re ? c.fl : perfectFlight(pl, wv), A = fl.pts[fl.pts.length - 1]; if (re ? c.tree : firstTreeHit(fl.pts)) return { tree: true }; /* re: the flight caddieCarryG just flew for this very plan in this wind */
-  const gd = PHYS.ground({ pts: fl.pts, v: fl.v, spin: fl.spin, sand: G.lie === 'sand' }, lieAt, groundHW, gradUV, 1 / 120, true, CADDIE_FAST), Z = gd.pts[gd.pts.length - 1] || A;
+  if (F3.slice && !re) yield; const gd = yield* PHYS.groundG({ pts: fl.pts, v: fl.v, spin: fl.spin, sand: G.lie === 'sand' }, lieAt, groundHW, gradUV, 1 / 120, true, CADDIE_FAST), Z = gd.pts[gd.pts.length - 1] || A;
   return { u: Z.x, v: -Z.z, lu: A.x, lv: -A.z, wet: gd.events.some(e => e.type === 'water') || lieAt(Z.x, -Z.z) === 'ob' }; }
 function* treeSafeG(d0, D0, atPin) { /* CADDIE_TREE_SAFE: d0, D0: the aim before the fit; atPin: it was aimed at the pin */
   if (!G.ball || G.mode === 'putt' || G.mode === 'sand') return; const b = G.ball, d1 = { ...G.dir }, D1 = G.D, T1 = { u: b.u + d1.u * D1, v: b.v + d1.v * D1 }, T0 = { u: b.u + d0.u * D0, v: b.v + d0.v * D0 };
   let red1 = false; try { red1 = !!planShot().tree; } catch (e) { return; } if (!red1 && !G.caddieTree && !underCrown(T1.u, T1.v)) return; /* the usual case: costs one look (G.caddieTree: a perfect strike in the wind hits a tree, from the fit's own flight) */
   const wv = caddieWv(), put = k => { const u = T0.u + (T1.u - T0.u) * k, v = T0.v + (T1.v - T0.v) * k, du = u - b.u, dv = v - b.v, L = Math.hypot(du, dv) || 1; G.dir = { u: du / L, v: dv / L }; G.D = clamp(L, dmin(), dmax()); };
-  const clear = function* () { const T = { u: b.u + G.dir.u * G.D, v: b.v + G.dir.v * G.D }; if (underCrown(T.u, T.v)) return false; planShot(true); yield; if (planShot().tree) return false; const E = windEnd(wv); yield; return !(E.tree || E.wet || underCrown(E.u, E.v)); }; /* marker clear, tracer white, a perfect strike in the wind finishes clear */
+  const clear = function* () { const T = { u: b.u + G.dir.u * G.D, v: b.v + G.dir.v * G.D }; if (underCrown(T.u, T.v)) return false; planShot(true); yield; if (planShot().tree) return false; const E = F3.slice ? yield* windEndG(wv) : windEnd(wv); yield; return !(E.tree || E.wet || underCrown(E.u, E.v)); }; /* marker clear, tracer white, a perfect strike in the wind finishes clear */
   try { put(0); planShot(true); yield; const red0 = !!planShot().tree; if (!red0 && Math.hypot(T1.u - T0.u, T1.v - T0.v) >= 1) for (const k of [.75, .5, .25, 0]) { put(k); if (yield* clear()) return; } /* the fit did it: give back what it takes */
     if (red0 && atPin && G.lie === 'tee' && GREEN && GREEN.c) for (const t of [.35, .7, 1]) { /* the line to the pin itself clips a tree (a tucked pin on a par 3): a clear spot on the green, from the pin toward its middle, fitted like any spot */
       const cu = PIN.u + (GREEN.c[0] - PIN.u) * t, cv = PIN.v + (GREEN.c[1] - PIN.v) * t, du = cu - b.u, dv = cv - b.v, L = Math.hypot(du, dv) || 1; G.dir = { u: du / L, v: dv / L }; G.D = clamp(L, dmin(), dmax()); yield* caddieFitG(false); if (yield* clear()) return; }
   } catch (e) {}
   G.dir = d1; G.D = D1; }
 function* teePlanAltG(tp, F, off) { /* off: the plan can't finish on its spot (in a crosswind the line that would hold it runs over the corner's crowns, so the fit leaves it to drift) */ /* HUNT_TEE_PLAN: the plan's own line red (a perfect calm strike clips a crown) or its wind flight hitting one (G.caddieTree): plan the alt spot the same way and keep it if it's clear of both */
-  let hard = !!G.caddieTree; try { hard = hard || !!planShot().tree || !!caddieEnd(1, .96, true).tree; } catch (e) { return; } if (!hard && !off) return; /* hard: the plan's line meets a crown; off: it's clear but finishes off its spot */ /* (.96: a touch lower launch, as launch() deals out even on a pure strike, clips a crown: the line is too tight) */
+  let hard = !!G.caddieTree; try { hard = hard || !!planShot().tree; if (!hard) hard = !!(F3.slice ? yield* caddieEndG(1, .96, true) : caddieEnd(1, .96, true)).tree; } catch (e) { return; } if (!hard && !off) return; /* hard: the plan's line meets a crown; off: it's clear but finishes off its spot */ /* (.96: a touch lower launch, as launch() deals out even on a pure strike, clips a crown: the line is too tight) */
   const b = G.ball, d0 = { ...G.dir }, D0 = G.D, c0 = G.caddieTree, a = tp.alt;
   try { const T = yield* teePlanLandG(a, F), du = T.u - b.u, dv = T.v - b.v, L = Math.hypot(du, dv) || 1; G.dir = { u: du / L, v: dv / L }; G.D = clamp(L, dmin(), F); yield* caddieFitG(false); const ok = yield* teePlanCheckG(a); planShot(true); yield;
     if ((ok || hard) && !G.caddieTree && !planShot().tree) { /* a clear alt beats a line into the trees wherever it finishes; beats a clear plan only if it finishes on its own spot */ if (G.teePlan) { G.teePlan.yd = a.yd; G.teePlan.bunker = !!a.bunker; } return; } } catch (e) {}
@@ -2412,16 +2443,17 @@ function* teePlanAltG(tp, F, off) { /* off: the plan can't finish on its spot (i
 function* teePlanCheckG(tp) { /* HUNT_TEE_PLAN: the carry fit lands it on its spot in the shot's wind, but a crosswind runs it on sideways: roll a perfect strike in that wind, and if it doesn't finish on this hole's fairway (3 yds in from the edge) move the landing by the miss and fit once more; the better of the two stays */
   const b = G.ball, own = (u, v) => !AUGD || !AUGD.own || AUGD.own.some(q => inPB(u, v, q)), fw = (u, v) => lieAt(u, v) === 'fairway' && own(u, v), safe = (u, v) => fw(u, v) && [0, 1, 2, 3, 4, 5, 6, 7].every(k => fw(u + Math.sin(k * .7854) * 3, v + Math.cos(k * .7854) * 3));
   const wv = caddieWv();
-  const fin = () => { const E = windEnd(wv); if (E.tree) return { tree: true, s: 1e9 }; const s = Math.hypot(E.u - tp.u, E.v - tp.v); return { ...E, ok: !E.wet && s < 6 && safe(E.u, E.v), s }; }; /* (ok: on this hole's fairway and within 6 yds of the spot) */
-  try { const E = fin(); yield; if (E.ok) return true; if (E.tree) return false; if (!E.wet && G.D >= dmax() - .05 && Math.hypot(E.u - b.u, E.v - b.v) < Math.hypot(tp.u - b.u, tp.v - b.v) && safe(E.u, E.v)) return true; /* full power and short of it (into the wind) on the fairway: a refit can't help */ const d0 = { ...G.dir }, D0 = G.D, T = { u: E.lu + tp.u - E.u, v: E.lv + tp.v - E.v }, du = T.u - b.u, dv = T.v - b.v, L = Math.hypot(du, dv) || 1;
-    G.dir = { u: du / L, v: dv / L }; G.D = clamp(L, dmin(), dmax()); yield* caddieFitG(false); planShot(true); yield; const E2 = fin(); yield;
+  const fin = function* () { const E = F3.slice ? yield* windEndG(wv) : windEnd(wv); if (E.tree) return { tree: true, s: 1e9 }; const s = Math.hypot(E.u - tp.u, E.v - tp.v); return { ...E, ok: !E.wet && s < 6 && safe(E.u, E.v), s }; }; /* (ok: on this hole's fairway and within 6 yds of the spot) */
+  try { const E = yield* fin(); yield; if (E.ok) return true; if (E.tree) return false; if (!E.wet && G.D >= dmax() - .05 && Math.hypot(E.u - b.u, E.v - b.v) < Math.hypot(tp.u - b.u, tp.v - b.v) && safe(E.u, E.v)) return true; /* full power and short of it (into the wind) on the fairway: a refit can't help */ const d0 = { ...G.dir }, D0 = G.D, T = { u: E.lu + tp.u - E.u, v: E.lv + tp.v - E.v }, du = T.u - b.u, dv = T.v - b.v, L = Math.hypot(du, dv) || 1;
+    G.dir = { u: du / L, v: dv / L }; G.D = clamp(L, dmin(), dmax()); yield* caddieFitG(false); planShot(true); yield; const E2 = yield* fin(); yield;
     if (!(E2.ok || (!E2.tree && E2.s < E.s))) { G.dir = d0; G.D = D0; } return !!E2.ok; } catch (e) { return false; } } /* -> the plan finishes where it should (teePlanAltG tries the alt if not) */
 if (HUNT_TEE_PLAN) window.__TP = { windEnd: () => windEnd(caddieWv()), plan: () => teePlan(), club: tp => teePlanClub(tp), TEE_PLAN, TP_ROLL, bunkers: () => BUNKERS, own: (u, v) => !!(AUGD && AUGD.own && AUGD.own.some(q => inPB(u, v, q))) }; /* test hook */
-function pickClub() {
+function pickClub() { return drainG(pickClubG()); }
+function* pickClubG() {
   const pd = pinDist(), f = LIES[G.lie].f || 1;
   if (G.lie === 'tee' && pd > 215) { const tp = HUNT_TEE_PLAN && teePlan(); return tp ? teePlanClub(tp) : 0; } /* HUNT_TEE_PLAN: the lay-up club */
   const lo = FESCUE && G.lie === 'fescue' ? FESCUE_LONGEST : DRIVER_TEE_ONLY && G.lie !== 'tee' ? 1 : 0; /* FESCUE: never a wood; DRIVER_TEE_ONLY: no driver off the tee box */
-  if (CLUB_WIND) { let c0 = G.lie === 'tee' ? 0 : Math.max(1, lo); for (let i = CLUBS.length - 1; i >= lo; i--) if (CLUBS[i].full * f >= pd * .98) { c0 = i; break; } return clubWind(c0, lo, pd); } /* CLUB_WIND: the calm pick, then plays-like */
+  if (CLUB_WIND) { let c0 = G.lie === 'tee' ? 0 : Math.max(1, lo); for (let i = CLUBS.length - 1; i >= lo; i--) if (CLUBS[i].full * f >= pd * .98) { c0 = i; break; } return yield* clubWindG(c0, lo, pd); } /* CLUB_WIND: the calm pick, then plays-like */
   for (let i = CLUBS.length - 1; i >= lo; i--) if (CLUBS[i].full * f >= pd * .98) return i; // shortest club that reaches
   return G.lie === 'tee' ? 0 : Math.max(1, lo);
 }
@@ -2429,24 +2461,26 @@ function pickClub() {
    Each club's calm launch speed (what the meter's top gives on the level) is found once (a few flights) and kept; then one flight per call. Returns { c: carry along the line, lat: drift right, C: the meter's top } */
 const PL = { sp: new Map(), memo: null };
 function plWind() { try { const W = CADDIE_WIND ? (CADDIE_WIND_SHOWN ? (WSNAP || G.wind) : WIND.base) : null; if (W && W.mph > .5) return { x: Math.cos(W.ang) * W.mph * .447, z: -Math.sin(W.ang) * W.mph * .447 }; } catch (e) {} return null; } /* (the same wind caddieCarryG fits in) */
-function plCarry(i, m, T, wv, real = false) { /* real (PUNCH_CLUB): over the real ground (a low punch meets the slopes on the way), not onto the plane at T's height */
-  const b = G.ball, m0 = G.mode, c0 = G.club; G.mode = m; G.club = i; /* shotSpec and the curve read the shot type and club in hand: borrowed for the sums, put back below */
-  try { const cl = CLUBS[i], C = modeRange(i, m)[1], s8 = shotSpec(cl, m, 0, .8, C, C), s1 = shotSpec(cl, m, 0, 1, C, C), tilt = totalCurve() * TILT_PER_CURVE, P0 = { x: 0, y: 0, z: 0 };
+function plCarry(i, m, T, wv, real = false) { return drainG(plCarryG(i, m, T, wv, real)); }
+function* plCarryG(i, m, T, wv, real = false) { /* real (PUNCH_CLUB): over the real ground (a low punch meets the slopes on the way), not onto the plane at T's height. (CADDIE_FAST3: a generator: pauses between its flights, with the club and shot type already handed back) */
+  const b = G.ball, m0 = G.mode, c0 = G.club; let cl, C, s8, s1, tilt; G.mode = m; G.club = i; /* shotSpec and the curve read the shot type and club in hand: borrowed for the sums, put back below */
+  try { cl = CLUBS[i]; C = modeRange(i, m)[1]; s8 = shotSpec(cl, m, 0, .8, C, C); s1 = shotSpec(cl, m, 0, 1, C, C); tilt = totalCurve() * TILT_PER_CURVE; } finally { G.mode = m0; G.club = c0; }
+  { const P0 = { x: 0, y: 0, z: 0 };
     const k = [i, m, C, s8.launch.toFixed(3), s8.spin.toFixed(0), Math.round(tilt / 5)].join('|'); let S = PL.sp.get(k);
-    if (!S) { let sp = 18 + C * .2, f0 = null, L = null; for (let j = 0; j < 6; j++) { f0 = PHYS.fly({ p: P0, yaw: 0, launch: s8.launch, spin: s8.spin, tilt: Math.round(tilt / 5) * 5, speed: sp }, () => 0, 1 / 120); L = f0.pts[f0.pts.length - 1]; const c = Math.hypot(L.x, L.z); if (Math.abs(c - C) < .3 || c < 1) break; sp *= Math.pow(C / c, .8); } /* the speed the meter's top fires (as the carry table and launch's secant find it) */
+    if (!S) { let sp = 18 + C * .2, f0 = null, L = null; for (let j = 0; j < 6; j++) { if (F3.slice && j) yield; f0 = PHYS.fly({ p: P0, yaw: 0, launch: s8.launch, spin: s8.spin, tilt: Math.round(tilt / 5) * 5, speed: sp }, () => 0, 1 / 120); L = f0.pts[f0.pts.length - 1]; const c = Math.hypot(L.x, L.z); if (Math.abs(c - C) < .3 || c < 1) break; sp *= Math.pow(C / c, .8); } /* the speed the meter's top fires (as the carry table and launch's secant find it) */
       S = { sp, ws: windScale(f0, P0, m), yc: Math.atan2(L.x, -L.z) }; if (PL.sp.size > 300) PL.sp.clear(); PL.sp.set(k, S); } /* ws: launch()'s wind scale for this flight (WIND_SHAPE); yc: how far the curve takes it off line (the plan aims off by it) */
-    const tee = G.lie === 'tee', p = { x: b.u, y: groundHW(b.u, -b.v), z: -b.v }, aT = Math.atan2(T.u - b.u, T.v - b.v), d = { u: Math.sin(aT), v: Math.cos(aT) }, sl = tee ? { up: 0, side: 0 } : lieSlope(b.u, b.v, d), hT = groundHW(T.u, -T.v), yaw = aT - S.yc;
+    if (F3.slice) yield; const tee = G.lie === 'tee', p = { x: b.u, y: groundHW(b.u, -b.v), z: -b.v }, aT = Math.atan2(T.u - b.u, T.v - b.v), d = { u: Math.sin(aT), v: Math.cos(aT) }, sl = tee ? { up: 0, side: 0 } : lieSlope(b.u, b.v, d), hT = groundHW(T.u, -T.v), yaw = aT - S.yc;
     const fl = PHYS.fly({ p, yaw, launch: Math.max(3, s8.launch + sl.up * .85), spin: s1.spin * (1 + sl.up * .02), tilt: tilt - sl.side * 2.2, speed: S.sp * (1 - sl.up * .006), ...(wv ? { wind: { x: wv.x * S.ws, z: wv.z * S.ws } } : {}) }, real ? groundHW : () => hT, 1 / 120), L = fl.pts[fl.pts.length - 1], dx = L.x - p.x, dz = L.z - p.z; /* the perfect strike (its stance's launch, spin, tilt and speed), as perfectFlight flies it */
-    return { c: dx * d.u - dz * d.v, lat: dx * d.v + dz * d.u, C }; }
-  finally { G.mode = m0; G.club = c0; } }
-function clubWind(c0, lo, pd) { /* CLUB_WIND: the shortest club whose plays-like full carry reaches the pin (2-3 flights). Outside a setup (the club sheet's caddie mark, a club tap's comment) it answers what the setup picked */
+    return { c: dx * d.u - dz * d.v, lat: dx * d.v + dz * d.u, C }; } }
+function clubWind(c0, lo, pd) { return drainG(clubWindG(c0, lo, pd)); }
+function* clubWindG(c0, lo, pd) { /* CLUB_WIND: the shortest club whose plays-like full carry reaches the pin (2-3 flights). Outside a setup (the club sheet's caddie mark, a club tap's comment) it answers what the setup picked */
   const b = G.ball, key = [b.u, b.v, PIN.u, PIN.v, G.lie, G.who, HOLE].join('|'); if (!WSNAP && PL.memo && PL.memo.k === key && PL.memo.h === HOLE) return PL.memo.c;
-  const wv = plWind(), need = pd * .98 * att('pow'), last = CLUBS.length - 1, /* need: as the calm rule (the club's listed carry x the lie reaches 98% of the way), so with no wind on level ground it picks what it always did; this golfer's power scales both sides */ P = new Map(), at = i => { if (!P.has(i)) P.set(i, plCarry(i, 'full', PIN, wv).c); return P.get(i); };
+  const wv = plWind(), need = pd * .98 * att('pow'), last = CLUBS.length - 1, /* need: as the calm rule (the club's listed carry x the lie reaches 98% of the way), so with no wind on level ground it picks what it always did; this golfer's power scales both sides */ P = new Map(), at = function* (i) { if (!P.has(i)) P.set(i, (yield* plCarryG(i, 'full', PIN, wv)).c); return P.get(i); };
   let c = c0; try {
-    const r = at(c0) / modeRange(c0, 'full')[1]; /* this club's plays-like / meter ratio: about the same for its neighbours */
+    const r = (yield* at(c0)) / modeRange(c0, 'full')[1]; /* this club's plays-like / meter ratio: about the same for its neighbours */
     let j = lo; for (let i = last; i >= lo; i--) if (modeRange(i, 'full')[1] * r >= need) { j = i; break; } /* the likely club */
-    for (let n = 0; n < 4; n++) { if (at(j) < need) { if (j > lo) { j--; continue; } break; } /* short: one more club (at most 3-4 flights in all) */
-      if (j < last && !P.has(j + 1) && modeRange(j + 1, 'full')[1] * at(j) / modeRange(j, 'full')[1] >= need * .97) { if (at(j + 1) >= need) { j++; continue; } } break; } /* it reaches: if one less might too (by this club's own ratio), fly it */
+    for (let n = 0; n < 4; n++) { if ((yield* at(j)) < need) { if (j > lo) { j--; continue; } break; } /* short: one more club (at most 3-4 flights in all) */
+      if (j < last && !P.has(j + 1) && modeRange(j + 1, 'full')[1] * (yield* at(j)) / modeRange(j, 'full')[1] >= need * .97) { if ((yield* at(j + 1)) >= need) { j++; continue; } } break; } /* it reaches: if one less might too (by this club's own ratio), fly it */
     c = j; } catch (e) { c = c0; }
   PL.memo = { k: key, h: HOLE, c, P }; return c; }
 /* CLUB_WIND: autoAim aims at b + dir x D with D clamped to the club's calm range (and calls a pin past its top out of reach: a lay-up). A club picked on plays-like
@@ -2460,19 +2494,21 @@ function* cwAimG() { const b = G.ball, du = PIN.u - b.u, dv = PIN.v - b.v, L = M
   G.D = clamp(G.D, lo, F); if (G.fitT && G.fitT.ball === G.ball) G.fitT.D = G.D; if (CADDIE_TREE_SAFE) yield* treeSafeG(fd0, fD0, true); } /* (PUNCH_CLUB's record of what the fit left) (CADDIE_TREE_SAFE also guards these windy pin-aimed shots) */
 /* Augusta's default landing spot: along the arc the club reaches, the stretch of fairway nearest the line the caddie would take, aimed at its middle;
    if none is in reach at full length, step it back (a lay-up) */
-function augFairwayAimF(b, tu, tv, F) { /* AIM_SAND (front nine): along the club's arc, the runs of this hole's own fairway that aren't sand (>= 10 yd wide); the one whose middle is nearest the hole's centre line, aimed at that middle; stepped back if none is in reach (a lay-up) */
+function augFairwayAimF(b, tu, tv, F) { return drainG(augFairwayAimFG(b, tu, tv, F)); }
+function* augFairwayAimFG(b, tu, tv, F) { /* AIM_SAND (front nine): along the club's arc, the runs of this hole's own fairway that aren't sand (>= 10 yd wide); the one whose middle is nearest the hole's centre line, aimed at that middle; stepped back if none is in reach (a lay-up) */
   const a0 = Math.atan2(tu - b.u, tv - b.v), ok = (u, v) => AUGD.own.some(q => inPB(u, v, q)) && lieAt(u, v) !== 'sand', C = AUGD.CL, st = .5 * Math.PI / 180;
   const dCL = (u, v) => { let m = 1e9; for (let i = 1; i < C.length; i++) { const A = C[i - 1], B = C[i], bx = B[0] - A[0], by = B[1] - A[1], t = clamp(((u - A[0]) * bx + (v - A[1]) * by) / (bx * bx + by * by || 1), 0, 1); m = Math.min(m, Math.hypot(u - A[0] - bx * t, v - A[1] - by * t)); } return m; };
-  for (let R = F; R >= F * .6; R -= F * .05) { let best = null, run = null;
+  for (let R = F; R >= F * .6; R -= F * .05) { if (F3.slice && R < F) yield; let best = null, run = null; /* (CADDIE_FAST3: a pause point per arc) */
     for (let k = -120; k <= 121; k++) { const a = a0 + k * st, on = k <= 120 && ok(b.u + Math.sin(a) * R, b.v + Math.cos(a) * R);
       if (on) { if (!run) run = { lo: a, hi: a }; else run.hi = a; }
       else if (run) { const m = (run.lo + run.hi) / 2, w = (run.hi - run.lo) * R, u = b.u + Math.sin(m) * R, v = b.v + Math.cos(m) * R, d = dCL(u, v); if (w >= 10 && (!best || d < best.d)) best = { u, v, d }; run = null; } }
     if (best) return best; }
   return null; }
-function augFairwayAim(b, tu, tv, F) {
-  if (AIM_SAND && AUG_FRONT && HOLE.n < 10) { const f = augFairwayAimF(b, tu, tv, F); if (f) return f; } /* AIM_SAND: the front nine's own rule (above) */
+function augFairwayAim(b, tu, tv, F) { return drainG(augFairwayAimG(b, tu, tv, F)); }
+function* augFairwayAimG(b, tu, tv, F) {
+  if (AIM_SAND && AUG_FRONT && HOLE.n < 10) { const f = yield* augFairwayAimFG(b, tu, tv, F); if (f) return f; } /* AIM_SAND: the front nine's own rule (above) */
   const a0 = Math.atan2(tu - b.u, tv - b.v), on = (u, v) => AUGD.own.some(q => inPB(u, v, q)); /* this hole's own fairway */
-  for (let R = F; R >= F * .6; R -= F * .05) { let best = null;
+  for (let R = F; R >= F * .6; R -= F * .05) { if (F3.slice) yield; let best = null; /* (CADDIE_FAST3: a pause point per arc) */
     for (let s = -1; s <= 1; s += 2) for (let k = 0; k <= 120; k++) { const a = a0 + s * k * .5 * Math.PI / 180; if (!on(b.u + Math.sin(a) * R, b.v + Math.cos(a) * R)) continue;
       let lo = a, hi = a; while (hi - a < .9 && on(b.u + Math.sin(hi + .004) * R, b.v + Math.cos(hi + .004) * R)) hi += .004; while (a - lo < .9 && on(b.u + Math.sin(lo - .004) * R, b.v + Math.cos(lo - .004) * R)) lo -= .004;
       const m = (lo + hi) / 2, w = (hi - lo) * R; if (w >= 8 && (!best || k < best.k)) best = { k, u: b.u + Math.sin(m) * R, v: b.v + Math.cos(m) * R }; break; }
@@ -2484,11 +2520,11 @@ function* autoAimG() {
   else if (pd <= F * 1.0) { tu = PIN.u; tv = PIN.v;
     if (AUGD && G.lie === 'tee' && HOLE.par >= 4 && pd > F * .8) { const hit = (u, v) => { const lz = lieAt(u, v); return lz === 'ob' || lz === 'water' || TREES.some(t => Math.abs(t.u - u) < t.r && Math.abs(t.v - v) < t.r && Math.hypot(t.u - u, t.v - v) < t.r * .85); }, clear = (a, R) => { const su = Math.sin(a), sv = Math.cos(a); for (let s = 25; s < R - 4; s += 2) if (hit(b.u + su * s, b.v + sv * s)) return false; return true; }, a0 = Math.atan2(PIN.u - b.u, PIN.v - b.v); /* a par 4 whose pin is just in reach (Hunt 8's dogleg): if the straight line crosses trees, OB or water, take the middle of the widest clear window onto this hole's own fairway, a little short so it stays on it */
       if (!clear(a0, pd - 12)) { const on = (u, v) => AUGD.own.some(q => inPB(u, v, q)); let pick = null;
-        for (let R = F * .88; R >= F * .68 && !pick; R -= F * .04) { let run = null, best = null; for (let k = -80; k <= 81; k++) { const a = a0 + k * .5 * Math.PI / 180, ok = k <= 80 && on(b.u + Math.sin(a) * R, b.v + Math.cos(a) * R) && on(b.u + Math.sin(a) * (R + 12), b.v + Math.cos(a) * (R + 12)) && clear(a, R); /* lands on it and is still on it after the roll */ if (ok) { if (!run) run = { lo: a, hi: a }; else run.hi = a; } else if (run) { const w = run.hi - run.lo, m = (run.lo + run.hi) / 2; if (w * R >= 6 && (!best || w > best.w + .02 || (Math.abs(w - best.w) <= .02 && Math.abs(m - a0) < Math.abs(best.m - a0)))) best = { w, m }; run = null; } }
+        for (let R = F * .88; R >= F * .68 && !pick; R -= F * .04) { if (F3.slice) yield; /* (CADDIE_FAST3) */ let run = null, best = null; for (let k = -80; k <= 81; k++) { const a = a0 + k * .5 * Math.PI / 180, ok = k <= 80 && on(b.u + Math.sin(a) * R, b.v + Math.cos(a) * R) && on(b.u + Math.sin(a) * (R + 12), b.v + Math.cos(a) * (R + 12)) && clear(a, R); /* lands on it and is still on it after the roll */ if (ok) { if (!run) run = { lo: a, hi: a }; else run.hi = a; } else if (run) { const w = run.hi - run.lo, m = (run.lo + run.hi) / 2; if (w * R >= 6 && (!best || w > best.w + .02 || (Math.abs(w - best.w) <= .02 && Math.abs(m - a0) < Math.abs(best.m - a0)))) best = { w, m }; run = null; } }
           if (best) pick = { u: b.u + Math.sin(best.m) * R, v: b.v + Math.cos(best.m) * R }; }
         if (pick) { tu = pick.u; tv = pick.v; } } } }
   else { let best = null; for (let v = Math.max(b.v, 0); v <= PIN.v + 10; v += .25) { const u = centerU(v); if (Math.hypot(u - b.u, v - b.v) >= F) { best = { u, v }; break; } } if (!best) best = PIN; tu = best.u; tv = best.v;
-    if (AUGD) { const fw = augFairwayAim(b, tu, tv, F); if (fw) { tu = fw.u; tv = fw.v; } } } /* Augusta: land it on the fairway, not across a dogleg's trees */
+    if (AUGD) { const fw = F3.slice ? yield* augFairwayAimG(b, tu, tv, F) : augFairwayAim(b, tu, tv, F); if (fw) { tu = fw.u; tv = fw.v; } } } /* Augusta: land it on the fairway, not across a dogleg's trees */
   const du = tu - b.u, dv = tv - b.v, L = Math.hypot(du, dv) || 1; G.dir = { u: du / L, v: dv / L }; G.D = pd <= F || tp ? clamp(L, dmin(), F) : F; /* (HUNT_TEE_PLAN: the lay-up's own length) (L is the fairway spot's distance when the dogleg rule moved it) */
   const fd0 = { ...G.dir }, fD0 = G.D; /* (CADDIE_TREE_SAFE: the aim before the fit) */
   if (CADDIE_ELEV || AIM_ROLLFIT) yield* caddieFitG(tu === PIN.u && tv === PIN.v);
@@ -2501,10 +2537,16 @@ function autoAim() { return runG(autoAimG()); }
    does to a good strike (its short end, a touch higher or lower), a tree knocking it down into it (a crown hanging over the white stakes) */
 function* caddieWetG() {
   const W = l => l === 'water' || l === 'ob', T = targetUV(); if (W(lieAt(T.u, T.v))) return true;
-  const e0 = caddieEnd(); yield; if (W(e0.lie) || W(e0.landLie) || (e0.tree && W(e0.flyLie))) return true;
+  const e0 = F3.slice ? yield* caddieEndG() : caddieEnd(); yield; if (W(e0.lie) || W(e0.landLie) || (e0.tree && W(e0.flyLie))) return true;
   const L = LIES[G.lie] || {}, rr = L.r && G.mode !== 'sand' ? L.r / L.f : 0, V = [[1, .96], [1, 1.04]]; if (rr) V.push([1 - rr / 2, 1], [1 - rr, 1], [1 - rr / 2, .96], [1 - rr / 2, 1.04]);
-  for (const [cf, lm] of V) { const e = caddieEnd(cf, lm, CADDIE_FAST); yield; if (e.tree && W(e.lie)) return true; } return false; } /* CADDIE_FAST: only a tree knock-down counts here, so these stop after the tree test */
-function caddieWet() { return runG(caddieWetG()); } /* CADDIE_FAST2: the generator (yield = a point where a sliced setup may pause), run straight through */
+  if (F3.memo && !treesNearWet()) return false; /* CADDIE_FAST3: on this hole no tree can knock a ball onto water or OB, so these looks can't find one */
+  for (const [cf, lm] of V) { const e = F3.slice ? yield* caddieEndG(cf, lm, CADDIE_FAST) : caddieEnd(cf, lm, CADDIE_FAST); yield; if (e.tree && W(e.lie)) return true; } return false; } /* CADDIE_FAST: only a tree knock-down counts here, so these stop after the tree test */
+function caddieWet() { return runG(caddieWetG()); }
+const _wetT = new WeakMap();
+function treesNearWet() { /* CADDIE_FAST3: could a tree knock a ball down onto water or OB anywhere on this hole? false only when it provably can't: a knock-down lands within the tree's hit reach + 2.5 yds of its trunk, and every water/OB lie needs the point inside that outline's box (traced holes with no bluff or hazard function); else true (look as before) */
+  const T = TREES, A = AUGD; let c = _wetT.get(T); if (c && c.A === A) return c.v; let v = true;
+  if (A && !A.bluff && !A.haz && Array.isArray(A.water) && Array.isArray(A.ob)) { const Q = A.water.concat(A.ob); v = T.some(t => { const r = (t.rh || t.r * 1.6) + .3 + 2.5 + .05; return Q.some(q => q.b[0] <= t.u + r && q.b[1] >= t.u - r && q.b[2] <= t.v + r && q.b[3] >= t.v - r); }); }
+  _wetT.set(T, { A, v }); return v; } /* CADDIE_FAST2: the generator (yield = a point where a sliced setup may pause), run straight through */
 /* AIM_SAFE: the default must not finish wet when a dry option exists */
 function* aimSafeG() {
   if (G.lie === 'tee' || G.lie === 'green' || G.mode === 'putt') return false;
@@ -2514,7 +2556,7 @@ function* aimSafeG() {
   const opts = [[m0, c0]]; if (m0 !== 'punch' && m0 !== 'sand' && m0 !== 'chip') opts.push(['punch', modeAllowed('punch', c0) ? c0 : 7]);
   let best = null; const C = [];
   try { for (let o = -120; o <= 120; o += 15) for (const [m, c] of opts) for (const k of [1, .6]) { const a = aP + o * Math.PI / 180; put(m, c, a, (m === m0 ? D0 : dmax()) * k); if (k < 1 && G.D <= dmin() + .01) continue;
-      planShot(true); yield; const e = caddieEnd(); yield; if (wet(e)) continue; C.push({ m, c, a, D: G.D, s: Math.hypot(e.u - PIN.u, e.v - PIN.v) + (PEN[e.lie] ?? 15) + (e.tree ? 20 : 0) }); }
+      planShot(true); yield; const e = F3.slice ? yield* caddieEndG() : caddieEnd(); yield; if (wet(e)) continue; C.push({ m, c, a, D: G.D, s: Math.hypot(e.u - PIN.u, e.v - PIN.v) + (PEN[e.lie] ?? 15) + (e.tree ? 20 : 0) }); }
     C.sort((x, y) => x.s - y.s); for (const q of C) { put(q.m, q.c, q.a, q.D); if (!(yield* caddieWetG())) { best = q; break; } } } catch (e) { best = null; } /* ranked on a perfect strike, then the best one that stays dry across the lie's range */
   if (best) { put(best.m, best.c, best.a, best.D); return true; }
   G.mode = m0; G.club = c0; applyModeTempo(); G.Feff = F0; G.dir = d0; G.D = D0; return false; }
@@ -2546,7 +2588,7 @@ function* punchClubG(m0, c0) { /* PUNCH_CLUB: the most lofted club whose punch, 
       G.dir = { u: Math.sin(a), v: Math.cos(a) }; G.D = clamp(D2, dmin(), dmax()); planShot(true); yield; if (red() || (G.D === Dp && Math.abs(D2 - Dp) > .5)) { G.dir = best.dir; G.D = best.D; break; } } /* (red, or pinned at the end of its range: stop at the best clear one) */
     G.dir = best.dir; G.D = best.D; G.autoPunch = { mode: m0, club: c0 }; tracerDirty = true; return true; };
   try { for (let i = CLUBS.length - 1; i >= 0; i--) { if (!modeAllowed('punch', i)) continue; const [lo, hi] = modeRange(i, 'punch'); if (dT < lo * .6 || dT > hi * 1.6) continue; /* (nowhere near its range) */
-      const e = plCarry(i, 'punch', T, wv, true); yield; const r = e.c / e.C; if (!(r > .3)) continue; const D = dT / r; if (D > hi + .5) { far.push({ i, e, c: hi * r }); continue; } if (D < lo - .5) continue; /* the meter yardage that lands it on the spot: out of this club's punch range (far: can't get there even at the top) */
+      const e = F3.slice ? yield* plCarryG(i, 'punch', T, wv, true) : plCarry(i, 'punch', T, wv, true); yield; const r = e.c / e.C; if (!(r > .3)) continue; const D = dT / r; if (D > hi + .5) { far.push({ i, e, c: hi * r }); continue; } if (D < lo - .5) continue; /* the meter yardage that lands it on the spot: out of this club's punch range (far: can't get there even at the top) */
       if (yield* tryG(i, e, D)) return true; }
     far.sort((x, y) => y.c - x.c); for (const q of far.slice(0, 3)) if (yield* tryG(q.i, q.e, 1e9)) return true; /* no punch gets there: the nearest clear one (up to 3 looked at) */
   } catch (e) { punchClubG.err = String(e); }
@@ -2562,23 +2604,28 @@ function autoPunchDrag() {
   if (autoPunch(true)) { updateHUD(); tracerDirty = true; } }
 /* CADDIE_ELEV / AIM_ROLLFIT: where a perfect, calm strike of the current plan finishes, fired the way launch() fires it (no randomness, a clean lie) */
 let _ceMemo = { pl: null, M: null }; /* CADDIE_FAST: the answers for the latest plan object (one slot: the repeats come back to back, and a WeakMap of short-lived plans slows every GC) */
-function caddieEnd(cf = 1, lm = 1, treeOnly = false) { /* cf, lm: carry and launch-angle multipliers (AIM_SAFE tries the lie's range). treeOnly (CADDIE_FAST): the caller only reads e.tree / e.lie when e.tree, so with no tree hit it skips the roll */
-  if (!CADDIE_FAST) return caddieEnd0(planShot(), cf, lm, false);
+const drainG = g => { let r; while (!(r = g.next()).done); return r.value; }; /* CADDIE_FAST3: a caddie generator run straight through (no lazy-plan bookkeeping: for helpers inside a run) */
+function caddieEnd(cf = 1, lm = 1, treeOnly = false) { return drainG(caddieEndG(cf, lm, treeOnly)); } /* CADDIE_FAST3: as below, straight through */
+function* caddieEndG(cf = 1, lm = 1, treeOnly = false) { /* cf, lm: carry and launch-angle multipliers (AIM_SAFE tries the lie's range). treeOnly (CADDIE_FAST): the caller only reads e.tree / e.lie when e.tree, so with no tree hit it skips the roll */
+  if (!CADDIE_FAST) return yield* caddieEnd0G(planShot(), cf, lm, false);
   const pl = planShot(), tb = tableCache.tbl, tg = G.treeGrace; if (CADDIE_FAST2) _ceMemo = pl.ce || (pl.ce = { pl, M: new Map(), T: TREES, A: AUGD, Gr: GREEN, H: HOLE, pu: PIN.u, pv: PIN.v }); /* CADDIE_FAST2: each plan keeps its own answers */ { const c = _ceMemo; if (c.pl !== pl || c.T !== TREES || c.A !== AUGD || c.Gr !== GREEN || c.H !== HOLE || c.pu !== PIN.u || c.pv !== PIN.v) _ceMemo = { pl, M: new Map(), T: TREES, A: AUGD, Gr: GREEN, H: HOLE, pu: PIN.u, pv: PIN.v }; } const M = _ceMemo.M; /* (and the same hole, ground and pin: a plan can outlive a hole or pin change) */
   const k = [cf, lm, G.D, G.mode, G.club, G.height, G.Feff, G.lie, G.curve, G.spinX, G.lefty, G.ball.u, G.ball.v].join('|'), m = M.get(k); /* every input caddieEnd reads besides the plan: exact values */
   if (m && m.tb === tb && m.tg === tg && (m.full || (treeOnly && m.part))) return m.full || m.part;
-  const e = caddieEnd0(pl, cf, lm, treeOnly), r = m && m.tb === tb && m.tg === tg ? m : { tb, tg, full: null, part: null }; if (e.part) r.part = e; else r.full = e; M.set(k, r); return e; }
-function caddieEnd0(pl, cf, lm, treeOnly) {
+  const e = yield* caddieEnd0G(pl, cf, lm, treeOnly), r = m && m.tb === tb && m.tg === tg ? m : { tb, tg, full: null, part: null }; if (e.part) r.part = e; else r.full = e; M.set(k, r); return e; }
+function caddieEnd0(pl, cf, lm, treeOnly) { return drainG(caddieEnd0G(pl, cf, lm, treeOnly)); }
+function* caddieEnd0G(pl, cf, lm, treeOnly) { /* (CADDIE_FAST3: pause points between the flight and the roll, and in the roll) */
   const cl = club(); let carry = G.D * cf; if (G.mode === 'chip') carry *= pl.cf || .45; if (G.mode === 'sand' && SAND_TOTAL) carry *= pl.cf || 1;
   const reuse = CADDIE_FAST2 && cf === 1 && lm === 1 && pl.pf && pl.pfHit !== undefined; /* CADDIE_FAST2: a perfect strike of this plan is the one it already flew (TRACER_TREE), tree test and all */
   const gP = pl.gP || groundHW, o = { p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launch, spin: pl.spin, tilt: pl.tilt }; let sp = reuse ? 0 : PHYS.speedFromTable(tableCache.tbl, carry);
-  if (!reuse) { const f0 = PHYS.fly({ ...o, speed: sp }, gP, 1 / 120), L0 = f0.pts[f0.pts.length - 1], c0 = Math.hypot(L0.x - pl.p.x, L0.z - pl.p.z); if (c0 > 1) sp *= Math.pow(carry / c0, .85); } /* the secant launch() takes (on the plan's own ground) */
+  const sx = F3.memo && !reuse ? (pl.sx || (pl.sx = new Map())) : null, sh = sx && sx.get(carry), tb0 = tableCache.tbl; /* CADDIE_FAST3: the launch-speed fit for this carry, from this table, is done once per plan (perfectFlight's own included) */
+  if (sh && sh.tb === tb0) sp = sh.sp; else if (sx && pl.pfSp !== undefined && pl.pfC === carry && pl.pfTb === tb0) sp = pl.pfSp;
+  else if (!reuse) { const f0 = PHYS.fly({ ...o, speed: sp }, gP, 1 / 120), L0 = f0.pts[f0.pts.length - 1], c0 = Math.hypot(L0.x - pl.p.x, L0.z - pl.p.z); if (c0 > 1) sp *= Math.pow(carry / c0, .85); if (sx) sx.set(carry, { tb: tb0, sp }); } /* the secant launch() takes (on the plan's own ground) */
   const fl = reuse ? pl.pf : PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launchL * lm, spin: shotSpec(cl, G.mode, G.height, 1, G.D, G.Feff).spin * (pl.spinMul || 1), tilt: pl.tiltL, speed: sp * (pl.speedMul || 1) }, groundHW); if (reuse) {} else if (CADDIE_FAST && !treesNear(fl.pts)) liftPts([fl.pts[fl.pts.length - 1]]); else liftPts(fl.pts); /* ...then the real flight over the real ground. CADDIE_FAST: with no tree near the flight the tree test never looks at a height, so only the landing point (where the roll starts) is lifted */
   const A = fl.pts[fl.pts.length - 1], land = { u: A.x, v: -A.z }, th = reuse ? pl.pfHit : firstTreeHit(fl.pts);
   if (treeOnly && !th) return { tree: false, part: true }; /* CADDIE_FAST: no tree in the way, and the caller asks nothing else */
   if (th) { const ku = th.x - Math.sin(pl.yaw) * 2.5, kv = -(th.z + Math.cos(pl.yaw) * 2.5), kl = lieAt(ku, kv); return { u: ku, v: kv, lie: kl === 'water' || kl === 'ob' ? kl : 'trees', tree: true, land: { u: th.x, v: -th.z }, landLie: 'trees', flyLie: lieAt(land.u, land.v) }; } /* knocked down 2.5 yds back, as launch() does: under a crown that hangs over the white stakes, that's OB */
   const landLie = lieAt(land.u, land.v); if (landLie === 'water') return { ...land, lie: 'water', land, landLie };
-  const gd = PHYS.ground({ pts: fl.pts, v: fl.v, spin: fl.spin, sand: G.lie === 'sand' }, lieAt, groundHW, gradUV, 1 / 120, true, CADDIE_FAST), E = gd.pts[gd.pts.length - 1] || A;
+  if (F3.slice) yield; const gd = yield* PHYS.groundG({ pts: fl.pts, v: fl.v, spin: fl.spin, sand: G.lie === 'sand' }, lieAt, groundHW, gradUV, 1 / 120, true, CADDIE_FAST), E = gd.pts[gd.pts.length - 1] || A;
   return { u: E.x, v: -E.z, lie: gd.events.some(e => e.type === 'water') ? 'water' : gd.lie, land, landLie, holed: !!gd.holed }; }
 /* CADDIE_CARRY: fit the default so a perfect strike, over the real ground and (CADDIE_WIND) in the prevailing wind, LANDS on the target the caddie picked. A few flights, no roll */
 function* caddieCarryG(atPin) {
@@ -2586,7 +2633,7 @@ function* caddieCarryG(atPin) {
   const b = G.ball, F = dmax(), lo = dmin(), a0 = Math.atan2(G.dir.u, G.dir.v), D0 = G.D, T0 = { u: b.u + G.dir.u * D0, v: b.v + G.dir.v * D0 };
   let wv = null; try { const W = CADDIE_WIND ? (CADDIE_WIND_SHOWN ? (WSNAP || G.wind) : WIND.base) : null; if (W && W.mph > .5) wv = { x: Math.cos(W.ang) * W.mph * .447, z: -Math.sin(W.ang) * W.mph * .447 }; } catch (e) {} /* (WIND exists from the first hole on) */
   const put = (a, D) => { G.dir = { u: Math.sin(a), v: Math.cos(a) }; G.D = clamp(D, lo, F); };
-  const land = () => { const pl = planShot(), fl = !wv && pl.pf ? pl.pf : perfectFlight(pl, wv), th = CADDIE_FAST2 && fl === pl.pf && pl.pfHit !== undefined ? pl.pfHit : firstTreeHit(fl.pts), A = fl.pts[fl.pts.length - 1], u = A.x, v = -A.z; return { u, v, tree: !!th, lie: lieAt(u, v), fl }; };
+  const land = () => { const pl = planShot(), fl = !wv && pl.pf ? pl.pf : perfectFlight(pl, wv), th = CADDIE_FAST2 && !(F3.lazy && wv) && fl === pl.pf && pl.pfHit !== undefined ? pl.pfHit : firstTreeHit(fl.pts), /* (CADDIE_FAST3: a wind flight is never the calm one, so the calm one isn't worked out to check) */ A = fl.pts[fl.pts.length - 1], u = A.x, v = -A.z; return { u, v, tree: !!th, lie: lieAt(u, v), fl }; };
   const fitTo = function* (T, E, cap = .1) { /* aim and power so the landing sits on T (a few flights; E: the landing of the plan as it stands, if known) */
     const aT = Math.atan2(T.u - b.u, T.v - b.v), dT = Math.hypot(T.u - b.u, T.v - b.v), sc = E => Math.hypot(E.u - T.u, E.v - T.v) + (E.tree ? 40 : 0) + (E.lie === 'water' || E.lie === 'ob' ? 25 : 0);
     let a = Math.atan2(G.dir.u, G.dir.v), D = G.D; E = E || land(); const s0 = sc(E); let best = { a, D, s: s0, E };
@@ -2599,21 +2646,21 @@ function* caddieCarryG(atPin) {
     let best = null;
     if (pr && CADDIE_PITCH_SLOPE && !E0.tree) { /* CADDIE_PITCH_SLOPE: find the landing spot L whose run-out stops at the pin, with a cheap roll model: the plan's own landing (speed, spin) moved to L and rolled on a plane tilted like the green on the line from L to the pin (3 slope samples), the real lies, no ground lookups while it rolls. A few cheap model steps, then one fit to L and one check from the real landing */
       const f0 = E0.fl, A0 = f0.pts[f0.pts.length - 1], sp0 = Math.hypot(f0.v.x, f0.v.z), sand = G.lie === 'sand';
-      const rollAt = (L, fl) => { const h0 = groundHW(L.u, -L.v); let gu = 0, gv = 0;
+      const rollAt = function* (L, fl) { const h0 = groundHW(L.u, -L.v); let gu = 0, gv = 0;
         for (const k of [.2, .5, .8]) { const g = gradUV(L.u + (PIN.u - L.u) * k, L.v + (PIN.v - L.v) * k); gu += g.u / 3; gv += g.v / 3; }
         let f = fl; if (!f) { const du = L.u - b.u, dv = L.v - b.v, l = Math.hypot(du, dv) || 1; f = { pts: [{ t: 0, x: L.u, y: h0, z: -L.v }], v: { x: du / l * sp0, y: f0.v.y, z: -dv / l * sp0 }, spin: f0.spin }; } /* the same landing speed and spin, heading from the ball to L */
-        const gd = PHYS.ground({ pts: f.pts, v: f.v, spin: f.spin, sand }, lieAt, (x, w) => h0 + gu * (x - L.u) + gv * (-w - L.v), () => ({ u: gu, v: gv }), 1 / 120, true, CADDIE_FAST), Z = gd.pts[gd.pts.length - 1];
+        const gd = yield* PHYS.groundG({ pts: f.pts, v: f.v, spin: f.spin, sand }, lieAt, (x, w) => h0 + gu * (x - L.u) + gv * (-w - L.v), () => ({ u: gu, v: gv }), 1 / 120, true, CADDIE_FAST), Z = gd.pts[gd.pts.length - 1];
         return !Z || gd.events.some(e => e.type === 'water') ? null : { u: Z.x, v: -Z.z }; }; /* where it stops */
       let L = { u: A0.x, v: -A0.z }, bestL = null, bestE = 1e9;
-      for (let k = 0; k < 5; k++) { yield; const Z = rollAt(L); if (!Z) break; const eu = PIN.u - Z.u, ev = PIN.v - Z.v, e = Math.hypot(eu, ev); if (e < bestE) { bestE = e; bestL = { ...L }; } if (e < .4) break; L = { u: L.u + eu * .8, v: L.v + ev * .8 }; } /* step the landing by most of the miss */
+      for (let k = 0; k < 5; k++) { yield; const Z = yield* rollAt(L); if (!Z) break; const eu = PIN.u - Z.u, ev = PIN.v - Z.v, e = Math.hypot(eu, ev); if (e < bestE) { bestE = e; bestL = { ...L }; } if (e < .4) break; L = { u: L.u + eu * .8, v: L.v + ev * .8 }; } /* step the landing by most of the miss */
       if (bestL) { /* then the check, with the real run-out over the real green (one roll per candidate): the fitted landing, one refit if it still misses, and plain carry to the pin; the best finish wins */
-        const real = E => { if (E.tree) return 1e9; const fl = E.fl, gd = PHYS.ground({ pts: fl.pts, v: fl.v, spin: fl.spin, sand }, lieAt, groundHW, gradUV, 1 / 120, true, CADDIE_FAST), Z = gd.pts[gd.pts.length - 1]; if (!Z || gd.events.some(e => e.type === 'water')) return 1e9; E.Z = { u: Z.x, v: -Z.z }; return gd.holed ? 0 : Math.hypot(PIN.u - E.Z.u, PIN.v - E.Z.v) + (['water', 'ob', 'sand', 'trees'].includes(gd.lie) ? 20 : 0); };
-        const C = []; best = yield* fitTo(bestL, E0); yield; C.push({ a: best.a, D: best.D, best, err: real(best.E) });
-        if (C[0].err > 1.5 && best.E.Z) { const eu = PIN.u - best.E.Z.u, ev = PIN.v - best.E.Z.v; best = yield* fitTo({ u: best.E.u + eu * .8, v: best.E.v + ev * .8 }, best.E); yield; C.push({ a: best.a, D: best.D, best, err: real(best.E) }); }
-        if (Math.min(...C.map(c => c.err)) > 1.5) { put(a0, D0); const b0 = yield* fitTo(T0, E0); yield; C.push({ a: b0.a, D: b0.D, best: b0, err: real(b0.E) }); } /* (carry to the pin, for comparison) */
+        const real = function* (E) { if (E.tree) return 1e9; const fl = E.fl, gd = yield* PHYS.groundG({ pts: fl.pts, v: fl.v, spin: fl.spin, sand }, lieAt, groundHW, gradUV, 1 / 120, true, CADDIE_FAST), Z = gd.pts[gd.pts.length - 1]; if (!Z || gd.events.some(e => e.type === 'water')) return 1e9; E.Z = { u: Z.x, v: -Z.z }; return gd.holed ? 0 : Math.hypot(PIN.u - E.Z.u, PIN.v - E.Z.v) + (['water', 'ob', 'sand', 'trees'].includes(gd.lie) ? 20 : 0); };
+        const C = []; best = yield* fitTo(bestL, E0); yield; C.push({ a: best.a, D: best.D, best, err: yield* real(best.E) });
+        if (C[0].err > 1.5 && best.E.Z) { const eu = PIN.u - best.E.Z.u, ev = PIN.v - best.E.Z.v; best = yield* fitTo({ u: best.E.u + eu * .8, v: best.E.v + ev * .8 }, best.E); yield; C.push({ a: best.a, D: best.D, best, err: yield* real(best.E) }); }
+        if (Math.min(...C.map(c => c.err)) > 1.5) { put(a0, D0); const b0 = yield* fitTo(T0, E0); yield; C.push({ a: b0.a, D: b0.D, best: b0, err: yield* real(b0.E) }); } /* (carry to the pin, for comparison) */
         const w = C.reduce((x, y) => y.err < x.err ? y : x); put(w.a, w.D); best = w.best; } }
     if (!best) best = yield* fitTo(T0, E0);
-    if (CADDIE_WIND_WIDE && wv && !pr && best.s > 3 && Math.abs(best.a - Math.atan2(T0.u - b.u, T0.v - b.v)) > .095) { const Z = windEnd(wv); yield; if (Z.tree || Z.wet) { const b0 = best, w = yield* fitTo(T0, best.E, .25); if (!w.E.tree && w.E.lie !== 'water' && w.E.lie !== 'ob' && w.s < b0.s - .5) best = w; else { best = b0; put(b0.a, b0.D); } } } /* CADDIE_WIND_WIDE: the aim-off ran into its cap and a perfect strike still finishes wet or in a tree: let it aim off further */
+    if (CADDIE_WIND_WIDE && wv && !pr && best.s > 3 && Math.abs(best.a - Math.atan2(T0.u - b.u, T0.v - b.v)) > .095) { const Z = F3.slice ? yield* windEndG(wv) : windEnd(wv); yield; if (Z.tree || Z.wet) { const b0 = best, w = yield* fitTo(T0, best.E, .25); if (!w.E.tree && w.E.lie !== 'water' && w.E.lie !== 'ob' && w.s < b0.s - .5) best = w; else { best = b0; put(b0.a, b0.D); } } } /* CADDIE_WIND_WIDE: the aim-off ran into its cap and a perfect strike still finishes wet or in a tree: let it aim off further */
     if (pr && !CADDIE_PITCH_SLOPE && !best.E.tree) { /* CADDIE_PITCH_ROLL: land it short so a perfect strike rolls out to the pin, the roll worked out on a level plane (the real lies, no slope) */
       const du = (PIN.u - b.u) / (Math.hypot(PIN.u - b.u, PIN.v - b.v) || 1), dv = (PIN.v - b.v) / (Math.hypot(PIN.u - b.u, PIN.v - b.v) || 1);
       const roll = E => { const fl = E.fl, A = fl.pts[fl.pts.length - 1], h = groundHW(A.x, A.z), gd = PHYS.ground({ pts: fl.pts, v: fl.v, spin: fl.spin, sand: G.lie === 'sand' }, lieAt, () => h, () => ({ u: 0, v: 0 }), 1 / 120, true, CADDIE_FAST), Z = gd.pts[gd.pts.length - 1] || A; return gd.events.some(e => e.type === 'water') ? null : (Z.x - A.x) * du + (-Z.z + A.z) * dv; }; /* yds it runs on along the line */
@@ -2689,7 +2736,7 @@ function setupShotW(u, v, lie) { if (CADDIE_FAST2) { HUD_HOLD++; try { setupShot
 function* setupShotG(u, v, lie) {
   if (TREE_UNSTICK) { G.treeGrace = null; if (lie !== 'tee') { const n = treeFree(u, v); if (n) { u = n.u; v = n.v; if (lie) lie = lieAt(u, v); } } }
   G.ball = { u, v }; G.lie = lie || lieAt(u, v); if (G.lie === 'water') G.lie = 'rough';
-  G.curve = curveDefault(); G.spinX = 0; G.height = 0; const [m, ci] = autoMode(); G.mode = m; applyModeTempo(); yield* setClubG(ci); if ((CADDIE_ELEV || CADDIE_CARRY) && G.caddieShort && G.club > 0) yield* setClubG(G.club - 1); /* CADDIE_ELEV: can't get there at full power (uphill): one more club */ else if (CADDIE_CARRY && G.caddieLong && G.club < CLUBS.length - 1 && modeAllowed(G.mode, G.club + 1)) yield* setClubG(G.club + 1); /* CADDIE_CARRY: still flies past at its shortest full swing (downhill, downwind): one less */ placeBall(); if (TREE_UNSTICK && (yield* treeEscapeG())) placeBall(); const safeMoved = AIM_SAFE && (yield* aimSafeG()); if (safeMoved) placeBall(); G.modeManual = false; G.autoPunch = null; if (AUTO_PUNCH && (yield* autoPunchG())) placeBall(); G.shortWarn = CADDIE_SHORT_WARN && !safeMoved && !G.autoPunch && shortWarn(); updateHUD(); tracerDirty = true; puttView();
+  G.curve = curveDefault(); G.spinX = 0; G.height = 0; const [m, ci] = F3.slice ? yield* autoModeG() : autoMode(); G.mode = m; applyModeTempo(); yield* setClubG(ci); if ((CADDIE_ELEV || CADDIE_CARRY) && G.caddieShort && G.club > 0) yield* setClubG(G.club - 1); /* CADDIE_ELEV: can't get there at full power (uphill): one more club */ else if (CADDIE_CARRY && G.caddieLong && G.club < CLUBS.length - 1 && modeAllowed(G.mode, G.club + 1)) yield* setClubG(G.club + 1); /* CADDIE_CARRY: still flies past at its shortest full swing (downhill, downwind): one less */ placeBall(); if (TREE_UNSTICK && (yield* treeEscapeG())) placeBall(); const safeMoved = AIM_SAFE && (yield* aimSafeG()); if (safeMoved) placeBall(); G.modeManual = false; G.autoPunch = null; if (AUTO_PUNCH && (yield* autoPunchG())) placeBall(); G.shortWarn = CADDIE_SHORT_WARN && !safeMoved && !G.autoPunch && shortWarn(); updateHUD(); tracerDirty = true; puttView();
 }
 function setupShot0(u, v, lie) { return runG(setupShotG(u, v, lie)); }
 /* TREE_UNSTICK: a ball never rests inside a trunk or a crown that comes down to the grass: out to the nearest free spot (straight out from the trunk, else round it), never into water or OB */
@@ -2756,37 +2803,46 @@ function setHand(open) {
 }
 function setDistLbl(t) {
   const el = $('#distLbl'), tt = $('#distLblT'); if (t != null) { if (tt.textContent === t) return; tt.textContent = t; } el.style.fontSize = ''; /* null: just refit (the elevation readout changed) */
+  if (HUD_FAST) { const k = ['L', el.innerHTML, el.style.paddingLeft, el.parentNode.clientWidth, innerWidth, innerHeight, devicePixelRatio, document.fonts.status].join('|'); let fs = FIT_C.get(k); /* HUD_FAST: this label at this width fitted before: the same size, without stepping down a pixel (and a layout) at a time */
+    if (fs === undefined) { const fits = f => { el.style.fontSize = f === 17 ? '' : f + 'px'; return !(el.scrollWidth > el.parentNode.clientWidth + 1); }; /* the size the loop below stops at: the largest of 17..13 that fits, else 12 (a wider text never fits where a narrower one doesn't) */
+      if (fits(17)) fs = 17; else { let lo = 12, hi = 16; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (m > 12 && fits(m)) lo = m; else hi = m - 1; } fs = lo; } FIT_C.set(k, fs); if (FIT_C.size > 400) FIT_C.clear(); }
+    el.style.fontSize = fs === 17 ? '' : fs + 'px'; return; }
   let fs = 17; while (fs > 12 && el.scrollWidth > el.parentNode.clientWidth + 1) { fs -= 1; el.style.fontSize = fs + 'px'; }
 }
 // the lie card never wraps a line: the slope note stays on one line and shrinks a little if it has to
-function fitLieSlope() { const el = $('#lieSlope'); el.style.fontSize = ''; if (!el.textContent) return; const max = $('#lie').clientWidth - 12; let f = 11; while (el.scrollWidth > max && f > 8.5) { f -= .5; el.style.fontSize = f + 'px'; } }
+function fitLieSlope() { const el = $('#lieSlope'); el.style.fontSize = ''; if (!el.textContent) return; const max = $('#lie').clientWidth - 12; let f = 11;
+  if (HUD_FAST) { const k = ['S', el.innerHTML, max, innerWidth, innerHeight, devicePixelRatio, document.fonts.status].join('|'), c = FIT_C.get(k); if (c !== undefined) { if (c !== 11) el.style.fontSize = c + 'px'; return; } /* HUD_FAST: fitted before at this width: the same size, without the steps */
+    while (el.scrollWidth > max && f > 8.5) { f -= .5; el.style.fontSize = f + 'px'; } FIT_C.set(k, f); return; }
+  while (el.scrollWidth > max && f > 8.5) { f -= .5; el.style.fontSize = f + 'px'; } }
 let HUD_HOLD = 0; /* CADDIE_FAST2: setupShot draws the HUD once, at its end */
-function runG(g) { let r; while (!(r = g.next()).done); return r.value; } /* CADDIE_FAST2: run a caddie generator straight through */
+function runG(g) { if (F3.lazy) return plRun(() => { let r; while (!(r = g.next()).done); return r.value; }); let r; while (!(r = g.next()).done); return r.value; } /* (CADDIE_FAST3: with lazy plans) */ /* CADDIE_FAST2: run a caddie generator straight through */
 /* CADDIE_SLICE (CADDIE_FAST2): the next shot's caddie work (club, aim fit, tree escape, AIM_SAFE, auto punch) runs a slice per frame (6 ms of work, so a frame with the last piece stays near 8 ms) while the camera glides to the ball. The aim line, the HUD and the caddie's line wait for the final pick, so nothing shows a guess; a swing, a drag of the target, opening the aim view, a club or shot-type pick, or any strike (MP included: launch() asks first) finishes it at once. Other callers (MP turns, auto-hit, tests) still set up in one go */
 const CADDIE_SLICE = true; const CJ = { g: null }; let WSNAP = null; /* ROLLBACK: false -> setupShot all in one go. WSNAP: the wind on the HUD when this setup started (CADDIE_WIND_SHOWN) */
-function caddieStep(ms) { if (!CJ.g) return; const t0 = performance.now(); try { do { if (CJ.g.next().done) { caddieDone(); return; } } while (performance.now() - t0 < ms); } catch (e) { CJ.g = null; WSNAP = null; HUD_HOLD--; console.error(e); } }
-function caddieDone() { CJ.g = null; WSNAP = null; HUD_HOLD--; updateHUD(); tracerDirty = true; if (G.view !== 'flight' && !(typeof FLY === 'object' && FLY.on)) tracer.visible = tracerInk.visible = rings.visible = true; }
+const CJ_END = {}; function* cjEndG(g) { yield* g; yield CJ_END; } /* CADDIE_FAST3: a sliced setup ends with one more pause, so the HUD refresh (caddieDone) gets a frame's slice of its own */
+function caddieStep(ms) { if (!CJ.g) return; const t0 = performance.now(); let n = 0; try { do { const r = CJ.g.next(); if (r.done) { caddieDone(); return; } if (r.value === CJ_END && n && ms < 1e8) return; n++; } while (performance.now() - t0 < ms); } catch (e) { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); console.error(e); } }
+function cjLazyEnd() { if (F3.lazy && PL_LAZY > 0 && --PL_LAZY === 0) plSettle(); } /* CADDIE_FAST3: a sliced setup holds lazy plans from its start to its end */
+function caddieDone() { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); updateHUD(); tracerDirty = true; if (G.view !== 'flight' && !(typeof FLY === 'object' && FLY.on)) tracer.visible = tracerInk.visible = rings.visible = true; }
 function caddieSync() { if (CJ.g) caddieStep(1e9); } /* finish it now (a strike, a drag, a pick) */
-function caddieCancel() { if (CJ.g) { try { CJ.g.return(); } catch (e) {} CJ.g = null; WSNAP = null; HUD_HOLD--; } } /* a new setup replaces it */
-function setupShotSliced(u, v, lie) { if (!(CADDIE_FAST2 && CADDIE_SLICE)) { setupShot(u, v, lie); return; } hushPre(); caddieCancel(); HUD_HOLD++; WSNAP = { ...G.wind }; CJ.g = setupShotG(u, v, lie); tracer.visible = tracerInk.visible = rings.visible = false; caddieStep(6); }
+function caddieCancel() { if (CJ.g) { try { CJ.g.return(); } catch (e) {} CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); } } /* a new setup replaces it */
+function setupShotSliced(u, v, lie) { if (!(CADDIE_FAST2 && CADDIE_SLICE)) { setupShot(u, v, lie); return; } hushPre(); caddieCancel(); HUD_HOLD++; if (F3.lazy) PL_LAZY++; WSNAP = { ...G.wind }; CJ.g = F3.slice ? cjEndG(setupShotG(u, v, lie)) : setupShotG(u, v, lie); tracer.visible = tracerInk.visible = rings.visible = false; caddieStep(6); }
 function updateHUD() { if (CADDIE_FAST2 && HUD_HOLD) return;
   if (HUD_PAR) hudPar(); /* HUD_PAR hook */
   if (G.view !== 'flight') { setDist(hudDist(), _bic); $('#distNum').classList.remove('live'); setDistLbl(G.mode === 'putt' ? 'Feet · Putter' : `Yards · ${club().name}`); const dm = $('#distMode'), mt = G.mode === 'full' || G.mode === 'putt' ? '' : MODES[G.mode].name; dm.hidden = !mt; app.classList.toggle('hasMode', !!mt); if (dm.textContent !== mt) dm.textContent = mt; }
-  $('#lieIcon').innerHTML = lieIcons[G.lie] || lieIcons.rough; try { setDialLie(G.lie); } catch (e) {}
-  $('#lieName').textContent = LIES[G.lie].name;
-  const pct = Math.round((LIES[G.lie].f || 1) * 100), lo = Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100); $('#liePct').textContent = lo < pct ? `${lo}–${pct}%` : pct + '%'; $('#liePct').classList.toggle('warn', pct < 100); $('#liePct').hidden = G.lie === 'green';
-  const putt = G.mode === 'putt'; $('#clubBadge').textContent = putt ? 'P' : club().id; $('#clubName').textContent = putt ? 'Putter' : club().name; $('#clubMode').textContent = MODES[G.mode].name;
+  setIH($('#lieIcon'), lieIcons[G.lie] || lieIcons.rough); try { setDialLie(G.lie); } catch (e) {}
+  setTx($('#lieName'), LIES[G.lie].name);
+  const pct = Math.round((LIES[G.lie].f || 1) * 100), lo = Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100), lp = $('#liePct'); setTx(lp, lo < pct ? `${lo}–${pct}%` : pct + '%'); lp.classList.toggle('warn', pct < 100); if (!HUD_FAST || lp.hidden !== (G.lie === 'green')) lp.hidden = G.lie === 'green';
+  const putt = G.mode === 'putt'; setTx($('#clubBadge'), putt ? 'P' : club().id); setTx($('#clubName'), putt ? 'Putter' : club().name); setTx($('#clubMode'), MODES[G.mode].name);
   app.classList.toggle('putting', putt); app.classList.toggle('onGreen', G.lie === 'green'); app.classList.toggle('shortgame', shortGame()); app.classList.toggle('nocurve', noCurve());
-  $('#holeTag').textContent = `Hole ${HOLE.n} · Par ${HOLE.par} · Shot ${G.stroke}`;
+  setTx($('#holeTag'), `Hole ${HOLE.n} · Par ${HOLE.par} · Shot ${G.stroke}`);
   if (G.mode === 'putt') { const dh = (groundHeight(PIN.u, PIN.v) - groundHeight(G.ball.u, G.ball.v)) * 36, ad = Math.abs(dh); // inches to the hole (putts play off a perfect lie)
-    $('#lieSlope').textContent = ad < 2 ? 'flat to the hole' : ad < 12 ? `${Math.round(ad)}" ${dh > 0 ? 'uphill' : 'downhill'} to hole` : `${(ad / 12).toFixed(1).replace(/\.0$/, '')} ft ${dh > 0 ? 'uphill' : 'downhill'} to hole`; }
+    setTx($('#lieSlope'), ad < 2 ? 'flat to the hole' : ad < 12 ? `${Math.round(ad)}" ${dh > 0 ? 'uphill' : 'downhill'} to hole` : `${(ad / 12).toFixed(1).replace(/\.0$/, '')} ft ${dh > 0 ? 'uphill' : 'downhill'} to hole`); }
   else { const ls = G.lie === 'tee' ? null : lieSlope(G.ball.u, G.ball.v, G.dir), parts = [];
     if (ls && Math.abs(ls.up) >= 1) parts.push(`${Math.round(Math.abs(ls.up))}° ${ls.up > 0 ? 'uphill' : 'downhill'}`);
     if (ls && Math.abs(ls.side) >= 1) { const above = G.lefty ? ls.side < 0 : ls.side > 0; parts.push(`${Math.round(Math.abs(ls.side))}° ${above ? 'above' : 'below'} feet`); }
-    $('#lieSlope').textContent = parts.join(' · '); }
+    setTx($('#lieSlope'), parts.join(' · ')); }
   fitLieSlope();
   setHand(false);
-  $('#windNum').innerHTML = `${Math.round(G.wind.mph)}<small>mph</small>`;
+  setIH($('#windNum'), `${Math.round(G.wind.mph)}<small>mph</small>`);
   updateShape();
 }
 let _shapeCache = '';
@@ -3547,7 +3603,7 @@ function launchPutt(sw) {
 /* ================= SHOT ================= */
 // does a point (yards, world height) touch this tree? Matches what's drawn: trunk, then a round canopy (or two stacked cones for pines)
 function treeHit(t, u, v, y) {
-  const d = Math.hypot(t.u - u, t.v - v); if (d > (t.rh || t.r * 1.6) + .3) return false;
+  const d = F3.hyp ? hyp2(t.u - u, t.v - v) : Math.hypot(t.u - u, t.v - v); /* (CADDIE_FAST3: the same number) */ if (d > (t.rh || t.r * 1.6) + .3) return false;
   const rel = y - (t.gy ?? (t.gy = groundHeight(t.u, t.v))), h = t.h;
   if (rel < 0) return false;
   if (t.lob) { if (rel < h * .86 && Math.hypot(u - (t.u + t.lx * rel), v - (t.v + t.lv * rel)) < .3 + BALL_R) return true; } /* a loblolly's long, leaning trunk */
@@ -4308,8 +4364,18 @@ function shotSpec0(cl, m, h, q, D, F) {
 function treesNear(pts) { /* CADDIE_FAST: firstTreeHit's own first filter (any tree within 7 of the flight's box); with none it returns null whatever the heights */
   let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const a of pts) { u0 = Math.min(u0, a.x); u1 = Math.max(u1, a.x); v0 = Math.min(v0, -a.z); v1 = Math.max(v1, -a.z); }
   return TREES.some(t => t.u > u0 - 7 && t.u < u1 + 7 && t.v > v0 - 7 && t.v < v1 + 7); }
+const _tGrid = new WeakMap(); /* CADDIE_FAST3: TREES -> its grid */
+function treeGrid() { /* CADDIE_FAST3: each tree in every 8-yd cell its segment-test box reaches (a little more), cells listing trees in TREES order */
+  const T = TREES; let g = _tGrid.get(T); if (g && g.n === T.length) return g; if (!T.length) return null;
+  const cs = 8, R = new Float64Array(T.length); let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+  for (let i = 0; i < T.length; i++) { const t = T[i], r = (t.rh || t.r * 1.6) + .3 + .02; R[i] = r; u0 = Math.min(u0, t.u - r); u1 = Math.max(u1, t.u + r); v0 = Math.min(v0, t.v - r); v1 = Math.max(v1, t.v + r); }
+  const nu = Math.floor((u1 - u0) / cs) + 1, nv = Math.floor((v1 - v0) / cs) + 1, L = Array.from({ length: nu * nv }, () => []);
+  for (let i = 0; i < T.length; i++) { const t = T[i], r = R[i], a0 = Math.max(0, Math.floor((t.u - r - u0) / cs)), a1 = Math.min(nu - 1, Math.floor((t.u + r - u0) / cs)), b0 = Math.max(0, Math.floor((t.v - r - v0) / cs)), b1 = Math.min(nv - 1, Math.floor((t.v + r - v0) / cs));
+    for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) L[b * nu + a].push(i); }
+  g = { n: T.length, cs, u0, v0, nu, nv, c: L.map(l => l.length ? Int32Array.from(l) : null), st: new Int32Array(T.length), sn: 0, q: [] }; _tGrid.set(T, g); return g; }
 function firstTreeHit(pts) {
   let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const a of pts) { u0 = Math.min(u0, a.x); u1 = Math.max(u1, a.x); v0 = Math.min(v0, -a.z); v1 = Math.max(v1, -a.z); }
+  if (F3.grid) return firstTreeHit3(pts, u0, u1, v0, v1);
   const near = TREES.filter(t => t.u > u0 - 7 - (t.rh || 0) && t.u < u1 + 7 + (t.rh || 0) && t.v > v0 - 7 - (t.rh || 0) && t.v < v1 + 7 + (t.rh || 0)); if (!near.length) return null;
   const p0 = pts[0], seg = firstTreeHit.seg || (firstTreeHit.seg = []);
   const gr = TREE_UNSTICK && G.treeGrace && Math.abs(G.treeGrace.u - p0.x) < .05 && Math.abs(G.treeGrace.v + p0.z) < .05 ? G.treeGrace.trees : null; /* TREE_UNSTICK: boxed in under a tree, it lets you out (until the ball is past its crown) */
@@ -4323,6 +4389,24 @@ function firstTreeHit(pts) {
       for (let q = 0; q < m; q++) { const t = seg[q]; if (gr && gr.includes(t) && Math.hypot(x - p0.x, z - p0.z) < treeExt(t) + 1) continue; if (Math.abs(t.u - u) < (t.rh || t.r * 1.6) + .3 && Math.abs(t.v - v) < (t.rh || t.r * 1.6) + .3 && treeHit(t, u, v, y)) return { i, t: a.t + (b.t - a.t) * k, x, y, z, tree: t }; } } }
   return null;
 }
+function firstTreeHit3(pts, u0, u1, v0, v1) { /* CADDIE_FAST3: firstTreeHit with each segment's candidates from the tree grid: the same trees (the near box and the segment box, tested as before), in TREES order, so the same first hit */
+  const g = treeGrid(); if (!g) return null; const T = TREES, cs = g.cs, gu = g.u0, gv = g.v0, nu = g.nu, nv = g.nv, C = g.c, st = g.st, q = g.q;
+  const p0 = pts[0], seg = firstTreeHit.seg || (firstTreeHit.seg = []);
+  const gr = TREE_UNSTICK && G.treeGrace && Math.abs(G.treeGrace.u - p0.x) < .05 && Math.abs(G.treeGrace.v + p0.z) < .05 ? G.treeGrace.trees : null;
+  for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i];
+    const su0 = Math.min(a.x, b.x), su1 = Math.max(a.x, b.x), sv0 = Math.min(-a.z, -b.z), sv1 = Math.max(-a.z, -b.z); let m = 0;
+    const ca0 = Math.max(0, Math.floor((su0 - gu) / cs)), ca1 = Math.min(nu - 1, Math.floor((su1 - gu) / cs)), cb0 = Math.max(0, Math.floor((sv0 - gv) / cs)), cb1 = Math.min(nv - 1, Math.floor((sv1 - gv) / cs)); if (ca0 > ca1 || cb0 > cb1) continue;
+    let L = null; if (ca0 === ca1 && cb0 === cb1) L = C[cb0 * nu + ca0]; else { const sn = ++g.sn; q.length = 0; for (let ca = ca0; ca <= ca1; ca++) for (let cb = cb0; cb <= cb1; cb++) { const l = C[cb * nu + ca]; if (l) for (let k = 0; k < l.length; k++) if (st[l[k]] !== sn) { st[l[k]] = sn; q.push(l[k]); } } if (q.length > 1) q.sort((x, y) => x - y); L = q; } /* (several cells: merged back into TREES order) */
+    if (!L) continue;
+    for (let k = 0; k < L.length; k++) { const t = T[L[k]], rh = t.rh || 0; if (!(t.u > u0 - 7 - rh && t.u < u1 + 7 + rh && t.v > v0 - 7 - rh && t.v < v1 + 7 + rh)) continue; /* firstTreeHit's near box */
+      const R = (t.rh || t.r * 1.6) + .3 + 1e-6; if (t.u > su0 - R && t.u < su1 + R && t.v > sv0 - R && t.v < sv1 + R) seg[m++] = t; }
+    if (!m) continue;
+    const n = Math.max(1, Math.ceil(hyp3(b.x - a.x, b.y - a.y, b.z - a.z) / .3));
+    for (let j = 1; j <= n; j++) { const k = j / n, x = a.x + (b.x - a.x) * k, z = a.z + (b.z - a.z) * k; if (hyp2(x - p0.x, z - p0.z) < 1.5) continue;
+      const y = a.y + (b.y - a.y) * k, u = x, v = -z;
+      for (let qq = 0; qq < m; qq++) { const t = seg[qq]; if (gr && gr.includes(t) && hyp2(x - p0.x, z - p0.z) < treeExt(t) + 1) continue; if (Math.abs(t.u - u) < (t.rh || t.r * 1.6) + .3 && Math.abs(t.v - v) < (t.rh || t.r * 1.6) + .3 && treeHit(t, u, v, y)) return { i, t: a.t + (b.t - a.t) * k, x, y, z, tree: t }; } } }
+  return null;
+}
 // shots LOOK higher than they physically fly: every height above the ground under the ball is stretched by SHOT_LIFT for the
 // on-screen flight, the aim tracer and the tree test (so what you see is what hits a tree). Carry, roll, apex stats are unchanged.
 const SHOT_LIFT = 1.35;
@@ -4334,14 +4418,16 @@ const SHOT_LIFT = 1.35;
 const TRACER_NOFOLD = true;
 function liftPts(pts) {
   if (TRACER_NOFOLD && pts.length > 1) { const a = pts[0], b = pts[pts.length - 1], ga = groundHW(a.x, a.z), gb = groundHW(b.x, b.z), dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz;
-    for (const p of pts) { const g = groundHW(p.x, p.z); if (!(p.y > g)) continue; const k = L2 > 1e-6 ? clamp(((p.x - a.x) * dx + (p.z - a.z) * dz) / L2, 0, 1) : 0, r = Math.min(ga + (gb - ga) * k, p.y); p.y = r + (p.y - r) * SHOT_LIFT; }
+    const top = F3.memo ? PHYS.groundTop() : Infinity; /* CADDIE_FAST3: no ground on the hole is that high (fly() leans on the same bound): a point above it is above the ground, without looking */
+    for (const p of pts) { if (!(p.y > top)) { const g = groundHW(p.x, p.z); if (!(p.y > g)) continue; } const k = L2 > 1e-6 ? clamp(((p.x - a.x) * dx + (p.z - a.z) * dz) / L2, 0, 1) : 0, r = Math.min(ga + (gb - ga) * k, p.y); p.y = r + (p.y - r) * SHOT_LIFT; }
     return pts; }
   for (const p of pts) { const g = groundHW(p.x, p.z); if (p.y > g) p.y = g + (p.y - g) * SHOT_LIFT; } return pts; }
 let PLAN_TREE = null; /* the tree the aimed shot will hit: it must stay drawn, even if it stands between the camera and the ball */
 function perfectFlight(pl, wind = null) { /* TRACER_TREE: the flight launch() fires for a perfect, calm strike of this plan (pin-high power, perfect tempo, no curve, no wind, a clean lie), lifted like the shown one */
   const cl = club(); let carry = G.D; if (G.mode === 'chip') carry *= pl.cf || .45; if (G.mode === 'sand' && SAND_TOTAL) carry *= pl.cf || 1;
-  let sp = pl.pfSp && pl.pfC === carry ? pl.pfSp : PHYS.speedFromTable(tableCache.tbl, carry); if (sp !== pl.pfSp) { const f0 = PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launch, spin: pl.spin, tilt: pl.tilt, speed: sp }, pl.gP || groundHW, 1 / 120), L0 = f0.pts[f0.pts.length - 1], c0 = Math.hypot(L0.x - pl.p.x, L0.z - pl.p.z); if (c0 > 1) sp *= Math.pow(carry / c0, .85); pl.pfSp = sp; pl.pfC = carry; pl.pfWs = windScale(f0, pl.p); } /* pfWs (WIND_SHAPE): the same calm flight launch() scales its wind by */ /* (the secant once per plan) */
-  const fl = PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launchL, spin: shotSpec(cl, G.mode, G.height, 1, G.D, G.Feff).spin * (pl.spinMul || 1), tilt: pl.tiltL, speed: sp * (pl.speedMul || 1), ...(wind ? { wind: { x: wind.x * (pl.pfWs ?? 1), z: wind.z * (pl.pfWs ?? 1) } } : {}) }, groundHW); liftPts(fl.pts); return fl; } /* wind: CADDIE_CARRY's fit only (the line stays calm air) */
+  let sp = pl.pfSp && pl.pfC === carry ? pl.pfSp : PHYS.speedFromTable(tableCache.tbl, carry); if (sp !== pl.pfSp) { const f0 = PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launch, spin: pl.spin, tilt: pl.tilt, speed: sp }, pl.gP || groundHW, 1 / 120), L0 = f0.pts[f0.pts.length - 1], c0 = Math.hypot(L0.x - pl.p.x, L0.z - pl.p.z); if (c0 > 1) sp *= Math.pow(carry / c0, .85); pl.pfSp = sp; pl.pfC = carry; pl.pfWs = windScale(f0, pl.p); pl.pfTb = tableCache.tbl; } /* pfWs (WIND_SHAPE): the same calm flight launch() scales its wind by */ /* (the secant once per plan) */
+  const spin = shotSpec(cl, G.mode, G.height, 1, G.D, G.Feff).spin * (pl.spinMul || 1), wk = F3.memo && wind ? [wind.x, wind.z, spin, sp, pl.pfWs].join('|') : null; if (wk && pl.wm && pl.wm.k === wk) return pl.wm.fl; /* CADDIE_FAST3: this plan's wind flight again (every input in the key) */
+  const fl = PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launchL, spin, tilt: pl.tiltL, speed: sp * (pl.speedMul || 1), ...(wind ? { wind: { x: wind.x * (pl.pfWs ?? 1), z: wind.z * (pl.pfWs ?? 1) } } : {}) }, groundHW); liftPts(fl.pts); if (wk) pl.wm = { k: wk, fl }; return fl; } /* wind: CADDIE_CARRY's fit only (the line stays calm air) */
 function planTree(pts) { const h = planTree.h = firstTreeHit(pts); PLAN_TREE = h ? h.tree : null; return h ? { t: h.t / (pts[pts.length - 1].t || 1) } : null; }
 function elevMorph(pts, p, h0) { /* the level plan ends at the ball's height: over the last three quarters of the way, ease it onto the ground at its end (the aim point), so the tracer still drops into the bullseye */
   const E = pts[pts.length - 1], dx = E.x - p.x, dz = E.z - p.z, L2 = dx * dx + dz * dz, dh = groundHW(E.x, E.z) - h0; if (L2 < 1 || Math.abs(dh) < 1e-3) return pts;
@@ -4365,7 +4451,7 @@ window.__SIDE = { tilt: sideTilt, spec: q => shotSpec(club(), G.mode, G.height, 
 function planShot(warm) { /* warm (CADDIE_SLICE): only make sure this plan's carry table is built, so a sliced setup can pause between the table and the flights */
   const cl = club(), h = G.height, tilt = totalCurve() * TILT_PER_CURVE;
   const key = [G.mode, G.club, G.lie, G.ball.u.toFixed(2), G.ball.v.toFixed(2), G.D.toFixed(2), G.dir.u.toFixed(4), G.dir.v.toFixed(4), tilt.toFixed(2), h.toFixed(3)].join('|');
-  if (key === planCache.key) return planCache;
+  if (key === planCache.key) { if (planCache.lz && !PL_LAZY) plForce(planCache, true); return planCache; } /* (CADDIE_FAST3: outside a caddie run every plan handed out is complete) */
   const { spin, launch } = shotSpec(cl, G.mode, h, .8, G.D, G.Feff);
   if (CADDIE_FAST2) { const c = F2.ctx; if (!tableCache.key || !c || c[0] !== TREES || c[1] !== AUGD || c[2] !== HOLE || c[3] !== PIN.u || c[4] !== PIN.v || c[5] !== G.treeGrace || c[6] !== G.who || c[7] !== GREEN) { F2.tab.clear(); F2.plan.clear(); F2.ctx = [TREES, AUGD, HOLE, PIN.u, PIN.v, G.treeGrace, G.who, GREEN]; } } /* CADDIE_FAST2: a new hole, pin, tree grace or golfer (or a reset table, as MP does) starts the caches afresh */
   const p = { x: G.ball.u, y: (ball.userData.restY ?? ball.position.y) - BALL_R, z: -G.ball.v }, yaw = Math.atan2(G.dir.u, G.dir.v);
@@ -4373,9 +4459,9 @@ function planShot(warm) { /* warm (CADDIE_SLICE): only make sure this plan's car
   const flatH = elevPlan() ? groundHW(p.x, p.z) : null, gP = flatH == null ? groundHW : () => flatH; /* ELEV_PLAYER: full swings are planned (table, steering, launch's secant) on a level plane at the ball's height */
   const tkey = [G.mode, G.club, G.lie, h.toFixed(2), Math.round(tilt / 5), Math.round(G.ball.u / 15), Math.round(G.ball.v / 15)].join('|');
   if (tableCache.key !== tkey) { const k2 = CADDIE_FAST2 ? [tkey, launch, spin, flatH == null ? [p.x, p.y, p.z, yaw].join(',') : ''].join('|') : null, hit = k2 && F2.tab.get(k2); /* CADDIE_FAST2: a table built from these same inputs (on a level plane the spot and the line don't matter) */
-    if (hit) { tableCache = hit; F2.put(F2.tab, k2, hit, 24); } else { tableCache = { key: tkey, tbl: PHYS.carryTable({ p, yaw, launch, spin, tilt: Math.round(tilt / 5) * 5 }, gP), mp: { dir: { ...G.dir }, D: G.D, Feff: G.Feff, h }, id: ++F2.n }; if (k2) F2.put(F2.tab, k2, tableCache, 24); } } /* mp: MP hook (the state it was built from) */
+    if (hit) { tableCache = hit; F2.put(F2.tab, k2, hit, 24); } else { tableCache = { key: tkey, tbl: (F3.table ? PHYS.carryTableL : PHYS.carryTable)({ p, yaw, launch, spin, tilt: Math.round(tilt / 5) * 5 }, gP), /* (CADDIE_FAST3: rows on demand) */ mp: { dir: { ...G.dir }, D: G.D, Feff: G.Feff, h }, id: ++F2.n }; if (k2) F2.put(F2.tab, k2, tableCache, 24); } } /* mp: MP hook (the state it was built from) */
   if (warm) return null;
-  const pk = CADDIE_FAST2 ? key + '|' + G.Feff + '|' + tableCache.id : null, ph = pk && F2.plan.get(pk); if (ph) { planCache = ph; PLAN_TREE = ph.ptree; F2.put(F2.plan, pk, ph, 48); return ph; } /* CADDIE_FAST2: this plan again */
+  const pk = CADDIE_FAST2 ? key + '|' + G.Feff + '|' + tableCache.id : null, ph = pk && F2.plan.get(pk); if (ph) { planCache = ph; if (ph.lz && PL_LAZY) PT_PL = ph; else { PLAN_TREE = ph.ptree; if (F3.lazy) PT_PL = null; } F2.put(F2.plan, pk, ph, 48); return ph; } /* (CADDIE_FAST3: in a caddie run its tree is set when the run ends) */ /* CADDIE_FAST2: this plan again */
   // chip: the meter sets TOTAL distance. Find the carry whose roll-out finishes on the target (3 quick passes)
   let cf = 1;
   if (G.mode === 'sand' && SAND_TOTAL) { let ct = G.D * .8; /* bunker shots too (Neil, 13 Nov: 12's front and back bunkers played ping-pong): the meter sets where it finishes, the splash carries short and releases to it */
@@ -4405,8 +4491,13 @@ function planShot(warm) { /* warm (CADDIE_SLICE): only make sure this plan's car
   { const tgt = G.D * cf; // up to 3 quick passes: steer the launch so the landing sits on the target (curve, slope, stance)
     for (let k = 0; k < 3; k++) { const E = f.pts[f.pts.length - 1], ex = E.x - p.x, ez = E.z - p.z, fw = ex * fx + ez * fz, la = ex * -fz + ez * fx, dd = Math.hypot(ex, ez);
       if (Math.abs(la) < .06 && Math.abs(dd - tgt) < .12) break;
-      yawc2 += -Math.atan2(la, fw); if (dd > 1) sm *= clamp(tgt / dd, .9, 1.1);
+      yawc2 += -Math.atan2(la, fw); if (dd > 1) sm *= clamp(tgt / dd, .9, 1.1); /* (dd: Math.hypot) */
       f = PHYS.fly(fo = { p, yaw: yaw + yawc2, launch: launchL, spin: spin * spinMul, tilt: tiltL, speed: speed * sm }, gP, 1 / 120); } }
+  if (F3.lazy) { /* CADDIE_FAST3: the rest (the tracer's lift, the calm perfect strike past its launch-speed fit, the tree test) waits until something reads it: a wind fit's in-between plans never do. The plan keeps what those sums read (the club, shot, power, lie, curve, ball, tree grace, table) and they're done with exactly that */
+    const pc = Object.create(PL_PROTO); Object.assign(pc, { key, skey, speed, yawc: yawc2, cf, spin, launch, tilt, p, yaw, lie, launchL, tiltL, spinMul, speedMul: sm, gP }); pc.lz = { f, fo, flatH, s: PL_SN.map(k => G[k]), tc: tableCache };
+    if (TRACER_TREE && G.mode !== 'putt') pfSecant(pc); /* (perfectFlight's launch-speed fit, as it would be done now: later calls, wind fits included, start from it) */
+    planCache = pc; if (CADDIE_FAST2) { pc.tab = tableCache; F2.put(F2.plan, pk, pc, 48); }
+    if (PL_LAZY) PT_PL = pc; else { plForce(pc, false); PT_PL = null; } return pc; }
   let fR = null; if (gP !== groundHW) { if (!TRACER_TREE || TRACER_ELEV === 'real') { fR = PHYS.fly(fo, groundHW, 1 / 120); liftPts(fR.pts); } elevMorph(f.pts, p, flatH); } /* TRACER_TREE: the real-ground flight is only drawn in 'real' mode; the tree test flies the perfect strike below */ /* ELEV_PLAYER: the same swing over the real ground (it lands short uphill, long downhill) is what the tree test sees; the tracer is the level plan bent down/up onto the target, so it gives nothing away */
   liftPts(f.pts); let track = f.pts; // the aim tracer shows the same lifted arc the ball will fly
   const bendRef = fR && TRACER_ELEV === 'real' ? { x: f.pts[f.pts.length - 1].x, z: f.pts[f.pts.length - 1].z } : null; if (bendRef) track = fR.pts; /* 'real': draw the real flight, nudged by the level plan's own miss so it isn't pulled onto the bullseye */
@@ -4417,6 +4508,29 @@ function planShot(warm) { /* warm (CADDIE_SLICE): only make sure this plan's car
   if (CADDIE_FAST2) { planCache.ptree = PLAN_TREE; if (planCache.pf) planCache.pfHit = planTree.h; planCache.tab = tableCache; F2.put(F2.plan, pk, planCache, 48); } /* (its tree, its perfect strike's tree hit, its table) */
   return planCache;
 }
+/* CADDIE_FAST3 (lazy plans): a plan's deferred part, done the first time anything reads f, track, bendRef, tree, pf, pfHit or ptree */
+function pfSecant(pl) { /* perfectFlight's first part, unchanged: the speed that carries the meter yardage (one calm flight), kept on the plan */
+  let carry = G.D; if (G.mode === 'chip') carry *= pl.cf || .45; if (G.mode === 'sand' && SAND_TOTAL) carry *= pl.cf || 1;
+  let sp = pl.pfSp && pl.pfC === carry ? pl.pfSp : PHYS.speedFromTable(tableCache.tbl, carry); if (sp !== pl.pfSp) { const f0 = PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launch, spin: pl.spin, tilt: pl.tilt, speed: sp }, pl.gP || groundHW, 1 / 120), L0 = f0.pts[f0.pts.length - 1], c0 = Math.hypot(L0.x - pl.p.x, L0.z - pl.p.z); if (c0 > 1) sp *= Math.pow(carry / c0, .85); pl.pfSp = sp; pl.pfC = carry; pl.pfWs = windScale(f0, pl.p); pl.pfTb = tableCache.tbl; } }
+function plForce(pc, quiet, all = true) { /* quiet: PLAN_TREE (and planTree.h) stay as they were (only a plan planShot hands out sets them); all: false = only the tracer's part (f, track, bendRef: what the tree escape's look reads) */
+  const z = pc.lz; if (!z || (z.st1 && !all)) return; if (all) pc.lz = null;
+  const def = K => { for (const k of K) Object.defineProperty(pc, k, { value: k === 'tree' ? null : undefined, writable: true, enumerable: true, configurable: true }); };
+  const s = z.s, cur = PL_SN.map(k => G[k]), tc = tableCache; let sw = tc !== z.tc; for (let i = 0; i < s.length && !sw; i++) if (!Object.is(cur[i], s[i])) sw = true;
+  if (sw) { PL_SN.forEach((k, i) => { G[k] = s[i]; }); tableCache = z.tc; } /* (read later: the inputs it was planned with, put back after) */
+  const keepT = PLAN_TREE, keepH = planTree.h;
+  try { const f = z.f, p = pc.p;
+    if (!z.st1) { def(PL_K1); let fR = null; if (pc.gP !== groundHW) { if (!TRACER_TREE || TRACER_ELEV === 'real') { fR = PHYS.fly(z.fo, groundHW, 1 / 120); liftPts(fR.pts); } elevMorph(f.pts, p, z.flatH); }
+      liftPts(f.pts); let track = f.pts;
+      const bendRef = fR && TRACER_ELEV === 'real' ? { x: f.pts[f.pts.length - 1].x, z: f.pts[f.pts.length - 1].z } : null; if (bendRef) track = fR.pts;
+      if (G.mode === 'chip') { const gd = PHYS.ground(f, lieAt, groundHW, gradUV), T0 = f.pts[f.pts.length - 1].t; track = f.pts.concat(gd.pts.map(q => ({ t: T0 + q.t, x: q.x, y: q.y, z: q.z }))); }
+      pc.f = f; pc.track = track; pc.bendRef = bendRef; z.fR = fR; z.st1 = true; }
+    if (!all) return; def(PL_K2); const fR = z.fR;
+    if (TRACER_TREE && G.mode !== 'putt') pc.pf = perfectFlight(pc);
+    pc.tree = planTree(pc.pf ? pc.pf.pts : fR ? fR.pts : f.pts);
+    if (CADDIE_FAST2) { pc.ptree = PLAN_TREE; if (pc.pf) pc.pfHit = planTree.h; } }
+  finally { if (sw) { PL_SN.forEach((k, i) => { G[k] = cur[i]; }); tableCache = tc; } if (quiet) { PLAN_TREE = keepT; planTree.h = keepH; } } }
+function plSettle() { if (PT_PL) { const pl = PT_PL; PT_PL = null; PLAN_TREE = pl.ptree; } } /* a caddie run ends: PLAN_TREE as the eager planShot left it */
+function plRun(fn) { PL_LAZY++; try { return fn(); } finally { if (--PL_LAZY === 0) plSettle(); } } /* run caddie work with lazy plans */
 
 /* ================= GREEN READING: contour grid + slope streaks that flow downhill ================= */
 let READ_ZS = 1; const _gc = new THREE.Vector3(), RC0 = new THREE.Color(0xffffff), RC1 = new THREE.Color(0xffe066), RC2 = new THREE.Color(0xff8a3d), _rc = new THREE.Color();
@@ -5366,7 +5480,7 @@ const HOLESYS = (() => {
     HS = newHS(); holeMap(); GREENTEX = BUILD_CHUNK3 ? yield* greenTexG(true) : greenTex(); yield;
     yield* courseSteps(); yield;
     buildOuter(); yield; buildTrees(); yield; buildBushes(); yield; buildBridges(); buildLake(); buildFountain(); yield; if (BUILD_CHUNK2) yield* buildSceneryG(); else buildScenery(); yield; CUPMESH = buildCup(); yield;
-    HS.read = yield* READ.make(); yield; HS.mini = BUILD_CHUNK3 ? yield* MINI.makeG(4) : MINI.make(); AUGCAM = makeAugCam(); homePath = makeHomePath();
+    HS.read = yield* READ.make(); yield; HS.mini = BUILD_CHUNK3 ? yield* MINI.makeG(4) : MINI.make(); AUGCAM = makeAugCam(); homePath = makeHomePath(); if (F3.warm) { yield; yield* caddieWarmG(); } /* CADDIE_FAST3: the caddie's tables for this hole */
     if (fresh) yield* upload(); }
   function* upload() { /* a prebuilt hole onto the GPU before it's shown: textures one at a time, then programs, then buffers (one 1-px draw) */
     const T = new Set(), add = t => { if (t && t.isTexture && !SHARED.has(t)) T.add(t); };
@@ -6710,5 +6824,5 @@ if (MULTI) try { MPX = (() => {
   window.__MP = { S, K, join, leave, send, autoHit, hit, skipFlight, card: R => CARD.show(R), pars: id => { const C = COURSE_DEF[id]; return (C.list || (C.list = C.holes())).map(h => h.par); }, /* test hooks: render the group card from a room state; a course's pars */ get room() { return S.room; }, can: CAN, kick: () => ({ shown: KICK.shown }), link: () => LOBBY.link(), pinSeed: () => S.room ? pinSeed() : null, stats: () => ({ ...S.stats, lastMiss: S.lastMiss }) };
   return { frame, pre: () => CHAT.pre(), get on() { return S.inRound; }, parText() { if (!S.inRound || !S.room) return null; const p = pl(S.turn) || me(); return p ? toPar(p) : null; } }; /* the HUD score box shows whoever's golfer is up there */
 })(); } catch (e) { console.error('[MP] init failed', e); MPX = null; }
-window.__CW = { sliceRun(u, v, l) { caddieCancel(); HUD_HOLD++; WSNAP = { ...G.wind }; const g = setupShotG(u, v, l), st = []; let t = performance.now(); try { while (!g.next().done) { const t2 = performance.now(); st.push(t2 - t); t = t2; } st.push(performance.now() - t); } finally { WSNAP = null; HUD_HOLD--; updateHUD(); } return st; }, pickClub: () => pickClub(), setClub: i => setClub(i), get cErr() { return caddieCarry.err; }, get pcTr() { return punchClubG.tr; }, plCarry, plWind, PL, autoMode: () => autoMode(), get pcErr() { return punchClubG.err; }, flags: () => ({ CLUB_WIND, PUNCH_CLUB }) }; /* CLUB_WIND / PUNCH_CLUB test hook */ window.__G = G; window.__SND = SND; window.__SNDT = { launch: sw => launch(sw), fly: dt => updateFlight(dt), setupShot: (u, v, l) => setupShot(u, v, l), setMode: m => setMode(m), pStar: () => pStar(), get TEMPO() { return TEMPO; }, get menu() { return MENU.on; }, get boot() { return BOOT.on; } }; /* test hooks for the sound agent: strike and step a flight without the renderer */ window.__TR = { get wet() { return TT.wet; }, get red() { return TT.red; }, dirty: () => { tracerDirty = true; } }; window.__BOARD = BOARD; window.__AV = () => AV; window.__cup = { get PIN() { return PIN; }, cupStep }; window.__RECT = RECT; window.__OV = OV; window.__R = { renderer, camera, flag }; window.__DROP = DROP; window.__ph = { PHYS, lieAt, groundHW, gradUV, planShot: () => planShot() }; Object.defineProperty(window, '__trees', { get: () => TREES, configurable: true }); window.__HOLESYS = HOLESYS; window.__PINS = PINS; window.__mem = () => Object.assign({}, renderer.info.memory); window.__hole = () => ({ CID, HOLE_N, n: HOLE.n, par: HOLE.par, yds: HOLE.yds, hcp: HOLE.hcp, PIN: { ...PIN }, round: ROUND.holes.slice(), wind: { ...G.wind }, nTrees: TREES.length, nBunk: BUNKERS.length, aug: !!AUGD, menu: MENU.on, course: MENU.course, hash: location.hash }); window.__treeHit = treeHit; window.__confetti = () => CONFETTI.burst(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v); window.__trEnd = () => ({ e: trPts[TR.segs].toArray().map(x => +x.toFixed(2)), s: shPts[TR.segs].toArray().map(x => +x.toFixed(2)), t: targetUV(), r: rings.position.toArray().map(x => +x.toFixed(2)), track: !!planShot().track }); window.__blk = _blk; window.__PT = () => TREES.indexOf(PLAN_TREE); window.__cart = { cartGap, cartDrop }; window.__putt = { rollPutt, puttSpeed, puttPace, PACE, COLLAR, PUTT, canPutt, autoMode, greenGap, modesHere }; window.__SW = SW; window.__setup = (u, v) => { setupShot(u, v); startCamTween(.01); }; window.__shot = { launch: sw => launch(sw), tempo: () => TEMPO, pStar: () => pStar(), plan: () => planShot(), fth: pts => firstTreeHit(pts), autoPunch: () => autoPunchDrag(), fwyMiss: at => fwyMiss(at), shortWarn: () => G.shortWarn, preLine: () => preShotLine(), caddieEnd: () => caddieEnd() };
+window.__CW = { sliceRun(u, v, l) { caddieCancel(); HUD_HOLD++; if (F3.lazy) PL_LAZY++; WSNAP = { ...G.wind }; const g = setupShotG(u, v, l), st = []; let t = performance.now(); try { while (!g.next().done) { const t2 = performance.now(); st.push(t2 - t); t = t2; } st.push(performance.now() - t); } finally { WSNAP = null; HUD_HOLD--; const t3 = performance.now(); cjLazyEnd(); updateHUD(); __CW.hudMs = performance.now() - t3; } return st; }, pickClub: () => pickClub(), setClub: i => setClub(i), get cErr() { return caddieCarry.err; }, get pcTr() { return punchClubG.tr; }, plCarry, plWind, PL, autoMode: () => autoMode(), get pcErr() { return punchClubG.err; }, flags: () => ({ CLUB_WIND, PUNCH_CLUB }) }; /* CLUB_WIND / PUNCH_CLUB test hook */ window.__G = G; window.__SND = SND; window.__SNDT = { launch: sw => launch(sw), fly: dt => updateFlight(dt), setupShot: (u, v, l) => setupShot(u, v, l), setMode: m => setMode(m), pStar: () => pStar(), get TEMPO() { return TEMPO; }, get menu() { return MENU.on; }, get boot() { return BOOT.on; } }; /* test hooks for the sound agent: strike and step a flight without the renderer */ window.__TR = { get wet() { return TT.wet; }, get red() { return TT.red; }, dirty: () => { tracerDirty = true; } }; window.__BOARD = BOARD; window.__AV = () => AV; window.__cup = { get PIN() { return PIN; }, cupStep }; window.__RECT = RECT; window.__OV = OV; window.__R = { renderer, camera, flag }; window.__DROP = DROP; window.__ph = { PHYS, lieAt, groundHW, gradUV, planShot: () => planShot() }; Object.defineProperty(window, '__trees', { get: () => TREES, configurable: true }); window.__HOLESYS = HOLESYS; window.__PINS = PINS; window.__mem = () => Object.assign({}, renderer.info.memory); window.__hole = () => ({ CID, HOLE_N, n: HOLE.n, par: HOLE.par, yds: HOLE.yds, hcp: HOLE.hcp, PIN: { ...PIN }, round: ROUND.holes.slice(), wind: { ...G.wind }, nTrees: TREES.length, nBunk: BUNKERS.length, aug: !!AUGD, menu: MENU.on, course: MENU.course, hash: location.hash }); window.__treeHit = treeHit; window.__confetti = () => CONFETTI.burst(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v); window.__trEnd = () => ({ e: trPts[TR.segs].toArray().map(x => +x.toFixed(2)), s: shPts[TR.segs].toArray().map(x => +x.toFixed(2)), t: targetUV(), r: rings.position.toArray().map(x => +x.toFixed(2)), track: !!planShot().track }); window.__blk = _blk; window.__PT = () => TREES.indexOf(PLAN_TREE); window.__cart = { cartGap, cartDrop }; window.__putt = { rollPutt, puttSpeed, puttPace, PACE, COLLAR, PUTT, canPutt, autoMode, greenGap, modesHere }; window.__SW = SW; window.__setup = (u, v) => { setupShot(u, v); startCamTween(.01); }; window.__shot = { launch: sw => launch(sw), tempo: () => TEMPO, pStar: () => pStar(), plan: () => planShot(), fth: pts => firstTreeHit(pts), autoPunch: () => autoPunchDrag(), fwyMiss: at => fwyMiss(at), shortWarn: () => G.shortWarn, preLine: () => preShotLine(), caddieEnd: () => caddieEnd() };
 })();
