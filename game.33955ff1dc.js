@@ -12,6 +12,15 @@ const hyp3 = (a, b, c) => { a = Math.abs(a); b = Math.abs(b); c = Math.abs(c); l
 /* CADDIE_FAST3 (lazy plans, see plForce) */ let PL_LAZY = 0, PT_PL = null; /* PL_LAZY: inside a caddie run; PT_PL: the plan whose tree PLAN_TREE would hold now (set as the run ends) */ const PL_SN = ['club', 'mode', 'D', 'height', 'Feff', 'lie', 'curve', 'spinX', 'lefty', 'ball', 'treeGrace']; /* everything in G the deferred sums read */ const PL_K1 = ['f', 'track', 'bendRef'], PL_K2 = ['tree', 'pf', 'pfHit', 'ptree']; /* (the tracer's part; the perfect strike and tree part) */ const PL_PROTO = {}; for (const k of PL_K1.concat(PL_K2)) { const all = PL_K2.includes(k); Object.defineProperty(PL_PROTO, k, { get() { plForce(this, true, all); return Object.prototype.hasOwnProperty.call(this, k) ? this[k] : undefined; }, configurable: true }); }
 const F2 = { tab: new Map(), plan: new Map(), n: 0, ctx: null, put(M, k, v, max) { M.delete(k); M.set(k, v); if (M.size > max) M.delete(M.keys().next().value); } }; /* CADDIE_FAST2: recent-use caches (a Map keeps insertion order: the oldest goes first) */
 const _pIdx = new WeakMap(); /* CADDIE_FAST: big outline -> its edges bucketed by height (built once it's been asked a few times) */
+const STRIKE_FAST = true; /* ROLLBACK: false -> as v414. perf5 (Neil 17 Nov 13:52: "re-run our perf agent playing the most expensive holes to try to find savings"): the moment of the strike froze the game for ~200 ms at 4x CPU in real play. Most of launch()'s own time was the page's layout, forced again and again: (1) the yardage label's new text ("Yards · 2,450 rpm", new every shot, so never in HUD_FAST's cache) was fitted at once, a forced layout per size it tried, right after the strike had restyled the whole HUD; now its text is set at once and it is fitted in the next frame, before anything is drawn (the same size, the same picture: nothing is painted in between); (2) the PERFECT / tempo stickers and the caddie's speech bubble restart their CSS animation with a forced LAYOUT (void el.offsetWidth); a style flush is all a restart needs, so they read a computed style instead (the same restart). (3) the number formatting's one-time set-up (57 ms at 4x) moves from the first strike to the page load. Same pixels, same flight. */
+const restyle = el => { if (STRIKE_FAST) void getComputedStyle(el).animationName; else void el.offsetWidth; }; /* STRIKE_FAST: restart a CSS animation (class off, flush, class on) with a style flush, not a layout */
+let DL_LATER = false; /* STRIKE_FAST: the yardage label's text is new and its fit waits for the frame */
+if (STRIKE_FAST) try { (0).toLocaleString(); } catch (e) {} /* STRIKE_FAST: the browser's number formatting (ICU) is set up on its first use: that was the first strike's "2,450 rpm" (57 ms at 4x, in the strike's own frame). Now it is set up here, while the page loads behind the splash */
+const HUD_FAST3 = true; /* ROLLBACK: false -> as v414. perf5: the HUD refresh that ends each caddie set-up (caddieDone) took 33-36 ms at 4x CPU in real play, one frame (perf4's HUD_FAST2 measured ~2.6 ms in its harness, where no frame had dirtied the page and the labels repeated: in play the result card, the bottom strip's slide and the new lie text have restyled the page, and the yardage label and the lie card's slope note (new text and new card widths each shot) miss HUD_FAST's fit cache, so each fit step forced a fresh layout of the whole page). Now that refresh writes everything and the two fits wait for the frame's end (STRIKE_FAST's dlLater): one layout for both, before the frame is painted, so the same sizes are on screen. Anything that reads the HUD's size first (measure, sizeTrTop) fits them first. */
+let LS_LATER = false, HUD_LATER = false; /* HUD_FAST3: the slope note's fit waits for the frame; a refresh in progress asks for that */
+const CARD_FAST = true; /* ROLLBACK: false -> as v414. perf5: the frame the ball stops in (finishShot) builds and lays out the shot card, and also ran the next set-up's first 6 ms caddie slice (often 12-16 ms at 4x: one step overruns), one 80-107 ms frame in real play. Now that first slice only does what must happen at once (the ball's new spot and lie, which multiplayer reports straight away: up to the caddie's first pause); its 6 ms slices start with the next frame. The same set-up, one frame later. */
+const PRE_WAIT = true; /* ROLLBACK: false -> as v414. perf5: the caddie's pre-shot line ("Driver brings trouble in...") is said from a timer (0.9 s after Play on, 0.35 s after the fly-over or its Skip); preShotLine() reads the final pick, so when the sliced set-up was still running it finished it there and then (caddieSync): one 40-50 ms frame at 4x in real play (Skip the fly-over and the tee's TEE_FINISH check is often still going). Now that line waits for the set-up to finish and is said as it does (the same line; a few frames later only when the caddie wasn't done). A new set-up drops a waiting line, as it hushes a shown one (PRE_LINE_LIVE). */
+const sayPre = f => { if (PRE_WAIT && CJ.g) { CJ.after = f; return; } f(); }; /* PRE_WAIT */
 const HUD_FAST2 = true; /* ROLLBACK: false -> as v403. perf4: the HUD refresh at the end of each caddie setup (its own slice: Neil feels it as caddie time) forced the page's layout three times (about 3 ms each at 4x CPU): the yardage label's fit read its card's width right after writing the label, the lie card's slope note read the lie card's width after more writes, and the aim tag read its own width. The two card widths can't depend on what the refresh writes (the yardage card is the row's flexible middle, between the 76 px face and the 138 px lie/wind column; the lie card is 138 px), so they're read once at the top of the refresh, while the layout is still clean (free), and the fits use those same numbers. The same DOM, two fewer layouts. HUDW: those widths, only while a refresh runs */ let HUDW = null;
 const HUD_FAST = true; /* ROLLBACK: false -> as v397. The end-of-setup HUD refresh (part of the caddie's last slice: Neil feels it as caddie time) gives the same DOM with less work: (1) the page runs in quirks mode, where querySelector('#id') can't use the id index and walks the whole document (~30 us each, ~25 per refresh): a plain '#id' is looked up with getElementById (the same element: no two ids differ only by case); (2) text and markup that already read the same aren't written again, so the layout the label fits read isn't thrown away for nothing */
 const ID_SEL = /^#[A-Za-z_][\w-]*$/; const FIT_C = new Map(); /* HUD_FAST: label fits seen (the label's markup, its padding, the room it has, the screen, the fonts' state) -> font size */
@@ -31,7 +40,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v418'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v420'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2960,8 +2969,8 @@ function setHand(open) {
   if (open) { clearTimeout(handTO); HP.rf.classList.toggle('on', !L); HP.lf.classList.toggle('on', L); handTO = setTimeout(() => { HP.rf.classList.remove('on'); HP.lf.classList.remove('on'); }, 1700); }
   HP.r.classList.toggle('on', !L); HP.l.classList.toggle('on', L);
 }
-function setDistLbl(t) {
-  const el = $('#distLbl'), tt = $('#distLblT'); if (t != null) { if (tt.textContent === t) return; tt.textContent = t; } el.style.fontSize = ''; /* null: just refit (the elevation readout changed) */
+function setDistLbl(t, later) {
+  const el = $('#distLbl'), tt = $('#distLblT'); if (t != null) { if (tt.textContent === t) return; tt.textContent = t; } el.style.fontSize = ''; /* null: just refit (the elevation readout changed) */ if (later && STRIKE_FAST) { DL_LATER = true; return; } DL_LATER = false; /* STRIKE_FAST: later = fitted at the frame's end (dlLater) */
   if (HUD_FAST) { const k = ['L', el.innerHTML, el.style.paddingLeft, HUDW && HUDW.d === el.parentNode ? HUDW.dw : el.parentNode.clientWidth, innerWidth, innerHeight, devicePixelRatio, document.fonts.status].join('|'); let fs = FIT_C.get(k); /* HUD_FAST: this label at this width fitted before: the same size, without stepping down a pixel (and a layout) at a time */
     if (fs === undefined) { const fits = f => { el.style.fontSize = f === 17 ? '' : f + 'px'; return !(el.scrollWidth > el.parentNode.clientWidth + 1); }; /* the size the loop below stops at: the largest of 17..13 that fits, else 12 (a wider text never fits where a narrower one doesn't) */
       if (fits(17)) fs = 17; else { let lo = 12, hi = 16; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (m > 12 && fits(m)) lo = m; else hi = m - 1; } fs = lo; } FIT_C.set(k, fs); if (FIT_C.size > 400) FIT_C.clear(); }
@@ -2969,7 +2978,7 @@ function setDistLbl(t) {
   let fs = 17; while (fs > 12 && el.scrollWidth > el.parentNode.clientWidth + 1) { fs -= 1; el.style.fontSize = fs + 'px'; }
 }
 // the lie card never wraps a line: the slope note stays on one line and shrinks a little if it has to
-function fitLieSlope() { const el = $('#lieSlope'); el.style.fontSize = ''; if (!el.textContent) return; const max = (HUDW && HUDW.l === $('#lie') ? HUDW.lw : $('#lie').clientWidth) - 12; let f = 11;
+function fitLieSlope(later) { const el = $('#lieSlope'); el.style.fontSize = ''; if (!el.textContent) { LS_LATER = false; return; } if ((later || HUD_LATER) && HUD_FAST3) { LS_LATER = true; return; } LS_LATER = false; /* HUD_FAST3: fitted at the frame's end */ const max = (HUDW && HUDW.l === $('#lie') ? HUDW.lw : $('#lie').clientWidth) - 12; let f = 11;
   if (HUD_FAST) { const k = ['S', el.innerHTML, max, innerWidth, innerHeight, devicePixelRatio, document.fonts.status].join('|'), c = FIT_C.get(k); if (c !== undefined) { if (c !== 11) el.style.fontSize = c + 'px'; return; } /* HUD_FAST: fitted before at this width: the same size, without the steps */
     while (el.scrollWidth > max && f > 8.5) { f -= .5; el.style.fontSize = f + 'px'; } FIT_C.set(k, f); return; }
   while (el.scrollWidth > max && f > 8.5) { f -= .5; el.style.fontSize = f + 'px'; } }
@@ -2978,16 +2987,16 @@ function runG(g) { if (F3.lazy) return plRun(() => { let r; while (!(r = g.next(
 /* CADDIE_SLICE (CADDIE_FAST2): the next shot's caddie work (club, aim fit, tree escape, AIM_SAFE, auto punch) runs a slice per frame (6 ms of work, so a frame with the last piece stays near 8 ms) while the camera glides to the ball. The aim line, the HUD and the caddie's line wait for the final pick, so nothing shows a guess; a swing, a drag of the target, opening the aim view, a club or shot-type pick, or any strike (MP included: launch() asks first) finishes it at once. Other callers (MP turns, auto-hit, tests) still set up in one go */
 const CADDIE_SLICE = true; const CJ = { g: null }; let WSNAP = null; /* ROLLBACK: false -> setupShot all in one go. WSNAP: the wind on the HUD when this setup started (CADDIE_WIND_SHOWN) */
 const CJ_END = {}; function* cjEndG(g) { yield* g; if (F4.end) { if (PT_PL && PT_PL.lz) { void PT_PL.ptree; yield; } if (planCache && planCache.lz && G.mode !== 'putt') { void planCache.tree; yield; } } yield CJ_END; } /* (CADDIE_FAST4 end: the plans plSettle and the next frame's line read, finished in slices of their own: the same quiet force they'd get there) */ /* CADDIE_FAST3: a sliced setup ends with one more pause, so the HUD refresh (caddieDone) gets a frame's slice of its own */
-function caddieStep(ms) { if (!CJ.g) return; const t0 = performance.now(); let n = 0; try { do { const r = CJ.g.next(); if (r.done) { caddieDone(); return; } if (r.value === CJ_END && n && ms < 1e8) return; n++; } while (performance.now() - t0 < ms); } catch (e) { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); console.error(e); } }
+function caddieStep(ms) { if (!CJ.g) return; if (CJ.wait && ms < 1e8) { CJ.wait = false; return; } /* CARD_FAST: the set-up's slices start a frame after the shot card's frame */ const t0 = performance.now(); let n = 0; try { do { const r = CJ.g.next(); if (r.done) { caddieDone(); return; } if (r.value === CJ_END && n && ms < 1e8) return; n++; } while (performance.now() - t0 < ms); } catch (e) { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); console.error(e); } }
 function cjLazyEnd() { if (F3.lazy && PL_LAZY > 0 && --PL_LAZY === 0) plSettle(); } /* CADDIE_FAST3: a sliced setup holds lazy plans from its start to its end */
-function caddieDone() { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); updateHUD(); tracerDirty = true; if (G.view !== 'flight' && !(typeof FLY === 'object' && FLY.on)) tracer.visible = tracerInk.visible = rings.visible = true; }
+function caddieDone() { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); if (HUD_FAST3 && STRIKE_FAST) { HUD_LATER = true; try { updateHUD(); } finally { HUD_LATER = false; } } else updateHUD(); tracerDirty = true; /* (HUD_FAST3: its fits at the frame's end) */ if (G.view !== 'flight' && !(typeof FLY === 'object' && FLY.on)) tracer.visible = tracerInk.visible = rings.visible = true; if (CJ.after) { const f = CJ.after; CJ.after = null; try { f(); } catch (e) { console.error(e); } } /* PRE_WAIT: a pre-shot line that waited for this pick */ }
 function caddieSync() { if (CJ.g) caddieStep(1e9); } /* finish it now (a strike, a drag, a pick) */
-function caddieCancel() { if (CJ.g) { try { CJ.g.return(); } catch (e) {} CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); } } /* a new setup replaces it */
-function setupShotSliced(u, v, lie) { if (!(CADDIE_FAST2 && CADDIE_SLICE)) { setupShot(u, v, lie); return; } hushPre(); caddieCancel(); HUD_HOLD++; if (F3.lazy) PL_LAZY++; WSNAP = { ...G.wind }; CJ.g = F3.slice ? cjEndG(setupShotG(u, v, lie)) : setupShotG(u, v, lie); tracer.visible = tracerInk.visible = rings.visible = false; caddieStep(6); }
+function caddieCancel() { CJ.after = null; /* PRE_WAIT */ if (CJ.g) { try { CJ.g.return(); } catch (e) {} CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); } } /* a new setup replaces it */
+function setupShotSliced(u, v, lie, first = 6) { if (!(CADDIE_FAST2 && CADDIE_SLICE)) { setupShot(u, v, lie); return; } /* (CARD_FAST: first = the first slice's ms) */ hushPre(); caddieCancel(); HUD_HOLD++; if (F3.lazy) PL_LAZY++; WSNAP = { ...G.wind }; CJ.g = F3.slice ? cjEndG(setupShotG(u, v, lie)) : setupShotG(u, v, lie); tracer.visible = tracerInk.visible = rings.visible = false; CJ.wait = false; caddieStep(first); if (CARD_FAST && first === 0 && CJ.g) CJ.wait = true; }
 function updateHUD() { if (!HUD_FAST2 || (CADDIE_FAST2 && HUD_HOLD)) return updateHUD0(); try { HUDW = 1; return updateHUD0(); } finally { HUDW = null; } } /* HUD_FAST2: HUDW holds the cards' widths only inside a refresh */
 function updateHUD0() { if (CADDIE_FAST2 && HUD_HOLD) return;
   if (HUD_PAR) hudPar(); /* HUD_PAR hook */ if (HUDW === 1) { const d = $('#dist'), l = $('#lie'); HUDW = d && l ? { d, dw: d.clientWidth, l, lw: l.clientWidth } : null; } /* HUD_FAST2: both widths now, before this refresh writes anything (after the score box, which sits in the face) */
-  if (G.view !== 'flight') { setDist(hudDist(), _bic); $('#distNum').classList.remove('live'); setDistLbl(G.mode === 'putt' ? 'Feet · Putter' : `Yards · ${club().name}`); const dm = $('#distMode'), mt = G.mode === 'full' || G.mode === 'putt' ? '' : MODES[G.mode].name; dm.hidden = !mt; app.classList.toggle('hasMode', !!mt); if (dm.textContent !== mt) dm.textContent = mt; }
+  if (G.view !== 'flight') { setDist(hudDist(), _bic); $('#distNum').classList.remove('live'); setDistLbl(G.mode === 'putt' ? 'Feet · Putter' : `Yards · ${club().name}`, HUD_LATER); const dm = $('#distMode'), mt = G.mode === 'full' || G.mode === 'putt' ? '' : MODES[G.mode].name; dm.hidden = !mt; app.classList.toggle('hasMode', !!mt); if (dm.textContent !== mt) dm.textContent = mt; }
   setIH($('#lieIcon'), lieIcons[G.lie] || lieIcons.rough); try { setDialLie(G.lie); } catch (e) {}
   setTx($('#lieName'), LIES[G.lie].name);
   const pct = Math.round((LIES[G.lie].f || 1) * 100), lo = Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100), lp = $('#liePct'); setTx(lp, lo < pct ? `${lo}–${pct}%` : pct + '%'); lp.classList.toggle('warn', pct < 100); if (!HUD_FAST || lp.hidden !== (G.lie === 'green')) lp.hidden = G.lie === 'green';
@@ -3755,7 +3764,7 @@ function launchPutt(sw) {
   G.prev = { u: G.ball.u, v: G.ball.v, lie: G.lie, club: G.club, mode: G.mode, dir: { ...G.dir }, D: G.D, curve: G.curve, spinX: G.spinX, height: G.height };
   G.shot = { P: () => ({ u: B.u, v: B.v, y: ball.position.y }), tEnd: 1, dur: .01, t: 1, phase: 'roll', land: B, rd: { ...G.dir }, roll: Math.hypot(end.u - B.u, end.v - B.v), end, endLie: gnd.holed ? 'green' : gnd.lie, lieLand: 'green', hitT: null, apex: 0, carry: 0, B, tq, ratio: sw.ratio, pinHigh, pure, th, puffAcc: 0, rollT: 0, gnd, ev: 0, spin: 0, axis: { x: 1, y: 0, z: 0 }, q: 1, shape: 'Putt', putt: true, holed: gnd.holed, lieLoss: 0 };
   G.shot.fromTop = G.aimT > .5; G.view = 'flight'; G.aimGoal = 0; G.aimT = 0; aimFrame = null; aimDrag = null; app.classList.add('flying'); tracer.visible = tracerInk.visible = trShadow.visible = false; rings.visible = false;
-  setDistLbl('Feet · rolling'); $('#distMode').hidden = true; $('#distNum').classList.add('live');
+  setDistLbl('Feet · rolling', true); $('#distMode').hidden = true; $('#distNum').classList.add('live');
   camFollow.copy(camera.position); lookFollow.copy(camLook);
   if (tq === 'perfect' && pure) showStamp('PURE ROLL', ''); else if (tq === 'off') { const side = deg * hs, off = Math.abs(Math.tan(deg * Math.PI / 180)) * D; showStamp(quick ? 'TOO QUICK' : 'TOO SLOW', !PUTT_LINE_LBL ? (quick ? 'pulled it' : 'pushed it') : off < .06 ? '' : side < 0 ? 'pulled it' : 'pushed it'); } /* PUTT_LINE_LBL: pulled/pushed comes from where the ball actually started (pull = left for a righty, right for a lefty), not from the tempo alone; nothing when the line was within ~2 in at the hole */
   if (SOUND) SND.strike({ mode: 'putt', p, v: v0, tq }); /* SND_STRIKE: the putter's tock, louder with pace */
@@ -3852,7 +3861,7 @@ function launch(sw) {
   else if (flub) showStamp(flub === 'blade' ? 'BLADED!' : 'CHUNKED!', `tempo ${sw.ratio.toFixed(1)} : 1`);
   else if (msgs.length) showStamp(msgs[0], msgs.slice(1).join(' · '));
   else if (tq === 'off') showStamp(quick ? 'QUICK!' : 'TOO SLOW', `tempo ${sw.ratio.toFixed(1)} : 1`);
-  setDistLbl(`Yards · ${(Math.round(spin / 10) * 10).toLocaleString()} rpm`); $('#distMode').hidden = true; $('#distNum').classList.add('live');
+  setDistLbl(`Yards · ${(Math.round(spin / 10) * 10).toLocaleString()} rpm`, true); $('#distMode').hidden = true; $('#distNum').classList.add('live');
   ffTipMaybe();
   camFollow.copy(camera.position); lookFollow.copy(camLook);
   const bp = ball.position, gy0 = groundHeight(G.ball.u, G.ball.v);
@@ -3961,7 +3970,7 @@ const SZ = (() => {
     S0 = S; acc = 0; prev.copy(ball.position);
     sub.textContent = msgs.filter(m => m !== 'PERFECT TEMPO').join(' · ');
     clearTimeout(stampTO); $('#stamp').classList.remove('go'); /* the PERFECT sticker owns the spot */
-    el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); clearTimeout(stTO); stTO = setTimeout(() => el.classList.remove('go'), 950);
+    el.classList.remove('go'); restyle(el); el.classList.add('go'); clearTimeout(stTO); stTO = setTimeout(() => el.classList.remove('go'), 950);
     return true;
   }
   function shake(S, dt) { /* after the chase camera has placed itself: a decaying wobble of the view only, so camFollow / lookFollow smoothing never sees it */
@@ -4196,7 +4205,7 @@ function finishShot() {
   clearTimeout(G.resTO); if (!holed && !water) G.resTO = setTimeout(() => { const r = $('#result'), go = r.querySelector('#resBtns .btn.go'); if (!r.hidden && go) go.click(); }, 2750); // carry on by itself
   G.view = 'result'; app.classList.remove('flying');
   if (holed) { G.ball = { u: PIN.u, v: PIN.v }; G.lie = 'green'; }
-  else if (!water) { const fd = cartDrop(endU, endV); if (fd) setupShotSliced(fd.u, fd.v, lieAt(fd.u, fd.v)); else setupShotSliced(endU, endV, S.lieLand === 'trees' ? lieAt(endU, endV) : lie); }
+  else if (!water) { const fd = cartDrop(endU, endV), f1 = CARD_FAST ? 0 : 6; if (fd) setupShotSliced(fd.u, fd.v, lieAt(fd.u, fd.v), f1); else setupShotSliced(endU, endV, S.lieLand === 'trees' ? lieAt(endU, endV) : lie, f1); } /* (CARD_FAST: the first slice to the caddie's first pause only) */
   else { restorePrev(); }
   startCamTween(1.5); G.preview = null; if (!holed && G.mode === 'putt') { aimFrame = null; G.aimGoal = 1; G.aimT = 1; } /* straight to the overhead putt view, no detour via the swing view */ // next putt: stay overhead
   if (!water && !holed) startPreview();
@@ -4234,7 +4243,7 @@ $('#resBtns').addEventListener('click', e => {
   if (a === 'finish') { ROUND.holes.push(holeStats(G.log)); showRoundCard(); return; }
   if (a === 'newround') { if (HOLE_N !== NINE.first(CID)) { HOLELOAD.go(NINE.first(CID), []); return; } ROUND.holes = []; } if (a !== 'next') G.preview = null;
   $('#result').hidden = true; app.classList.remove('resulting');
-  if (a === 'next') { G.stroke++; newWind(); setTimeout(() => AV.say(preShotLine(), { pre: true }), 900); } /* (pre: PRE_LINE_LIVE) */
+  if (a === 'next') { G.stroke++; newWind(); setTimeout(() => sayPre(() => AV.say(preShotLine(), { pre: true })), 900); } /* (PRE_WAIT) */ /* (pre: PRE_LINE_LIVE) */
   else if (a === 'retry') { G.stroke -= G.gimmeAdd || 0; if (G.log) { G.log.pop(); if (G.gimmeAdd && G.log.length) G.log.pop(); } G.gimmeAdd = 0; restorePrev(); startCamTween(1.1); AV.say(line('mulligan')); }
   else if (a === 'penalty') { G.stroke += 2; if (G.log && G.log.length) G.log[G.log.length - 1].pen = 1; }
   else if (a === 'drop') { G.stroke += 2; if (G.log && G.log.length) G.log[G.log.length - 1].pen = 1; DROP.open(); return; }
@@ -4330,7 +4339,7 @@ const DROP = (() => {
   function close() { if (miniHome) { miniHome[0].insertBefore($('#mini'), miniHome[1]); miniHome = null; } G.drop = null; st = null; drag = null; dp.clear(); dpinch = null; grp.visible = false; app.classList.remove('dropping'); $('#dropUI').hidden = true; ['#dLblZ', '#dLblL', '#dLblX'].forEach(q => $(q).hidden = true); }
   function finish(a) {
     const P = st && st.P; close(); aimFrame = null; G.view = 'swing'; G.aimGoal = 0; rings.visible = true; tracer.visible = tracerInk.visible = true;
-    if (a === 'drop' && P) { setupShotSliced(P.u, P.v, lieAt(P.u, P.v)); newWind(); setTimeout(() => AV.say(preShotLine(), { pre: true }), 700); }
+    if (a === 'drop' && P) { setupShotSliced(P.u, P.v, lieAt(P.u, P.v)); newWind(); setTimeout(() => sayPre(() => AV.say(preShotLine(), { pre: true })), 700); } /* (PRE_WAIT) */
     else { restorePrev(); AV.say(line('mulligan')); }
     if (DROP_CAM) G.aimT = G.aimGoal; /* DROP_CAM: glide straight from the overhead to the ball view (no second blend under the tween) */
     startCamTween(1.1, DROP_CAM); updateHUD(); tracerDirty = true; puttView();
@@ -4620,7 +4629,7 @@ function planShot(warm) { /* warm (CADDIE_SLICE): only make sure this plan's car
   const flatH = elevPlan() ? groundHW(p.x, p.z) : null, gP = flatH == null ? groundHW : () => flatH; /* ELEV_PLAYER: full swings are planned (table, steering, launch's secant) on a level plane at the ball's height */
   const tkey = [G.mode, G.club, G.lie, h.toFixed(2), Math.round(tilt / 5), Math.round(G.ball.u / 15), Math.round(G.ball.v / 15)].join('|');
   if (tableCache.key !== tkey) { const k2 = CADDIE_FAST2 ? [tkey, launch, spin, flatH == null ? [p.x, p.y, p.z, yaw].join(',') : ''].join('|') : null, hit = k2 && F2.tab.get(k2); /* CADDIE_FAST2: a table built from these same inputs (on a level plane the spot and the line don't matter) */
-    if (hit) { tableCache = hit; F2.put(F2.tab, k2, hit, 24); } else { tableCache = { key: tkey, tbl: (F3.table ? PHYS.carryTableL : PHYS.carryTable)({ p, yaw, launch, spin, tilt: Math.round(tilt / 5) * 5 }, gP), /* (CADDIE_FAST3: rows on demand) */ mp: { dir: { ...G.dir }, D: G.D, Feff: G.Feff, h }, id: ++F2.n }; if (k2) F2.put(F2.tab, k2, tableCache, 24); } } /* mp: MP hook (the state it was built from) */
+    if (hit) { tableCache = hit; F2.put(F2.tab, k2, hit, 24); } else { tableCache = { key: tkey, tbl: (F3.table ? PHYS.carryTableL : PHYS.carryTable)({ p, yaw, launch, spin, tilt: Math.round(tilt / 5) * 5 }, gP), /* (CADDIE_FAST3: rows on demand) */ mp: { dir: { ...G.dir }, D: G.D, Feff: G.Feff, h }, id: ++F2.n, at: [HOLE, G.ball.u, G.ball.v, G.lie, G.who, G.lefty] }; /* (MP_REPLAY_FAST: at = where and for whom it was built; never sent) */ if (k2) F2.put(F2.tab, k2, tableCache, 24); } } /* mp: MP hook (the state it was built from) */
   if (warm && !(F4.warm && F3.lazy)) return null; /* (CADDIE_FAST4 warm: with lazy plans, go on and make the plan the next line will ask for, here at the pause) */
   if (warm && F3.table && tableCache.tbl && tableCache.tbl.lz && G.mode !== 'chip' && !(G.mode === 'sand' && SAND_TOTAL)) { const t0 = performance.now(); PHYS.speedFromTable(tableCache.tbl, G.D); if (performance.now() - t0 > 2) return null; } /* (CADDIE_FAST4 warm: a cold table's rows first, the very rows this plan reads (a full swing's carry is G.D); if that took a while, the plan itself waits for the next slice) */
   const pk = CADDIE_FAST2 ? key + '|' + G.Feff + '|' + tableCache.id : null, ph = pk && F2.plan.get(pk); if (ph) { planCache = ph; if (ph.lz && PL_LAZY) PT_PL = ph; else { PLAN_TREE = ph.ptree; if (F3.lazy) PT_PL = null; } F2.put(F2.plan, pk, ph, 48); return ph; } /* (CADDIE_FAST3: in a caddie run its tree is set when the run ends) */ /* CADDIE_FAST2: this plan again */
@@ -4804,7 +4813,7 @@ const trPts = Array.from({ length: TR.segs + 1 }, () => new THREE.Vector3()); co
 /* the part of the tracer that passes behind the distance readout is redrawn on a small canvas above it (tracer over the number) */
 const TT = { x: 0, y: 0, w: 0, h: 0, e: 0, dashes: 8, drawn: false, occ: new Uint8Array(TR.segs + 1), X: new Float32Array(TR.segs + 1), Y: new Float32Array(TR.segs + 1), Z: new Float32Array(TR.segs + 1) };
 const trTop = document.getElementById('trTop'), ttx = trTop.getContext('2d');
-function sizeTrTop() { const d = $('#dist').getBoundingClientRect(), a = RECT.app || app.getBoundingClientRect(); TT.x = d.left - a.left; TT.y = Math.max(0, d.top - a.top - 6); TT.w = Math.max(1, d.width); TT.h = d.height + 12;
+function sizeTrTop() { if (DL_LATER) setDistLbl(null); if (LS_LATER) fitLieSlope(); /* STRIKE_FAST / HUD_FAST3 */ const d = $('#dist').getBoundingClientRect(), a = RECT.app || app.getBoundingClientRect(); TT.x = d.left - a.left; TT.y = Math.max(0, d.top - a.top - 6); TT.w = Math.max(1, d.width); TT.h = d.height + 12;
   trTop.style.transform = `translate(${TT.x}px,${TT.y}px)`; trTop.style.width = TT.w + 'px'; trTop.style.height = TT.h + 'px'; trTop.width = Math.round(TT.w * PR); trTop.height = Math.round(TT.h * PR); TT.drawn = false; }
 function drawTrTop() {
   const clear = () => { if (TT.drawn) { ttx.setTransform(1, 0, 0, 1, 0, 0); ttx.clearRect(0, 0, trTop.width, trTop.height); TT.drawn = false; trTop.style.visibility = 'hidden'; } };
@@ -5057,7 +5066,7 @@ function callLie(S, L, at) { /* the caddie's call and the big stamp for where th
   if (L === 'green' && ['chip', 'pitch', 'flop', 'sand'].includes(G.mode)) return; /* a short-game shot that finds the green needs no stamp */
   showStamp(rv ? ravWord(at.u, at.v) : L === 'water' ? 'SPLASH!' : L === 'trees' ? 'TIMBER!' : (LIES[L] ? LIES[L].name : L).toUpperCase() + '!', '');
 }
-function showStamp(big, small) { const s = $('#stamp'); s.innerHTML = big + (small ? `<small>${small}</small>` : ''); s.classList.remove('go'); void s.offsetWidth; s.classList.add('go'); clearTimeout(stampTO); stampTO = setTimeout(() => s.classList.remove('go'), 1600); }
+function showStamp(big, small) { const s = $('#stamp'); s.innerHTML = big + (small ? `<small>${small}</small>` : ''); s.classList.remove('go'); restyle(s); s.classList.add('go'); clearTimeout(stampTO); stampTO = setTimeout(() => s.classList.remove('go'), 1600); }
 /* ================= SOUND (Neil 16 Nov: "bring sounds back, but just when you hit the ball or when it lands, and some subtle nature bird sounds ... more like real golf") =================
    Everything is synthesized in Web Audio (no files): each sound is a handful of short-lived oscillators and filtered noise bursts scheduled on the audio clock,
    built when it plays and left for the GC once it stops. No per-frame work: birds are a setTimeout every few seconds. The old cartoon pops/ticks/whooshes stay silent. */
@@ -5521,7 +5530,7 @@ const AV = (() => {
     if (st.text && st.shown < st.text.length && !opts.force) { if (st.queue.length < 1) st.queue.push([text, opts]); return; }
     st.text = text; st.pre = !!opts.pre; st.shown = 0; st.typeAcc = 0; st.hideT = 0; bubble.hidden = false; sayA.textContent = ''; sayB.textContent = text; st.drawn = 0; if (BUB_FIT) { bubble.classList.remove('short'); bubble.classList.toggle('short', bubble.offsetWidth < 78); } /* BUB_FIT: a one-word line gets a wider, centred bubble so the tail isn't in its corner */ app.style.setProperty('--sayH', (bubble.offsetHeight + 12) + 'px'); setTalking(true);
     if (SAY_DODGE) { st.rect = null; const c = RECT.canvas; if (c) { const r = bubble.getBoundingClientRect(), m = 16; st.rect = { l: r.left - c.left - m, r: r.right - c.left + m, t: r.top - c.top - m, b: r.bottom - c.top + m }; } if (holeUnder()) { hush(); if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } } /* SAY_DODGE: putting with the hole under where the bubble would be: no line (the mood still shows on the face) */
-    bubble.style.animation = 'none'; void bubble.offsetWidth; bubble.style.animation = '';
+    bubble.style.animation = 'none'; restyle(bubble); bubble.style.animation = '';
     if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5);
   }
   function hushPre() { let h = false; const q = st.queue.filter(x => !(x[1] && x[1].pre)); if (q.length !== st.queue.length) { h = true; st.queue = q; } /* PRE_LINE_LIVE: take down a pre-shot line (on screen or queued) */
@@ -5733,6 +5742,7 @@ function playHole() {
 
 /* ================= LOOP ================= */
 function measure() { // control rects in their RESTING place: the bottom strip may be mid-slide (flight / green flyover), so take its transform back out
+  if (DL_LATER) setDistLbl(null); if (LS_LATER) fitLieSlope(); /* STRIKE_FAST / HUD_FAST3: a label waiting for its fit is fitted before anything reads the HUD's size */
   let ty = 0; try { ty = (new DOMMatrixReadOnly(getComputedStyle($('#bottom')).transform).m42 || 0) * UIS.s; } catch (e) {} /* TABLET_FILL: the slide is in the bar's own px, the bar is drawn UIS.s times bigger */
   RECT.ctrls = ['#dialWrap', '#strike', '#strikeCap', '#clubBtn', '#mini', '#knobPick'].map(q => { const r = $(q).getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top - ty, bottom: r.bottom - ty, width: r.width, height: r.height }; });
   RECT.ctrlT = Math.min(...RECT.ctrls.slice(0, 5).filter(r => r.height > 0).map(r => r.top));
@@ -5747,7 +5757,7 @@ setupShot(0, 0, 'tee');
 { const s = swingPose(); camera.position.copy(s.pos); camLook.copy(s.look); camera.lookAt(camLook); }
 if (!G.firstSwing) $('#coach').classList.add('off');
 setTimeout(() => setHand(true), 400);
-BOOT.greet = () => setTimeout(() => AV.say(G.firstSwing ? line('greet') : preShotLine(), { mood: 'happy', moodFor: 1.2, pre: !G.firstSwing }), 350);
+BOOT.greet = () => setTimeout(() => { if (G.firstSwing) AV.say(line('greet'), { mood: 'happy', moodFor: 1.2, pre: false }); else sayPre(() => AV.say(preShotLine(), { mood: 'happy', moodFor: 1.2, pre: true })); }, 350); /* (PRE_WAIT: the pre-shot line waits for the set-up) */
 let last = performance.now(), fpsAcc = 0, fpsN = 0, perfT = 0;
 // frame-time watcher: drops render resolution in small steps only while frames are slow, climbs back when there's room
 // frame-time watcher. Learns the screen's real refresh (60 / 90 / 120 Hz) from the fastest steady frames,
@@ -5813,7 +5823,7 @@ function frame(now) {
   { const ch = Math.max(0, camera.position.y - (AUGD ? groundHeight(camera.position.x, -camera.position.z) : TERRAIN_BASE)); scene.fog.near = 240 + ch * 2.4; scene.fog.far = 1050 + ch * 3.2; } // the higher the camera, the thinner the haze
   const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null; /* sky fully hidden by the ground: skip its pass */
   try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
-  edgePanStep(dt); updateOverlays(); drawTrTop(); if (G.drop) DROP.update();
+  edgePanStep(dt); if (DL_LATER) setDistLbl(null); if (LS_LATER) fitLieSlope(); /* STRIKE_FAST / HUD_FAST3: labels set this frame (or since the last), fitted before it is painted */ updateOverlays(); drawTrTop(); if (G.drop) DROP.update();
   fpsAcc += Math.min(rawDt, 1); fpsN++; perfT += Math.min(rawDt, 1); // real frame times, not the capped game step
   scaler(now);
   if (perfT > .5 && now > FARLOD.noteT) { const i = renderer.info.render; $('#perf').textContent = `${Math.round(fpsN / fpsAcc)}/${Math.round(1000 / SC.budget)} fps · ${+glPR.toFixed(2)}×`; fpsAcc = fpsN = perfT = 0; }
@@ -6410,6 +6420,8 @@ try { const H = document.documentElement; if (WIND_HIDE_PUTT) H.classList.add('w
    are read at the very start of the frame, while the layout is still clean, and placed from those (the same boxes: nothing that runs before the chat moves them; a room / turn message
    in the same frame drops them and it reads live as before). Same bubbles, same places, same frame. false = v358. */
 const MP_BUBBLE_RECT = true;
+const MP_TURN_SLICE = true; /* ROLLBACK: false -> as v414. perf5 (Neil 17 Nov: "improve multiplayer"): every turn change ran the caddie's whole set-up for the next golfer in one go (turn() called setupShot), on every phone in the room, shooter and watchers alike: one frame of 50-130 ms at 4x CPU each time (a tee shot's TEE_FINISH check, a bad lie's PITCH_FIT2). Now it runs in slices over the next frames, as single player's set-up after a shot does (CADDIE_SLICE): the aim line, ring and HUD wait for the final pick; the shooter's aim isn't streamed until then (no half-made aim goes out); a watcher applies the streamed aim once its own set-up is done (it never fights the caddie's search); a replay, a strike or an auto hit finishes a set-up still running first (launch() and setupShot already do; replay() now does it before it writes the shooter's state, so the replayed state is exactly v414's). A pre-shot line hushed by the new set-up is said again once it's done, not by forcing it through. */
+const MP_REPLAY_FAST = false; /* (v420: OFF. One replay in a two-page test landed 0.0076 yd off the shooter's with it on; replays rebuild the table again, as v418) */ /* ROLLBACK: false -> as v414. perf5: a watcher's replay always threw its carry table away and built the shooter's again from the inputs in the packet (tb: aim, power, meter top, height), so the replay is the same flight to the last digit. Most of the time this phone already holds exactly that table: its own sliced set-up for this turn built it from the very same inputs (same hole, same ball spot and lie, same aim, power, meter top and height). Then it is kept, and the replay skips that rebuild (and its plan): the same table, so the same flight (checked on every replay as before: 'replay ok' / 'replay mismatch'). Any doubt (another spot, another input, a table built elsewhere) rebuilds as v414 did. tableCache.at (where a table was built) stays on this phone: the packet is unchanged. */
 const MP_FEEL = true; /* undo switch: your swing never waits on the network (inbox drained in the frame loop, shots through a de-duped outbox, bubbles a beat after launch) */
 /* mplag (Neil 11-16 16:48, "multiplayer lag as low as possible, for free"): six undo switches (server.js: NEXT_HOLD, FLY_SKIP_ALL). All off = exactly as before. Nothing on screen changes but when it happens (MP_FLY_SKIP_ALL: Neil's ask, a Skip for everyone). */
 const MP_EARLY_NEXT = true; /* turn hand-off: the shooter reports where the ball ended up as soon as the result card is up (not when it goes), so the round trip happens under the card. Every phone still shows the card exactly as long as before (2.75 s or a tap; a holed card 2.6 s), then the next turn is already there. 'next' carries hold (ms of card left) so the server's idle clock starts when the turn shows. Water / OB still waits for Replay / Drop. false = 'next' after the card, as before */
@@ -6570,8 +6582,9 @@ if (MULTI) try { MPX = (() => {
     clearTimeout(G.resTO); $('#result').hidden = true; app.classList.remove('resulting', 'flying', 'previewing', 'swinging'); if (G.drop) DROP.close();
     if (G.who !== p.who) { G.who = AV.has(p.who) ? p.who : 'neil'; AV.setChar(G.who); } G.lefty = S.mine ? S.myLefty : !!p.lefty; setHand(false);
     G.stroke = p.ball.stroke; G.log = S.logs[p.id] || (S.logs[p.id] = []); G.gimmeAdd = 0;
-    setupShot(p.ball.u, p.ball.v, p.ball.lie === 'tee' && p.ball.stroke === 1 ? 'tee' : p.ball.lie); if (PRE_LINE_LIVE && PRE_HUSHED && S.mine) AV.say(preShotLine(), { pre: true }); /* PRE_LINE_LIVE: the line it took down named the last setup's club */
-    G.view = 'swing'; G.aimGoal = 0; aimFrame = null; G.preview = null; rings.visible = tracer.visible = tracerInk.visible = true; tracerDirty = true;
+    if (MP_TURN_SLICE) { setupShotSliced(p.ball.u, p.ball.v, p.ball.lie === 'tee' && p.ball.stroke === 1 ? 'tee' : p.ball.lie); S.preAfter = !!(PRE_LINE_LIVE && PRE_HUSHED && S.mine); if (S.preAfter && !CJ.g) { S.preAfter = false; AV.say(preShotLine(), { pre: true }); } } /* MP_TURN_SLICE: in slices (the pre-shot line, if one was hushed, once it's done: MPX.frame) */
+    else { setupShot(p.ball.u, p.ball.v, p.ball.lie === 'tee' && p.ball.stroke === 1 ? 'tee' : p.ball.lie); if (PRE_LINE_LIVE && PRE_HUSHED && S.mine) AV.say(preShotLine(), { pre: true }); } /* PRE_LINE_LIVE: the line it took down named the last setup's club */
+    G.view = 'swing'; G.aimGoal = 0; aimFrame = null; G.preview = null; if (!(MP_TURN_SLICE && CJ.g)) rings.visible = tracer.visible = tracerInk.visible = true; tracerDirty = true; /* (MP_TURN_SLICE: still setting up: caddieDone shows them) */
     if (!FLY.on) startCamTween(1.2); puttView(); updateHUD();
     app.classList.toggle('mpWatch', !S.mine); app.classList.toggle('mpMine', S.mine);
     if (S.mine) { S.aimLast = ''; if (S.compOpen || CHAT.focused()) CHAT.yourTurn(); else CHAT.close(); }
@@ -6583,10 +6596,10 @@ if (MULTI) try { MPX = (() => {
 
   /* ---------- aim: streamed from the active phone at ~10 Hz, smoothed on the others ---------- */
   const r4 = x => Math.round(x * 1e4) / 1e4;
-  function aimOut(now) { if (now - S.aimT < K.AIM_MS) return; S.aimT = now; if (G.view !== 'swing' && G.view !== 'aim') return;
+  function aimOut(now) { if (now - S.aimT < K.AIM_MS) return; S.aimT = now; if (G.view !== 'swing' && G.view !== 'aim') return; if (MP_TURN_SLICE && CJ.g) return; /* MP_TURN_SLICE: the caddie is still choosing: nothing half-made goes out */
     const d = { u: r4(G.dir.u), v: r4(G.dir.v), D: r4(G.D), c: r4(G.curve || 0), h: r4(G.height || 0), s: r4(G.spinX || 0), k: G.club, m: G.mode, g: G.aimGoal ? 1 : 0, w: [Math.round(G.wind.mph * 10) / 10, Math.round(G.wind.ang * 100) / 100], l: G.lefty ? 1 : 0 }, j = JSON.stringify(d);
     if (j !== S.aimLast) { S.aimLast = j; let own = 0; if (MP_KICK) { const k = j.replace(/"w":\[[^\]]*\],?/, ''); own = k !== S.aimOwn ? 1 : 0; S.aimOwn = k; } if (send(own ? { t: 'aim', d, in: 1 } : { t: 'aim', d })) S.stats.aimOut++; } } /* MP_KICK: in:1 = the player's own aim changed (a wind update alone isn't them playing) */
-  function aimIn(dt) { const A = S.aim; if (!A || (G.view !== 'swing' && G.view !== 'aim') || FLY.on) return;
+  function aimIn(dt) { const A = S.aim; if (!A || (G.view !== 'swing' && G.view !== 'aim') || FLY.on) return; if (MP_TURN_SLICE && CJ.g) return; /* MP_TURN_SLICE: my own set-up first (the streamed aim then eases in from the caddie's pick, as it did after v414's set-up in one go) */
     if (A.m !== G.mode) setMode(A.m, true); if (A.k !== G.club) setClub(A.k, false);
     if (!!A.l !== !!G.lefty) { G.lefty = !!A.l; setHand(false); }
     if ((A.g ? 1 : 0) !== (G.aimGoal ? 1 : 0)) { G.aimGoal = A.g ? 1 : 0; G.view = A.g ? 'aim' : 'swing'; aimFrame = null; measure(); }
@@ -6606,6 +6619,7 @@ if (MULTI) try { MPX = (() => {
   launch = function (sw) {
     if (!S.inRound) return _launch(sw);
     const as = S.shootAs || (S.mine ? S.you : null); if (!as) return; /* watching: the swing never reaches here (input is blocked), but never fire someone else's shot */
+    if (MP_TURN_SLICE && CJ.g) caddieSync(); /* MP_TURN_SLICE: the packet below is the final pick's state (_launch would finish it only after the packet was made) */
     const seed = (Math.random() * 4294967296) >>> 0, ls = G.lastSwing || { pts: [], curveDeg: sw.curveDeg, q: 1, wob: { rms: 0, word: 'smooth' } };
     const d = { sw: { p: sw.p, ratio: sw.ratio, curveDeg: sw.curveDeg }, seed, ball: { ...G.ball }, lie: G.lie, club: G.club, mode: G.mode, dir: { ...G.dir }, D: G.D, Feff: G.Feff, curve: G.curve, spinX: G.spinX, height: G.height, wind: { ...G.wind }, lefty: !!G.lefty, who: G.who, puttMax: G.puttMax, aimT: G.aimT,
       lsw: { curveDeg: ls.curveDeg, q: ls.q, wob: ls.wob, pts: packPts(ls.pts || []) }, tb: tableCache && tableCache.mp ? tableCache.mp : null, stroke: G.stroke };
@@ -6617,15 +6631,21 @@ if (MULTI) try { MPX = (() => {
     if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* this turn's shot is struck */
     S.pend = { as, auto: !!S.autoNow, n: S.curN, sentNext: false }; S.autoNow = false; S.stats.shots++; S.launchAt = performance.now(); if (MP_FEEL) setTimeout(() => { BANNER.set(); STRIP.draw(); }, 0); else { BANNER.set(); STRIP.draw(); CHAT.flushHeld(); } /* MP_FEEL: the launch frame does nothing extra; held bubbles come a beat later (CHAT.tick) */ log('shot', S.curN, 'end', R.end.u.toFixed(3), R.end.v.toFixed(3), R.endLie);
   };
+  function tbHeld(tb) { /* MP_REPLAY_FAST: the current carry table is the one the packet's inputs would build here: built on this hole, at this ball, lie, golfer and hand, from the same aim, power, meter top and height, under the table key planShot will look for */
+    const T = tableCache, m = T && T.mp, a = T && T.at; if (!T || !T.key || !T.tbl || !m || !a || !tb || !tb.dir) return false;
+    if (a[0] !== HOLE || a[1] !== G.ball.u || a[2] !== G.ball.v || a[3] !== G.lie || a[4] !== G.who || a[5] !== G.lefty) return false;
+    if (m.dir.u !== tb.dir.u || m.dir.v !== tb.dir.v || m.D !== tb.D || m.Feff !== tb.Feff || m.h !== tb.h) return false;
+    const h0 = G.height; G.height = tb.h; try { const tilt = totalCurve() * TILT_PER_CURVE; return T.key === [G.mode, G.club, G.lie, tb.h.toFixed(2), Math.round(tilt / 5), Math.round(G.ball.u / 15), Math.round(G.ball.v / 15)].join('|'); } finally { G.height = h0; } } /* (planShot's tkey, as replay's rebuild would see it) */
   function replay(m) { /* someone else's shot: the same state, the same table, the same seed -> the same flight */
     const d = m.d; if (!d) return; /* (the sender never gets its own shot back: one from the proxy playing for me is replayed like any other) */
+    if (MP_TURN_SLICE && CJ.g) caddieSync(); /* MP_TURN_SLICE: a set-up still running finishes before the shooter's state is written (as v414's had, all of it: the tree grace and the plan caches it leaves) */
     if (MP_KICK && m.from === S.you) NUDGE.stop(); /* MP_KICK: someone AUTO HIT for me: my your-turn nudge (TURN_*) stops now, not at the next turn */
     if (FLY.on) FLY.stop(); clearTimeout(G.resTO); $('#result').hidden = true; app.classList.remove('resulting');
     if (G.who !== d.who) { G.who = AV.has(d.who) ? d.who : 'neil'; AV.setChar(G.who); } G.lefty = d.lefty; setHand(false);
     G.ball = { ...d.ball }; G.lie = d.lie; G.club = d.club; G.mode = d.mode; applyModeTempo(); G.Feff = d.Feff; G.puttMax = d.puttMax;
     G.dir = { ...d.dir }; G.D = d.D; G.curve = d.curve; G.spinX = d.spinX; G.height = d.height; G.wind = { ...d.wind }; G.stroke = d.stroke || G.stroke;
     placeBall(); G.lastSwing = { pts: unpackPts(d.lsw && d.lsw.pts), curveDeg: d.lsw ? d.lsw.curveDeg : d.sw.curveDeg, q: d.lsw ? d.lsw.q : 1, wob: d.lsw && d.lsw.wob || { rms: 0, word: 'smooth' } };
-    if (d.tb && d.mode !== 'putt') { const k = { dir: G.dir, D: G.D, Feff: G.Feff, h: G.height }; G.dir = { ...d.tb.dir }; G.D = d.tb.D; G.Feff = d.tb.Feff; G.height = d.tb.h; planCache = { key: '' }; tableCache = { key: '' }; planShot(); G.dir = k.dir; G.D = k.D; G.Feff = k.Feff; G.height = k.h; }
+    if (d.tb && d.mode !== 'putt' && !(MP_REPLAY_FAST && tbHeld(d.tb))) { const k = { dir: G.dir, D: G.D, Feff: G.Feff, h: G.height }; G.dir = { ...d.tb.dir }; G.D = d.tb.D; G.Feff = d.tb.Feff; G.height = d.tb.h; planCache = { key: '' }; tableCache = { key: '' }; planShot(); G.dir = k.dir; G.D = k.D; G.Feff = k.Feff; G.height = k.h; } /* (MP_REPLAY_FAST: unless this phone holds that very table) */
     planCache = { key: '' }; G.aimT = d.aimT || 0; G.aimGoal = 0; G.view = 'swing';
     S.replaying = { n: m.n, auto: !!m.auto, from: m.from }; if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* (MP_AIM_TAG_LIVE: struck) */
     seeded(d.seed, () => _launch(d.sw)); S.stats.replays++;
@@ -6990,6 +7010,7 @@ if (MULTI) try { MPX = (() => {
     if (S.mine && !S.pend && !S.shootAs) { if (!(MP_EARLY_NEXT && S.room && S.room.shotN !== S.curN)) aimOut(now); } else if (!S.mine) aimIn(dt); /* (MP_EARLY_NEXT: a newer turn is waiting under the card: no aim from the old one) */
     if (MP_EARLY_NEXT && S.goN != null && $('#result').hidden) S.goN = null; /* (the card went: a tap sent 'go' as it happened, below) */
     if (MP_FLY_SKIP_ALL && S.flySkip && S.flySkip === S.hole && S.loaded && FLY.on) FLY.end(true); /* MP_FLY_SKIP_ALL: the same path as this phone's own Skip (it does nothing once the glide back has begun) */
+    if (MP_TURN_SLICE && S.preAfter && !CJ.g) { S.preAfter = false; if (S.mine && G.view !== 'flight') AV.say(preShotLine(), { pre: true }); } /* MP_TURN_SLICE: the hushed pre-shot line, now the set-up is done */
     settle(); if (S.Q.length) pump(); CHAT.tick(now); RING.tick(now); CARD.tick(now); NUDGE.tick(now); if (MP_KICK) KICK.tick(now);
     if (MP_TRACER_NEXT && S.trWait) trNext();
     const fl = G.view === 'flight'; if (fl !== S._fl || FLY.on !== S._fy) { S._fl = fl; S._fy = FLY.on; BANNER.set(); STRIP.draw(); }
@@ -6999,7 +7020,7 @@ if (MULTI) try { MPX = (() => {
   { let code = null, quiet = false; try { const h = window.__mpHash || ''; if (MP_SHARE && window.__mpRoom) code = window.__mpRoom; /* MP_SHARE: a ?room=CODE link (read and taken off the address by the head script) */ else if (/^#[A-Za-z0-9]{1,10}$/.test(h) && !/^#augusta$/i.test(h)) code = h.slice(1).toUpperCase(); const j = JSON.parse(sessionStorage.getItem('tp_mp') || 'null'); if (!code && j && /^[A-Z0-9]{1,10}$/.test(j.code)) { code = j.code; quiet = true; } /* (#augusta is the game's own page; #hole-N and #augusta-hole-N have a dash so never match) */ } catch (e) {}
     if (code && (WSURL || MP_CONNECT_FIRST)) { const go = () => { if (!$('#boot.home') || document.getElementById('intro')) { setTimeout(go, 300); return; } join(code, quiet); }; go(); } } /* MP_CONNECT_FIRST: a room link opens the code modal, connecting (or says multiplayer needs teeparty.fun) */
   function hit(o = {}) { /* test hook: the active phone strikes (power k x the right power, tempo k x perfect, curve in degrees); optional ball placement {at:{u,v,lie}} */
-    if (!S.mine && !S.shootAs) return false; if (o.at) { setupShot(o.at.u, o.at.v, o.at.lie); }
+    if (!S.mine && !S.shootAs) return false; if (o.at) { setupShot(o.at.u, o.at.v, o.at.lie); } if (MP_TURN_SLICE && CJ.g) caddieSync(); /* (MP_TURN_SLICE: the right power is the final pick's) */
     const ps = pStar(); G.lastSwing = { pts: [], curveDeg: o.curve || 0, q: 1, wob: { rms: .5, word: 'smooth' } }; launch({ p: ps * (o.p || 1), ratio: TEMPO * (o.tempo || 1), curveDeg: o.curve || 0 }); return !!G.shot; }
   function skipFlight() { /* test hook: land the flight now (the frame loop then finishes the shot as usual) */ const R = G.shot; if (G.view !== 'flight' || !R) return false; R.t = 1; R.phase = 'roll'; R.squash = 0; R.rollT = 1e9; return true; }
   window.__MP = { S, K, join, leave, send, autoHit, hit, skipFlight, card: R => CARD.show(R), pars: id => { const C = COURSE_DEF[id]; return (C.list || (C.list = C.holes())).map(h => h.par); }, /* test hooks: render the group card from a room state; a course's pars */ get room() { return S.room; }, can: CAN, kick: () => ({ shown: KICK.shown }), link: () => LOBBY.link(), pinSeed: () => S.room ? pinSeed() : null, stats: () => ({ ...S.stats, lastMiss: S.lastMiss }) };
