@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.c9231b1df9.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.fd7d634fc9.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -44,10 +44,13 @@ try { if (MP_SHARE) { const q = new URLSearchParams(location.search), hm = /^#ro
 try { if (/^#(augusta-)?hole-\d+$/.test(location.hash) || /"go":true/.test(sessionStorage.getItem('tp_round') || '') || sessionStorage.getItem('tp_home')) document.documentElement.classList.add('holeNext'); } catch (e) {}
 /* iOS home-screen app: with the translucent status bar the page is laid out one status-bar short, which leaves a strip of
    page background along the bottom. Stretch the page to the full screen height there. */
+const SA_FIT_EARLY = true;
 (function () { const SA = navigator.standalone || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches; window.__SA = SA; if (!SA) return; const H = document.documentElement;
   const st = document.createElement('style'); st.textContent = 'html,body{height:100lvh!important;overflow:hidden}'; document.head.appendChild(st); /* lvh reaches the bottom of the screen even when the layout is short */
   const fit = () => { const portrait = innerHeight >= innerWidth, full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-    const h = full > innerHeight ? full + 'px' : ''; for (const el of [H, document.body]) if (el) { if (h) el.style.setProperty('height', h, 'important'); else el.style.removeProperty('height'); } };
+    const h = full > innerHeight ? full + 'px' : '';
+    if (SA_FIT_EARLY) { const css = 'html,body{height:' + (h || '100lvh') + '!important;overflow:hidden}'; if (st.textContent !== css) st.textContent = css; return; } /* SA_FIT_EARLY (v408, Neil 17 Nov: "the splash title still jumps down a touch, home-screen app only"): the full height goes in the style sheet, so the body has it from its very first paint (before, the body only got it at DOMContentLoaded, a beat after the splash showed, and the extra height dropped the title a few px). false = per-element styles as v407 */
+    for (const el of [H, document.body]) if (el) { if (h) el.style.setProperty('height', h, 'important'); else el.style.removeProperty('height'); } };
   fit(); addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 200)); document.addEventListener('DOMContentLoaded', fit); })();
 </script>
 <script>
@@ -1162,5 +1165,5 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
 if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror="__splitFail()"><\/script>');</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.c9231b1df9.js" onerror="__splitFail()"></script>
+<script src="game.fd7d634fc9.js" onerror="__splitFail()"></script>
 
