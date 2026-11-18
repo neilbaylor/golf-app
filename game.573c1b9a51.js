@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v434'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v436'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1451,6 +1451,8 @@ const SAY_DODGE = true; /* Neil 17 Nov (v404): "on long putts your character's s
 const ROUND_HOME_DIRECT = true; /* Neil 17 Nov (v403): Home on the finished-round scorecard goes straight home (the round is over: no "your score won't be kept" ask). false = it asks, as v402 */
 const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
 $('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
+const FAR_GROW = true; /* Neil (11-18 11:29, OslerBrook 2's fly-over): "The little trees on the right appear as the flyover is going". Ground cover with a draw limit (the wet meadow's reeds and cattails at 220 yd, fescue and reed clumps at 170, grass tufts at 70-102) popped in whole when the camera came within range. Now, over the last fifth of that range (at least 20 yd), each one is drawn scaled down, so it grows in instead of popping. false = as v435 */
+const FLY_NO_HIDE = true; /* the same report: during the hole's fly-over no tree steps aside for the line to the ball on the tee (the drone isn't looking at it; on its way back trees ahead of it were vanishing and reappearing). Only a crown the camera is actually inside still steps aside. false = as v435 */
 function updateCull() {
   camera.updateMatrixWorld(); const e = camera.matrixWorld.elements; let same = true;
   for (let i = 0; i < 16; i++) if (_ck[i] !== e[i]) { same = false; _ck[i] = e[i]; }
@@ -1465,13 +1467,13 @@ function updateCull() {
       const top = (t.gy ?? (t.gy = groundHeight(t.u, t.v))) + t.h; /* cached ground under the trunk (as treeHit) */
       if (t !== PLAN_TREE && cy0 < top + 4 && Math.hypot(tx - cx0, tz - cz0) < (TREE_UNSTICK ? treeExt(t) : t.r) + 1.5 && (!aimKeep || crownAt(t, cx0, -cz0, cy0, 1.2))) { _blk.add(i); continue; }
       if (TREE_UNSTICK && t === PLAN_TREE && crownAt(t, cx0, -cz0, cy0, 1.2)) { _blk.add(i); continue; } /* TREE_UNSTICK: blob crowns reach past t.r (Hunt 2's 13: r 11, leaves out to 17.5), and from inside the tree you're about to hit you see nothing but leaves */ /* the camera is in (or brushing) its crown: it steps aside in every view (12's back bunker sat the camera inside a pine) */
-      if (AIM_TREES && !MENU.on && G.view !== 'flight' && !aimKeep) { /* AIM_TREES: any crown that really sits on the sight line to the ball (or, overhead, to the target) steps aside, by its true reach */
+      if (AIM_TREES && !MENU.on && G.view !== 'flight' && !aimKeep && !(FLY_NO_HIDE && FLY.on)) { /* AIM_TREES: any crown that really sits on the sight line to the ball (or, overhead, to the target) steps aside, by its true reach */
         let hit = false; const tg = !line && !AIM_TREES_KEEP ? targetUV() : null; /* AIM_TREES_KEEP 'ball': the aim view tests only the line to the ball */
         for (const e of tg ? [[bx, by, bz, 1], [tg.u, groundHeight(tg.u, tg.v), -tg.v, 0]] : [[bx, by, bz, 1]]) { if (hit) break; if (!e[3] && t === PLAN_TREE) continue; /* the tree you're about to hit stays, unless it hides the ball itself */
           const sx = e[0] - cx0, sz = e[2] - cz0, l2 = sx * sx + sz * sz || 1e-6, kk = clamp(((tx - cx0) * sx + (tz - cz0) * sz) / l2, 0, 1); if (Math.hypot(cx0 + sx * kk - tx, cz0 + sz * kk - tz) > treeExt(t) + .5) continue;
           for (let j = 1; j < 16; j++) { const f = j / 16; if (crownAt(t, cx0 + sx * f, -(cz0 + sz * f), cy0 + (e[1] - cy0) * f, .4)) { hit = true; break; } } }
         if (hit) { _blk.add(i); continue; } }
-      if (!line) continue;
+      if (!line || (FLY_NO_HIDE && FLY.on)) continue; /* FLY_NO_HIDE: the drone isn't looking at the ball */
       const k = clamp(((tx - cx0) * dx + (tz - cz0) * dz) / L2, 0, 1), qx = cx0 + dx * k - tx, qz = cz0 + dz * k - tz, segY = cy0 + (by - cy0) * k;
       if (Math.hypot(qx, qz) < t.r + .8 && segY < top + .5 && t !== PLAN_TREE) _blk.add(i); } } /* never hide the tree you're about to hit */
   _cmx.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _cf.setFromProjectionMatrix(_cmx);
@@ -1484,13 +1486,14 @@ function updateCull() {
     if (C.lead) { V = C.lead.vl; nv = C.lead.nv; } /* a twin: its lead (just before it) has tested the same centres this frame */
     else { V = C.vl || (C.vl = new Int32Array(C.n));
       for (let i = 0; i < C.n; i++) {
-        { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far + r; if (dx * dx + dy * dy + dz * dz > fr * fr) continue; } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; }
+        { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far + r, d2 = dx * dx + dy * dy + dz * dz; if (d2 > fr * fr) continue; if (FAR_GROW) { const B = Math.max(20, C.far * .2), d = Math.sqrt(d2), gs = C.gs || (C.gs = new Float32Array(C.n)); gs[i] = d <= fr - B ? 1 : smooth(fr, fr - B, d); } } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; }
         V[nv++] = i; }
       C.nv = nv; }
     const im = C.m.instanceMatrix.array, ic = C.cols && C.m.instanceColor.array, A = C.all, Cc = C.cols; let k = 0, ch = false; const pi = C.pi || (C.pi = new Int32Array(C.n).fill(-1));
     const F = lod ? C.fm : null, fim = F && F.instanceMatrix.array, fic = F && Cc && F.instanceColor.array, fpi = C.fpi; let kf = 0, chf = false;
     for (let q = 0; q < nv; q++) { const i = V[q];
       if (F) { const j = i * 4, dx = S[j] - cx, dy = S[j + 1] - cy, dz = S[j + 2] - cz; if (dx * dx + dy * dy + dz * dz > FD2) { if (fpi[kf] !== i) { fpi[kf] = i; chf = true; const s0 = i * 16, d0 = kf * 16; for (let e = 0; e < 16; e++) fim[d0 + e] = A[s0 + e]; if (fic) { const s1 = i * 3, d1 = kf * 3; fic[d1] = Cc[s1]; fic[d1 + 1] = Cc[s1 + 1]; fic[d1 + 2] = Cc[s1 + 2]; } } kf++; continue; } }
+      const gsv = FAR_GROW && C.far < 1e9 ? (C.lead || C).gs : null, gk = gsv ? gsv[i] : 1; if (gk < 1) { pi[k] = -1; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = (e < 11 && e % 4 !== 3) ? A[s0 + e] * gk : A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } k++; continue; } /* FAR_GROW: near its draw limit it's scaled down, so it grows in rather than popping */
       if (pi[k] !== i) { pi[k] = i; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } } k++;
     }
     C.m.count = k; C.m.visible = k > 0;
@@ -2967,6 +2970,15 @@ const WIND_CALMER = true; /* Neil (11-17 07:22): "Let's make strong wind not hap
    always from about the same quarter. The shot takes whatever is blowing at the moment it's struck */
 const OSLER1_WIND = true; /* the first hole's fixed 10 mph 'off the lake' wind (Hunt 1's) doesn't apply on OslerBrook: its hole 1 rolls a wind like any other hole. false = as v433 */
 const OSLER3_WIND = true; /* osler5 (Neil 18 Nov, his club: OslerBrook 3 plays "into the prevailing winds"): hole 3's wind blows in the player's face, 6 in 10 within 20 deg of straight in, else quartering (35-55 deg). Strength as on any hole; no new random draws (MP stays in step). false = as before */
+const PREVAIL_WIND = true; /* Neil (18 Nov 09:32-09:39): each course's prevailing wind. A hole's wind is still one roll (strength as before); its direction comes from the course's mix of directions it blows FROM (true compass): OslerBrook and Augusta W (half within 30 deg, the rest anywhere else), the Hunt W 45% / NE 25% (within 30 deg) / the rest anywhere else; OslerBrook 3 keeps OSLER3_WIND. Every hole 1 rolls too (no fixed 'off the lake' 10 mph). The rolled angle is remapped: no new random draws, a room's phones stay in step. false = as v434. Re-apply: opine/patch_wind.py */
+const PREVAIL = { osler: [[270, .5]], augusta: [[270, .5]], hunt: [[270, .45], [45, .25]] }, PREVAIL_BRG = { hunt: { 1: 32.4, 2: 314.3, 3: 335.2, 4: 163.1, 5: 339.0, 6: 216.6, 7: 150.9, 8: 225.3, 9: 119.8 }, augusta: { 1: 305.9, 2: 169.7, 3: 311.3, 4: 269.2, 5: 164.5, 6: 14.1, 7: 114.0, 8: 349.8, 9: 125.5, 10: 186.0, 11: 219.4, 12: 213.6, 13: 327.0, 14: 89.5, 15: 285.2, 16: 335.5, 17: 105.3, 18: 17.9 } }; /* PREVAIL: [compass FROM, share within 30 deg]; PREVAIL_BRG: each hole's tee-to-pin bearing, true north (Hunt: its builder, hole 1 from osm.json + 1.2 deg grid convergence; Augusta: the OSM builder; OslerBrook: its data, +0.5 deg) */
+function prevailAng(q, cid, n) { /* PREVAIL_WIND: q in [0, 1) (the hole's own uniform roll) -> the wind's angle in the hole's frame (null: no table for it) */
+  const L = PREVAIL[cid]; let b = PREVAIL_BRG[cid] ? PREVAIL_BRG[cid][n] : null;
+  if (cid === 'osler') { const F = typeof OSLER_HOLES === 'object' && OSLER_HOLES[n] && OSLER_HOLES[n].meta && OSLER_HOLES[n].meta.frame; b = F ? F.bearing_deg_grid + .5 : null; }
+  if (!L || b == null) return null; let from = null, c = 0;
+  for (const [d, p] of L) { if (q < c + p) { from = d + ((q - c) / p - .5) * 60; break; } c += p; }
+  if (from == null) { const x = L[0][0] + 30, ex = L.map(([d]) => (((d - 30 - x) % 360) + 360) % 360).sort((u, v) => u - v); let pos = (q - c) / (1 - c) * (360 - 60 * L.length); for (const o of ex) if (pos >= o) pos += 60; from = x + pos; } /* the rest: evenly round the circle outside the arcs */
+  return (b - 90 - from) * Math.PI / 180; }
 const WIND = (() => { let R = Math.random; const ph = [0, 0, 0, 0].map(() => R() * 6.283); /* (R: MP hook, see rng) */ let base = { mph: 12, ang: Math.PI * .95 }, T = 0, g = { at: 14 + R() * 18, t: -1, dur: 0, amp: 0, da: 0 }, shown = null;
   const env = () => { if (g.t < 0) return 0; const up = 1.2, down = 1.8; return g.t < up ? g.t / up : g.t < up + g.dur ? 1 : Math.max(0, 1 - (g.t - up - g.dur) / down); };
   function update(dt) { T += dt;
@@ -2975,7 +2987,7 @@ const WIND = (() => { let R = Math.random; const ph = [0, 0, 0, 0].map(() => R()
     const e = env(), tw = 6.283;
     G.wind = { mph: Math.max(0, base.mph * (1 + .1 * Math.sin(T * tw / 33 + ph[2]) + .05 * Math.sin(T * tw / 11 + ph[3])) + g.amp * e), ang: base.ang + .15 * Math.sin(T * tw / 47 + ph[0]) + .07 * Math.sin(T * tw / 19 + ph[1]) + g.da * e };
     const m = Math.round(G.wind.mph); if (m !== shown) { shown = m; const el = document.getElementById('windNum'); if (el) el.innerHTML = `${m}<small>mph</small>`; } if (!MENU.on && G.dir) updateWindArrow(); } /* only ever called from the frame loop, after MENU exists */
-  function hole(n) { base = n === 1 && !(OSLER1_WIND && CID === 'osler') ? { mph: WIND_CALMER ? 10 : 12, ang: Math.PI * .95 } : { mph: WIND_CALMER ? Math.round(2 + 14 * Math.pow(R(), 2.2)) : Math.round(4 + R() * 10), ang: R() * 6.283 }; if (OSLER3_WIND && CID === 'osler' && HOLE && HOLE.n === 3) { const q = base.ang / 6.283, side = q < .8 ? -1 : 1; base.ang = Math.PI * 1.5 + (q < .6 ? (q / .6 - .5) * .7 : side * (.61 + ((q - .6) % .2) / .2 * .35)); } /* OSLER3_WIND */ shown = null; G.wind = { mph: base.mph, ang: base.ang }; flag.aim(base); } /* no update() here: it runs at boot, before MENU and the HUD exist */ /* the Hunt's 1st: off the lake, as it always was */
+  function hole(n) { base = n === 1 && !PREVAIL_WIND && !(OSLER1_WIND && CID === 'osler') ? { mph: WIND_CALMER ? 10 : 12, ang: Math.PI * .95 } : { mph: WIND_CALMER ? Math.round(2 + 14 * Math.pow(R(), 2.2)) : Math.round(4 + R() * 10), ang: R() * 6.283 }; if (PREVAIL_WIND && HOLE && !(OSLER3_WIND && CID === 'osler' && HOLE.n === 3)) { const a = prevailAng(base.ang / 6.283, CID, HOLE.n); if (a != null) base.ang = a; } /* PREVAIL_WIND */ if (OSLER3_WIND && CID === 'osler' && HOLE && HOLE.n === 3) { const q = base.ang / 6.283, side = q < .8 ? -1 : 1; base.ang = Math.PI * 1.5 + (q < .6 ? (q / .6 - .5) * .7 : side * (.61 + ((q - .6) % .2) / .2 * .35)); } /* OSLER3_WIND */ shown = null; G.wind = { mph: base.mph, ang: base.ang }; flag.aim(base); } /* no update() here: it runs at boot, before MENU and the HUD exist */ /* the Hunt's 1st: off the lake, as it always was */
   return { update, hole, gusting: () => g.t >= 0, rng(f) { R = f || Math.random; } /* MP hook: a room seeds each hole's wind */, get base() { return base; } /* base: the hole's prevailing wind (CADDIE_WIND) */ }; })();
 function newWind() {} /* retired: the wind no longer re-rolls every shot (WIND keeps the hole's prevailing wind, with drift and gusts) */
 /* CART PATHS: a ball that comes to rest on a cart path gets a free drop at the nearest spot off it that's no nearer the hole, silently (Neil: no message). */
