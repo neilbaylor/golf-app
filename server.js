@@ -87,7 +87,7 @@ const MP = (() => {
   for (const k in T) if (process.env['MP_' + k]) T[k] = +process.env['MP_' + k]; /* e.g. MP_IDLE=3000 for quick tests */
   const EMO = ['❤️', '😂', '🔥', '👏', '😮', '🙈'];
   const COURSES = { hunt: 'Toronto Hunt', augusta: 'Augusta National' };
-  const RATE = { aim: [20, 30], chat: [1.2, 3], react: [5, 8], typing: [2, 4], act: [2, 4], who: [2, 4], course: [2, 4], hello: [1, 3], '*': [60, 90] }; /* per second, burst */
+  const RATE = { aim: [20, 30], chat: [1.2, 3], react: [5, 8], typing: [2, 4], ff: [6, 10], act: [2, 4], who: [2, 4], course: [2, 4], hello: [1, 3], '*': [60, 90] }; /* per second, burst */
   const ENDED = new Map(); let endedN = 0; /* MP_EMPTY_END: code -> the ended round's sids and ids (15 min), so its phones are told rather than seated in a ghost room */
   const rooms = new Map(), socks = new Set(); let msgsIn = 0, msgsOut = 0, bytesIn = 0, bytesOut = 0, bpSkip = 0, bpCut = 0, restoredN = 0;
   const now = () => Date.now();
@@ -295,7 +295,7 @@ const MP = (() => {
   function message(c, data) {
     msgsIn++; bytesIn += data.length; let m; try { m = JSON.parse(data.toString('utf8')); } catch (e) { return; }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
-    if (!rate(c, m.t)) { if (m.t !== 'aim' && m.t !== 'typing' && m.t !== 'react') send(c, { t: 'err', code: 'rate', msg: 'Slow down a little' }); return; }
+    if (!rate(c, m.t)) { if (m.t !== 'aim' && m.t !== 'typing' && m.t !== 'react' && m.t !== 'ff') send(c, { t: 'err', code: 'rate', msg: 'Slow down a little' }); return; }
     if (m.t === 'ping') return send(c, { t: 'pong', at: m.at });
     if (m.t === 'hello') return hello(c, m);
     const R = c.room, p = R && P(R, c.pid); if (!p) return send(c, { t: 'err', code: 'noroom', msg: 'Not in a room' });
@@ -321,6 +321,7 @@ const MP = (() => {
       case 'chat': { const s = typeof m.text === 'string' ? m.text.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim() : ''; if (!s || [...s].length > T.CHAT_MAX) return send(c, { t: 'err', code: 'chat', msg: 'Messages are 1 to 40 characters' });
         return broadcast(R, { t: 'chat', from: p.id, text: s, id: rid(6) }); }
       case 'typing': return broadcast(R, { t: 'typing', from: p.id, on: !!m.on }, p);
+      case 'ff': if (R.tstate === 'flight' && R.shot && R.shot.by === p.id) broadcast(R, { t: 'ff', from: R.shot.as, n: R.shotN, on: !!m.on }, p); return; /* MP_FF_SHARE (Neil 11-17): the shooter holding fast-forward: the others' replay speeds up too */
       case 'react': if (EMO.includes(m.e)) broadcast(R, { t: 'react', from: p.id, e: m.e }); return;
     }
   }

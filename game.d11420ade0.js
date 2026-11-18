@@ -40,7 +40,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v425'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v427'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5816,8 +5816,8 @@ function frame(now) {
     const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null;
     try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
     requestAnimationFrame(frame); return; }
-  { const ff = G.ff && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
-  if (G.view === 'flight') updateFlight(dt * 1.15 * (G.ff ? 3 : 1)); else updateCamera(dt); // flight plays 15% quicker than real time
+  { const ff = (G.ff || (MP_FF_SHARE && G.ffR && G.view === 'flight')) && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
+  if (G.view === 'flight') updateFlight(dt * 1.15 * (G.ff || (MP_FF_SHARE && G.ffR) ? 3 : 1)); else updateCamera(dt); // flight plays 15% quicker than real time
   if (G.shake > 0) { G.shake -= dt; const k = G.shake * .06; camera.position.x += (Math.random() - .5) * k; camera.position.y += (Math.random() - .5) * k; }
   updateTracer(); dashTex.offset.x = -(t * .9) % 1;
   { const show = G.aimT < .35 || G.view === 'flight', lc = scene.userData.lowClouds;
@@ -6418,7 +6418,8 @@ const MP_FLY_NO_CHAT = true; /* Neil (11-17 20:04): "We don't want chat up durin
 const MP_BUB_FOLLOW = true; /* Neil (11-17 20:05): "Sometimes chat bubble is in wrong spot when player who is hitting changes": a bubble (or typing dots) already up is placed once, on whoever's face it was then; when the turn changes the faces move (the hitter's big avatar, the strip, the panel), so the bubbles on screen move to their golfer's new spot, again once the panel has slid in. false = as v423 */
 const MP_ME_BUB = true; /* Neil (11-17 20:22, 2-player chat): "it sits above the chat not above my face": watching, your own bubble sits just over your face (bottom left of the panel, its tail on it), not up on the panel's top line, and your reactions float up from your face (or beside your bubble). false = as v424 */
 const MP_BALL_CHECK = true; /* Neil (11-17 20:36): "Sometimes in multiplayer when you chip close you get to the green and not as close I think". The ball's spot travels exactly (the shot's end -> your 'next' -> the server -> your turn), so this is a check, not a fix: when your turn starts on the green more than 1 ft from where your last shot stopped, the console log keeps both spots (Neil 20:43: no toast). false = no check */
-const MP_LOAD_CARD = true; /* Neil (11-17 20:40): "After you start a multiplayer game it shows the Home Screen while loading. Very confusing. Let's show a loading bar instead": tee off from the lobby covers the screen with the hole's loader card (crest, Hole N, par and yards) and a filling bar until the hole is ready, and the build runs at full speed under it. false = as v424 (home screen while it builds) */
+const MP_LOAD_CARD = true; /* Neil (11-17 20:40): "After you start a multiplayer game it shows the Home Screen while loading. Very confusing. Let's show a loading bar instead"; (20:57) "No blue loader. Just a small loading bar like between holes over top of the lobby": tee off keeps the lobby up, with the small Loading pill (Hole N, par and yards, a filling bar) over it, until hole 1 is ready; the build runs at full speed meanwhile. false = as v424 (home screen while it builds) */
+const MP_FF_SHARE = true; /* Neil (11-17 21:04): "if I ff my shot by holding the screen in multiplayer my playing partners don't get the fast forward" / "They should also get fast forward": holding to fast-forward your own shot in the air tells the room (on / off); the others' replay of that shot runs at 3x for as long as you hold (their own hold still works too). Speed only: the flight and where it ends are the same. false = as v426 (needs the server's 'ff' relay) */
 const MP_KB_LIFT = true; /* Neil (11-16 16:11): on iOS the chat box rides up above the keyboard as soon as it's focused (visualViewport), not only once you start typing. false = as v374 */
 const MP_CHAT_BLUR = true; /* Neil (11-16 14:11): after you send a chat message the text box blurs (keyboard away), watching or not. false = it kept focus while watching */
 /* mpui (Neil 11-16 20:19-20:24, tested on real iOS and Android phones). Each false = v387 */
@@ -6540,6 +6541,7 @@ if (MULTI) try { MPX = (() => {
       case 'go': if (MP_EARLY_NEXT) { S.goSeen = m.n; if (S.resN === m.n && !$('#result').hidden) S.resHold = Math.min(S.resHold || 0, S.resAt + K.CARD_HOLD); } break; /* MP_EARLY_NEXT: the hitter tapped their card away: here the next turn may now take this card down after 1.7 s (CARD_HOLD), as before when that tap sent 'next' */
       case 'chat': if (!CHAT.echo('m', m.from, m.text)) { CHAT.msg(m.from, m.text); CHAT.log(m.from, m.text); } break; /* (MP_OPT_CHAT: my own was shown when I sent it) */
       case 'typing': CHAT.typing(m.from, m.on); break;
+      case 'ff': if (MP_FF_SHARE) S.ffR = { n: m.n, from: m.from, on: !!m.on }; break; /* MP_FF_SHARE: the shooter is holding fast-forward on this shot */
       case 'react': if (!CHAT.echo('r', m.from, m.e)) CHAT.react(m.from, m.e); break;
       case 'err': log('err', m.code, m.msg); if (S.joining && /^(taken|full|code)$/.test(m.code)) joinDone(); /* MP_CONNECT_FIRST: refused: the modal shows why (below) */
         if (S.switchTo && /^(taken|full|code|rate)$/.test(m.code)) { S.switchTo = null; tiles(); const x = el('mpCodeMsg'); x.classList.add('stk'); x.innerHTML = '<b></b><small></small>'; /* a room switch that didn't work: still in this room */
@@ -6555,8 +6557,9 @@ if (MULTI) try { MPX = (() => {
   /* ---------- room state: lobby, round, cards ---------- */
   function room(R, fresh) {
     const was = S.room; S.room = R; if (NINES_PICK) NINE.mp = R.nine || '18'; /* NINES_PICK: in a room, the room's nine */ { const m = R.players.find(p => p.id === S.you); if (m && m.who !== S.myWho) { S.myWho = m.who; S.myLefty = m.who === S.homeWho ? S.homeLefty : handFor(m.who); const f = el('mpMe'); if (f && S.inRound) f.innerHTML = face(m.who); } } /* my golfer is the room's record of me (a rejoin keeps its seat's golfer) */
-    if (R.phase === 'lobby') { if (S.inRound) endRound(); LOBBY.show(); LOBBY.draw(); CARD.hide(); return; }
-    LOBBY.hide();
+    if (R.phase === 'lobby') { S.lobHold = false; el('mpLobby').classList.remove('ld'); if (S.inRound) endRound(); LOBBY.show(); LOBBY.draw(); CARD.hide(); return; }
+    if (MP_LOAD_CARD && !S.inRound && !el('mpLobby').hidden && R.phase === 'play') { S.lobHold = true; el('mpLobby').classList.add('ld'); } /* MP_LOAD_CARD: teeing off: the lobby stays until hole 1 is ready (loadHole) */
+    if (!S.lobHold) LOBBY.hide();
     if (R.phase === 'play' || R.phase === 'hole' || R.phase === 'done') {
       if (!S.inRound) startRound(R);
       if (R.hole !== S.hole) { S.Q.push({ k: 'hole', n: R.hole, course: R.course }); S.hole = R.hole; S.logs = {}; S.flySkip = 0; }
@@ -6578,9 +6581,9 @@ if (MULTI) try { MPX = (() => {
     S.loaded = false; const seedH = (S.room.seed ^ Math.imul(n, 0x9E3779B1)) >>> 0, cid = course || S.room.course;
     let fresh = false; if (MP_PIN_SEED && cid === 'hunt' && typeof PINS === 'object') { const ps = pinSeed(); S.pinSeeded = true; if (PINS.seed() !== ps) { PINS.seed(ps); fresh = true; log('pins seed', ps); } } /* MP_PIN_SEED: the room's pins on every phone (a late joiner or a reload with a stale tp_pins too); a hole built with other pins (the home's Hunt 1) is built again */
     const go = () => { WIND.rng(rng(seedH)); if (n === 1) FLY.reset(); BOOT.on = false; if (MENU.on) setHome(false); playHole(); const bt = $('#boot'); if (bt && !bt.hidden) { bt.classList.add('done'); setTimeout(() => { if (!BOOT.on) bt.hidden = true; }, 600); } S.loaded = true; log('hole', n, 'ready'); pump(); };
-    let card = false; if (MP_LOAD_CARD && MENU.on && (fresh || !HOLESYS.isReady(cid, NINE.first(cid) + n - 1))) try { card = true; const i = NINE.first(cid) + n - 1, C = COURSE_DEF[cid], m = (C.list || (C.list = C.holes()))[i - 1] || { n: i, par: 4, yds: 0 }, L = document.getElementById('holeLdr'); HOLELOAD.show({ n: m.n, par: m.par, yds: m.yds, logo: C.logo }); L.querySelector('img').classList.toggle('thin', cid === 'augusta'); L.classList.add('bar'); const u = L.querySelector('.hlBar u'); u.style.width = '4%'; clearInterval(S.ldIv); S.ldIv = setInterval(() => { u.style.width = Math.round(4 + 96 * HOLESYS.prog) + '%'; }, 120); } catch (e) { console.error(e); } /* MP_LOAD_CARD: the hole's loader card with a bar, not the home screen */
-    const go1 = go; const goC = card ? () => { clearInterval(S.ldIv); try { document.querySelector('#holeLdr .hlBar u').style.width = '100%'; } catch (e) {} go1(); setTimeout(() => { HOLELOAD.hide(); setTimeout(() => document.getElementById('holeLdr').classList.remove('bar'), 500); }, 150); } : go;
-    if (MENU.on) { MENU.course = cid; } HOLESYS.go(cid, NINE.first(cid) + n - 1, [], goC, { pill: !MENU.on, fresh, card }); /* NINES_PICK: the room's hole n is the n-th of its nine */
+    const card = !!(MP_LOAD_CARD && MENU.on); /* MP_LOAD_CARD: from the lobby: the lobby stays up with the small Loading pill over it (as between holes) until the hole is ready, built at full speed */
+    const goC = () => { if (S.lobHold) { S.lobHold = false; LOBBY.hide(); el('mpLobby').classList.remove('ld'); } go(); };
+    if (MENU.on) { MENU.course = cid; } HOLESYS.go(cid, NINE.first(cid) + n - 1, [], goC, { pill: !MENU.on || card, fresh, card }); /* NINES_PICK: the room's hole n is the n-th of its nine */
   }
   const pinSeed = () => (S.room.seed ^ 0x2C1B3C6D) | 0; /* the Hunt's pins: from the room's per-game seed (the server deals a new one at every TEE OFF), kept apart from the wind's */
   function unpin() { if (!S.pinSeeded) return; S.pinSeeded = false; try { PINS.seed(null); } catch (e) {} } /* out of the round: single player's own random pins again */
@@ -7040,6 +7043,8 @@ if (MULTI) try { MPX = (() => {
     if (MP_FEEL && S.mine && (SW.phase === 'back' || SW.phase === 'down')) return; /* mid-swing on your turn: the frame is the swing's alone (the inbox, aim stream, bubbles and cards wait ~1 s for the launch) */
     if (MP_CATCHUP && S.hidAt && now - S.hidAt > 2000) { S.catchT = now + 600; S.hidAt = 0; } /* the first frame back (it can come before 'visibilitychange'): hold the inbox's backlog for the catch-up */
     drain(); if (!S.inRound) return; if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
+    if (MP_FF_SHARE) { const fl = G.view === 'flight', mineF = fl && !!S.pend && !S.replaying; if (mineF) { const on = !!G.ff; if (on !== !!S.ffSent) { S.ffSent = on; send({ t: 'ff', on }); } } else if (S.ffSent) { if (!fl) S.ffSent = false; } /* my shot in the air: my fast-forward goes to the others (on, off) */
+      const R0 = S.replaying, F = S.ffR; G.ffR = !!(fl && R0 && F && F.on && F.from === R0.from && F.n === R0.n); } /* watching it: the shooter's fast-forward plays here too */
     if (S.mine && !S.pend && !S.shootAs) { if (!(MP_EARLY_NEXT && S.room && S.room.shotN !== S.curN)) aimOut(now); } else if (!S.mine) aimIn(dt); /* (MP_EARLY_NEXT: a newer turn is waiting under the card: no aim from the old one) */
     if (MP_EARLY_NEXT && S.goN != null && $('#result').hidden) S.goN = null; /* (the card went: a tap sent 'go' as it happened, below) */
     if (MP_FLY_SKIP_ALL && S.flySkip && S.flySkip === S.hole && S.loaded && FLY.on) FLY.end(true); /* MP_FLY_SKIP_ALL: the same path as this phone's own Skip (it does nothing once the glide back has begun) */
