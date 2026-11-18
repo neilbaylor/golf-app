@@ -40,7 +40,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v428'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v429'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -71,6 +71,7 @@ const h9Bare = (u, v) => Math.sin(u * .22 + .5) * Math.cos(v * .19 + 1.7) + .6 *
 const HUNT_PINES = true; /* Hunt 7, 8, 9 (Neil: "some pine trees in the mix. Not like Christmas trees ... fuller a bit"; then: white pines, "about 50%" down 9 and on the left of 8): pines drawn in natural clumps, eastern-white-pine style: a bare trunk up to a high, flat-topped crown of flat, irregular tiers, each tier a couple of lumps off to different sides, about as wide as the lidar crown. Same crown mesh, colours and ink as Augusta's loblollies (no new geometry). Share of each treeline: HUNT_PINE_SHARE. false = all broadleaf */
 const NO_DOMES = true; /* Neil (11-16 10:44): "I don't like when we do far off bumps in the background, let's just have it be plain grass": no background domes (Hunt 1, Augusta); the Hunt's lake and its low crown rings stay. false = the domes as before */
 const AUG_DOMES = true; /* Neil (11-17 19:50): "We removed the background bumps at Augusta. Let's bring them back (not too many, it's just a bit boring now)": with NO_DOMES on, Augusta gets back half of its old far domes (the same ones, every other one); the Hunt stays plain. false = no domes (as v422) */
+const AUG_DOMES_K = { h: .38, r: .8 }; /* Neil (11-17 21:36): "Augusta bumps are too big. They look like big hills / mountains": each dome's height x .38 and its width x .8 (a gentle roll on the skyline). { h: 1, r: 1 } = v423's size */
 const H5_TEE_GRASS = true; /* Neil (11-16 10:19): "Hunt 5 tee is continuous grass not pine straw": the back box and the next one joined into one long tee on the lidar's raised deck (as his photo; the tee in use), and the straw strips over the tee area (the data's two PINE beds there) turned back to grass. The forward box past the cart path stays. false = the boxes and straw as before */
 const HUNT_TEE5 = { box: [[-12.0, 43.6], [-5.5, 44.9], [4.5, -5.7], [-2.0, -7.0]], join: [[0, 0], [-6.1, 30.9]], straw: [-15, 25, -12, 85] }; /* box: the long tee; join: the boxes it replaces (centres); straw: PINE beds wholly inside [u0, u1, v0, v1] go */
 const H9_FRAME = true; /* Neil (11-16 09:15, photo from the 9 tee): the tee shot is framed by a full leafy mass on the left and tall broadleaf trees plus one dark spruce on the right. Within 120 yd of the tee: no pines on the left, and on the right only the nearest tall one (the spruce's stand-in); the rest of 9 keeps HUNT_PINE_SHARE's ~50%. Only which trees draw as pines changes (no tree moves or resizes). false = as before */
@@ -1826,7 +1827,7 @@ function* buildSceneryG() { /* BUILD_CHUNK2: yields between its parts and throug
     if (OE) OSLX.oslerEsc();
   } else if (!NO_DOMES || (AUG_DOMES && AUGD && AUGD.course === 'augusta')) { /* (AUG_DOMES: Augusta's come back, every other one) */
   for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(HB.cx + Math.cos(a) * d, HB.cz + Math.sin(a) * d, r)) d += 15; if (Math.cos(a) * d - r < 60 && false) continue; if (!AUGD && Math.cos(a) * d > 40) continue; hills.push({ p: new THREE.Vector3(HB.cx + Math.cos(a) * d, HB.y, HB.cz + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
-  if (NO_DOMES && AUG_DOMES) for (let i = hills.length - 1; i >= 0; i--) if (i % 2) hills.splice(i, 1); /* AUG_DOMES: the same domes as before NO_DOMES, every other one (8 of 16) */
+  if (NO_DOMES && AUG_DOMES) for (let i = hills.length - 1; i >= 0; i--) if (i % 2) hills.splice(i, 1); if (NO_DOMES && AUG_DOMES) for (const h of hills) { h.s.y *= AUG_DOMES_K.h; h.s.x *= AUG_DOMES_K.r; h.s.z *= AUG_DOMES_K.r; } /* (AUG_DOMES_K: low, gentle rises, not hills) */ /* AUG_DOMES: the same domes as before NO_DOMES, every other one (8 of 16) */
   const hm = new THREE.InstancedMesh(geo, toon(0xffffff), hills.length), inked = hills.filter(h => h.ink), ho = new THREE.InstancedMesh(geo, inkMat, inked.length);
   const M4 = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), C0 = new THREE.Color(), S0 = new THREE.Vector3();
   hills.forEach((h, i) => { hm.setMatrixAt(i, M4.compose(h.p, Q0, h.s)); hm.setColorAt(i, C0.set(h.c)); });
@@ -5072,6 +5073,8 @@ app.addEventListener('pointerdown', e => { if (G.view === 'flight' || (FLY_FF &&
 function ffTipMaybe() { if (store.get('ffUsed', false)) return; const n = store.get('ffTips', 0); if (n >= 2) return;
   clearTimeout(G.ffTipTO); G.ffTipTO = setTimeout(() => { if (G.view !== 'flight' || G.ff || store.get('ffUsed', false)) return; store.set('ffTips', n + 1); const t = $('#ffTip'); t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 2600); }, 2000); }
 window.addEventListener('pointercancel', () => { G.ff = false; });
+const FF_UNSTICK = true; /* Neil (11-17 21:37): "Now sometimes 3x stays on the screen": a release some control kept to itself (the golfer's face stops its pointerup) or one lost to an app switch left G.ff on, so the 3x badge stayed and the next flight or fly-over ran fast with no finger down. Fingers are now counted at the window before anything else sees them; with none down, fast-forward is off. false = as v427 */
+const FFP = new Set(); window.addEventListener('pointerdown', e => FFP.add(e.pointerId), true); window.addEventListener('pointerup', e => FFP.delete(e.pointerId), true); window.addEventListener('pointercancel', e => FFP.delete(e.pointerId), true); window.addEventListener('blur', () => FFP.clear()); ['touchstart', 'touchend', 'touchcancel'].forEach(k => window.addEventListener(k, e => { if (!e.touches.length) FFP.clear(); }, { capture: true, passive: true })); /* (iOS: a touch taken over by a system gesture can end with no pointerup or pointercancel at all; the touch list is the truth: no touches, no fingers down) */ document.addEventListener('visibilitychange', () => { if (document.hidden) FFP.clear(); });
 canvas.addEventListener('pointerdown', e => {
   if (!$('#result').hidden) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -5879,6 +5882,7 @@ function frame(now) {
     const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null;
     try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
     requestAnimationFrame(frame); return; }
+  if (FF_UNSTICK && G.ff && !FFP.size) G.ff = false; /* FF_UNSTICK: no finger down: no fast-forward */
   { const ff = (G.ff || (MP_FF_SHARE && G.ffR && G.view === 'flight')) && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
   if (G.view === 'flight') updateFlight(dt * 1.15 * (G.ff || (MP_FF_SHARE && G.ffR) ? 3 : 1)); else updateCamera(dt); // flight plays 15% quicker than real time
   if (G.shake > 0) { G.shake -= dt; const k = G.shake * .06; camera.position.x += (Math.random() - .5) * k; camera.position.y += (Math.random() - .5) * k; }
@@ -7105,7 +7109,7 @@ if (MULTI) try { MPX = (() => {
   function frame(dt, now) {
     if (MP_FEEL && S.mine && (SW.phase === 'back' || SW.phase === 'down')) return; /* mid-swing on your turn: the frame is the swing's alone (the inbox, aim stream, bubbles and cards wait ~1 s for the launch) */
     if (MP_CATCHUP && S.hidAt && now - S.hidAt > 2000) { S.catchT = now + 600; S.hidAt = 0; } /* the first frame back (it can come before 'visibilitychange'): hold the inbox's backlog for the catch-up */
-    drain(); if (!S.inRound) return; if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
+    drain(); if (!S.inRound) { G.ffR = false; return; } /* (MP_FF_SHARE: out of a round, nobody else's fast-forward) */ if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
     if (MP_FF_SHARE) { const fl = G.view === 'flight', mineF = fl && !!S.pend && !S.replaying; if (mineF) { const on = !!G.ff; if (on !== !!S.ffSent) { S.ffSent = on; send({ t: 'ff', on }); } } else if (S.ffSent) { if (!fl) S.ffSent = false; } /* my shot in the air: my fast-forward goes to the others (on, off) */
       const R0 = S.replaying, F = S.ffR; G.ffR = !!(fl && R0 && F && F.on && F.from === R0.from && F.n === R0.n); } /* watching it: the shooter's fast-forward plays here too */
     if (S.mine && !S.pend && !S.shootAs) { if (!(MP_EARLY_NEXT && S.room && S.room.shotN !== S.curN)) aimOut(now); } else if (!S.mine) aimIn(dt); /* (MP_EARLY_NEXT: a newer turn is waiting under the card: no aim from the old one) */
