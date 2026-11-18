@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v437'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v439'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -66,8 +66,9 @@ const FESCUE_DENSITY = 2.5; /* (FESCUE_THICK) tufts per area, x the v379 stand: 
 const HUNT_LAKE = {"2":[28.2,-19.5,0.1682,-0.9857,173,-56.7],"3":[185.3,-224.9,0.5088,-0.8609,173,-60.9],"4":[-187.8,437.4,-0.6223,0.7828,173,-63.3],"5":[140.2,31.0,0.5647,-0.8253,173,-55.6],"6":[-485.2,61.7,-0.9994,-0.0346,173,-66.0],"7":[-172.2,497.9,-0.4428,0.8966,173,-65.6],"8":[-235.9,83.0,-0.9827,-0.1854,173,-58.4],"9":[16.1,361.5,0.0839,0.9965,173,-55.9]}; /* Lake Ontario off each Hunt data hole, in the hole frame (yards): [u, v] a point on the lip of the Scarborough Bluffs, [nu, nv] the way to the lake (a straight fit of the lidar lip: it runs SW-NE, the lake to the SE), the shore that far past the lip, and the lake level below the tee (Ontario lidar, ~74 m). Kept apart from HUNT_HOLES so a re-embed of the holes keeps it */
 const H9_RAVINE = true; /* Hunt 9 (Neil: "ravine on 9 needs to be deeper and just bushes down there, not trees"): ground more than 6 ft below the tee drawn H9_DEEP x as deep off the tee (fading in from 25 yd behind it, out from 130 to 230 yd: the lidar's 59 ft floor reads ~100 ft), the trees down in it (below 15 ft, short of the fairway) taken out and the floor and lower slopes (below 10 ft) covered in scrub: undergrowth painted over the straw (a few patches left bare) and dense clumps of leafy bushes on it (inked crown blobs, play as deep rough), as in Neil's photos from the tee. The 6 ft line, so the carry, is unchanged; tree tops stay where the lidar has them. false = the plain lidar ravine with its trees */
 const H9_DEEP = 2.1; /* (Neil: "a bit deeper too": was 1.8) how much deeper Hunt 9's ravine is drawn (H9_RAVINE). The grid and its smoothing are not what flattens it (the H grid is within ~1 ft of the raw lidar): at true scale 60 ft over a 130 yd carry just reads as a dip from the tee */
-const H9_BUSH = { step: 3.4, thr: -.95, lip: -1.0, r0: 1.1, rs: .7, tree: -2.6, v1: 215, bare: -.45 }; /* Hunt 9's ravine scrub (H9_RAVINE): grid step (yd), clump cut (lower = more cover), the lip line (yd below the playable ground beside it: bushes from here down), bush radius (yd: 2.5-4 yd across with its lumps), the depth (yd) below which a tree is taken out, how far down the hole (v) the scrub runs (the valley down the right, seen from the tee), and the bare-patch cut (H9_BARE) */
-const H9_BARE = false; /* Neil (11-16 10:28): "I like bare off for hunt 9" (the dense green ravine; true = the brown patches) */ /* Neil: "Just a touch too many bushes. Let's have a bit more of the brown from the before": bare pine-straw patches, 10-20 yd across, opened between the ravine's clumps (about 30% fewer bushes; the undergrowth paint leaves the straw showing there too). false = the scrub as it was */
+const H9_BROWN = true; /* Neil (11-18 12:02): "lets trim back some bushes in hunt ravine a bit, i prefer to see a bit of brown there anyway": the bare pine-straw patches come back (H9_BARE) but fewer and smaller than v348's (cut -.8 instead of -.45: roughly half as much ground), so the ravine stays mostly green scrub with some brown showing through. false = as v437 (no bare patches) */
+const H9_BUSH = { step: 3.4, thr: -.95, lip: -1.0, r0: 1.1, rs: .7, tree: -2.6, v1: 215, bare: H9_BROWN ? -.8 : -.45 }; /* Hunt 9's ravine scrub (H9_RAVINE): grid step (yd), clump cut (lower = more cover), the lip line (yd below the playable ground beside it: bushes from here down), bush radius (yd: 2.5-4 yd across with its lumps), the depth (yd) below which a tree is taken out, how far down the hole (v) the scrub runs (the valley down the right, seen from the tee), and the bare-patch cut (H9_BARE) */
+const H9_BARE = H9_BROWN; /* (11-18: on again, lighter: H9_BROWN) */ /* Neil (11-16 10:28): "I like bare off for hunt 9" (the dense green ravine; true = the brown patches) */ /* Neil: "Just a touch too many bushes. Let's have a bit more of the brown from the before": bare pine-straw patches, 10-20 yd across, opened between the ravine's clumps (about 30% fewer bushes; the undergrowth paint leaves the straw showing there too). false = the scrub as it was */
 const h9Bare = (u, v) => Math.sin(u * .22 + .5) * Math.cos(v * .19 + 1.7) + .6 * Math.sin((u * .7 - v) * .15 + 2.3) + .4 * Math.sin((u + v * .5) * .11 + .9); /* below H9_BUSH.bare: a bare patch (H9_BARE): ~50 patches 8-20 yd across, about 27% of the ravine, rather than one big band */
 const HUNT_PINES = true; /* Hunt 7, 8, 9 (Neil: "some pine trees in the mix. Not like Christmas trees ... fuller a bit"; then: white pines, "about 50%" down 9 and on the left of 8): pines drawn in natural clumps, eastern-white-pine style: a bare trunk up to a high, flat-topped crown of flat, irregular tiers, each tier a couple of lumps off to different sides, about as wide as the lidar crown. Same crown mesh, colours and ink as Augusta's loblollies (no new geometry). Share of each treeline: HUNT_PINE_SHARE. false = all broadleaf */
 const NO_DOMES = true; /* Neil (11-16 10:44): "I don't like when we do far off bumps in the background, let's just have it be plain grass": no background domes (Hunt 1, Augusta); the Hunt's lake and its low crown rings stay. false = the domes as before */
@@ -1396,8 +1397,9 @@ function* terrainSteps(course) { // the painted course on the terrain, as 4x7 ti
   const TU = AUGD ? AUGD.MESH.TU : 2, TV = AUGD ? AUGD.MESH.TV : 4, su = NU / TU, sv = NV / TV;
   HS.remove(course); course.geometry.dispose();
   for (let tj = 0; tj < TV; tj++) for (let ti = 0; ti < TU; ti++) {
-    const geo = new THREE.PlaneGeometry(su * du, sv * dv, su, sv), pa = geo.attributes.position, uv = geo.attributes.uv, nm = geo.attributes.normal;
-    const tu = MAP.U0 + (ti + .5) * su * du, tv = MAP.V0 + (tj + .5) * sv * dv;
+    const tu = MAP.U0 + (ti + .5) * su * du, tv = MAP.V0 + (tj + .5) * sv * dv; let fine = null;
+    for (const half of GROUND_LOD ? [0, 1] : [0]) { /* GROUND_LOD: the tile, then its half-resolution twin */
+    const geo = new THREE.PlaneGeometry(su * du, sv * dv, half ? Math.ceil(su / 2) : su, half ? Math.ceil(sv / 2) : sv), pa = geo.attributes.position, uv = geo.attributes.uv, nm = geo.attributes.normal;
     for (let k = 0; k < pa.count; k++) {
       const i = ti * su + Math.round((pa.getX(k) + su * du / 2) / du), j = tj * sv + Math.round((pa.getY(k) + sv * dv / 2) / dv);
       pa.setZ(k, H(i, j)); uv.setXY(k, i / NU, j / NV);
@@ -1406,6 +1408,7 @@ function* terrainSteps(course) { // the painted course on the terrain, as 4x7 ti
     }
     geo.computeBoundingSphere(); yield;
     const m = new THREE.Mesh(geo, course.material); m.rotation.x = -Math.PI / 2; m.position.set(tu, 0, -tv); m.userData.courseTile = true; if (AUGD) m.renderOrder = -2; HS.add(m);
+    if (!half) fine = m; else { m.visible = false; (HS.ud.gtiles || (HS.ud.gtiles = [])).push({ fine, coarse: m, c: new THREE.Vector3(tu, geo.boundingSphere.center.z, -tv), r: Math.hypot(su * du, sv * dv) / 2 }); } }
   }
 }
 function buildOuter() { /* the land round the painted map (per hole) */
@@ -1437,7 +1440,7 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
   items.forEach((it, i) => { it.m.toArray(all, i * 16); m.setMatrixAt(i, it.m); if (cols) { it.c.toArray(cols, i * 3); m.setColorAt(i, it.c); } sph[i * 4] = it.p.x + o.x; sph[i * 4 + 1] = it.p.y + o.y; sph[i * 4 + 2] = it.p.z + o.z; sph[i * 4 + 3] = it.r; if (it.tid != null) tid[i] = it.tid; });
   m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (m.instanceColor) m.instanceColor.setUsage(THREE.DynamicDrawUsage);
   if (opt.off) m.position.copy(opt.off); if (opt.ud) Object.assign(m.userData, opt.ud);
-  const C = { m, all, cols, sph, tid, n, far: opt.hideBeyond || 1e9, lead: null, vl: null, nv: 0, fm: null };
+  const C = { m, all, cols, sph, tid, n, far: opt.hideBeyond || 1e9, lead: null, vl: null, nv: 0, fm: null, fcut2: opt.farCut ? opt.farCut * opt.farCut : 0 };
   { const P = HS.cull[HS.cull.length - 1], L = P && (P.lead || P); /* a twin (an ink hull, a blossom cap): same instance centres as the mesh before it, so it shares that mesh's visible list (radius: the larger of the two, so it can only draw more, never less) */
     if (L && L.n === n && L.far === C.far && !!L.m.userData.tuft === !!m.userData.tuft) { let same = true; for (let i = 0; i < n * 4 && same; i += 4) same = sph[i] === L.sph[i] && sph[i + 1] === L.sph[i + 1] && sph[i + 2] === L.sph[i + 2] && tid[i >> 2] === L.tid[i >> 2];
       if (same) { for (let i = 3; i < n * 4; i += 4) L.sph[i] = Math.max(L.sph[i], sph[i]); C.lead = L; } } }
@@ -1445,17 +1448,22 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
     f.count = 0; f.visible = false; if (opt.off) f.position.copy(opt.off); if (opt.ud) Object.assign(f.userData, opt.ud); C.fm = f; C.fpi = new Int32Array(n).fill(-1); } /* "far trees: simple": the same instances, far off, in a simpler mesh */
   HS.cull.push(C); HS.add(m); if (C.fm) HS.add(C.fm); return m;
 }
+const FAR_TRUNK = true; /* Augusta 8 lightening, option 2 (preview for Neil 11-18): with "far trees: simple", trunks and branches beyond 120 yd are drawn as a 4-sided open tube (8 tris, not 28) and without their ink outline. false = as v437 */
+const AZ_INK_CUT = 200; /* option 3: the far azalea domes' ink outline is dropped beyond this many yd (0 = never, as v437) */
+const GROUND_LOD = 120; /* option 4: course ground tiles whose nearest edge is beyond this many yd are drawn from a half-resolution twin (a quarter of the triangles). 0 = off, as v437 */
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
 const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
 const SAY_DODGE = true; /* Neil 17 Nov (v404): "on long putts your character's speech bubble covers the hole ... maybe we just don't have the player talk when it's that situation": putting, if the hole is (or the putting view settles) under the bubble, the golfer doesn't say the line (one already up goes). Other shots unchanged. false = they always talk, as v403 */
 const ROUND_HOME_DIRECT = true; /* Neil 17 Nov (v403): Home on the finished-round scorecard goes straight home (the round is over: no "your score won't be kept" ask). false = it asks, as v402 */
-const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
-$('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
+const FAR_ALWAYS = true; /* Neil (11-18 12:24): the fps-meter toggle doesn't need to exist: far trees (crowns, trunks, azaleas) are always simple, whatever a device saved before; tapping the meter does nothing. false = as v438 */
+const FARLOD = { on: FAR_ALWAYS || !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
+$('#perf').addEventListener('click', () => { if (FAR_ALWAYS) return; FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
 const FAR_GROW = true; /* Neil (11-18 11:29, OslerBrook 2's fly-over): "The little trees on the right appear as the flyover is going". Ground cover with a draw limit (the wet meadow's reeds and cattails at 220 yd, fescue and reed clumps at 170, grass tufts at 70-102) popped in whole when the camera came within range. Now, over the last fifth of that range (at least 20 yd), each one is drawn scaled down, so it grows in instead of popping. false = as v435 */
 const FLY_FAR = 2.5; /* Neil (11-18 11:39): still saw them appear. During a hole's fly-over (the drone sees the whole hole from up high) ground cover is drawn out to 2.5x its usual distance (OslerBrook 2's cattails 550 yd, fescue clumps 425), so anything still coming in is tiny and far off, and grows in (FAR_GROW). Each is a 2-6 triangle card: ~19k on OslerBrook 2, the most of any hole. 1 = as v436 */
 const FADE_K = { value: 1 }; /* FLY_FAR: the ground cover's shader distance fade (tufts 85 -> 45 yd, fescue 100 -> 55, OslerBrook's reeds 170/220 -> 50 less) stretched by this; FLY_FAR during a fly-over, else 1 */
 const FLY_NO_HIDE = true; /* the same report: during the hole's fly-over no tree steps aside for the line to the ball on the tee (the drone isn't looking at it; on its way back trees ahead of it were vanishing and reappearing). Only a crown the camera is actually inside still steps aside. false = as v435 */
 function updateCull() {
+  if (GROUND_LOD && HS && HS.ud && HS.ud.gtiles) { const cp = camera.position; for (const T of HS.ud.gtiles) { const far = cp.distanceTo(T.c) - T.r > GROUND_LOD; if (T.coarse.visible !== far) { T.coarse.visible = far; T.fine.visible = !far; } } } /* GROUND_LOD */
   { const fk = FLY_FAR > 1 && FLY.on ? FLY_FAR : 1; if (FADE_K.value !== fk) FADE_K.value = fk; } /* FLY_FAR: the shader fade too (the cards fade out by distance in the shader, under their draw limit) */
   camera.updateMatrixWorld(); const e = camera.matrixWorld.elements; let same = true;
   for (let i = 0; i < 16; i++) if (_ck[i] !== e[i]) { same = false; _ck[i] = e[i]; }
@@ -1495,7 +1503,7 @@ function updateCull() {
     const im = C.m.instanceMatrix.array, ic = C.cols && C.m.instanceColor.array, A = C.all, Cc = C.cols; let k = 0, ch = false; const pi = C.pi || (C.pi = new Int32Array(C.n).fill(-1));
     const F = lod ? C.fm : null, fim = F && F.instanceMatrix.array, fic = F && Cc && F.instanceColor.array, fpi = C.fpi; let kf = 0, chf = false;
     for (let q = 0; q < nv; q++) { const i = V[q];
-      if (F) { const j = i * 4, dx = S[j] - cx, dy = S[j + 1] - cy, dz = S[j + 2] - cz; if (dx * dx + dy * dy + dz * dz > FD2) { if (fpi[kf] !== i) { fpi[kf] = i; chf = true; const s0 = i * 16, d0 = kf * 16; for (let e = 0; e < 16; e++) fim[d0 + e] = A[s0 + e]; if (fic) { const s1 = i * 3, d1 = kf * 3; fic[d1] = Cc[s1]; fic[d1 + 1] = Cc[s1 + 1]; fic[d1 + 2] = Cc[s1 + 2]; } } kf++; continue; } }
+      if (F) { const j = i * 4, dx = S[j] - cx, dy = S[j + 1] - cy, dz = S[j + 2] - cz, d2f = dx * dx + dy * dy + dz * dz; if (d2f > FD2) { if (C.fcut2 && d2f > C.fcut2) continue; /* AZ_INK_CUT */ if (fpi[kf] !== i) { fpi[kf] = i; chf = true; const s0 = i * 16, d0 = kf * 16; for (let e = 0; e < 16; e++) fim[d0 + e] = A[s0 + e]; if (fic) { const s1 = i * 3, d1 = kf * 3; fic[d1] = Cc[s1]; fic[d1 + 1] = Cc[s1 + 1]; fic[d1 + 2] = Cc[s1 + 2]; } } kf++; continue; } }
       const gsv = FAR_GROW && C.far < 1e9 ? (C.lead || C).gs : null, gk = gsv ? gsv[i] : 1; if (gk < 1) { pi[k] = -1; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = (e < 11 && e % 4 !== 3) ? A[s0 + e] * gk : A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } k++; continue; } /* FAR_GROW: near its draw limit it's scaled down, so it grows in rather than popping */
       if (pi[k] !== i) { pi[k] = i; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } } k++;
     }
@@ -1553,6 +1561,7 @@ function buildTrees() {
   TREES.geo = { blobFar }; /* the hole's crown mesh, shared with its leafy bushes (buildBushes: Hunt 9's ravine) */
   const coneGeo = new THREE.ConeGeometry(1, 1, 8, 1); coneGeo.translate(0, .5, 0);
   const trunkGeo = new THREE.CylinderGeometry(.32, .48, 1, 7); trunkGeo.translate(0, .5, 0);
+  const trunkFar = FAR_TRUNK ? new THREE.CylinderGeometry(.32, .48, 1, 4, 1, true).translate(0, .5, 0) : null, inkNone = FAR_TRUNK ? new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3)) : null; /* FAR_TRUNK */
   const blobs = [], cones = [], trunks = [], crowns = [], branches = [], plates = OPINE_PADS[CID] ? [] : null; /* plates: the Ontario pines' own pad mesh (OPINE_PADS), else their pads go in the crown mesh */
   const R = rng(11), _q = new THREE.Quaternion(), _ax = new THREE.Vector3();
   if (TREE_ACCENTS && !TREES._acc) { TREES._acc = true; /* a couple of trees a hole in an accent colour (TREE_ACCENTS): their own seeded stream, so the rest draw as before */
@@ -1633,11 +1642,11 @@ function buildTrees() {
   inst(blobGeo, inkMat, crowns, (o, s) => s.set(o.s[0] + .28, o.s[1] + .26, o.s[2] + .28), null, null, blobFar);
   if (plates && plates.length) { const pG = opinePlateGeo(14, 6), pF = opinePlateGeo(9, 4); /* OPINE_PADS: the Ontario pines' needle pads in their own scalloped mesh (near and far; two draws with the ink) */
     inst(pG, toon(0xffffff), plates, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c, null, pF); inst(pG, inkMat, plates, (o, s) => s.set(o.s[0] + .28, o.s[1] + .22, o.s[2] + .28), null, null, pF); }
-  inst(trunkGeo, toon(0x8a5a35), branches, (o, s) => s.set(o.s[0], o.s[1], o.s[2]));
-  inst(trunkGeo, inkMat, branches, (o, s) => s.set(o.s[0] * 1.6, o.s[1], o.s[2] * 1.6));
-  if (trunks.some(o => o.c)) inst(trunkGeo, toon(0xffffff), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || '#8a5a35'); /* OPINE: the Ontario pines' dark and orange-red bark (a colour per trunk; the rest the same brown) */
-  else inst(trunkGeo, toon(0x8a5a35), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]));
-  inst(trunkGeo, inkMat, trunks, (o, s) => s.set(o.s[0] * 1.45, o.s[1], o.s[2] * 1.45));
+  inst(trunkGeo, toon(0x8a5a35), branches, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), null, null, trunkFar);
+  inst(trunkGeo, inkMat, branches, (o, s) => s.set(o.s[0] * 1.6, o.s[1], o.s[2] * 1.6), null, null, inkNone);
+  if (trunks.some(o => o.c)) inst(trunkGeo, toon(0xffffff), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || '#8a5a35', null, trunkFar); /* OPINE: the Ontario pines' dark and orange-red bark (a colour per trunk; the rest the same brown) */
+  else inst(trunkGeo, toon(0x8a5a35), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), null, null, trunkFar);
+  inst(trunkGeo, inkMat, trunks, (o, s) => s.set(o.s[0] * 1.45, o.s[1], o.s[2] * 1.45), null, null, inkNone);
 }
 /* ---- flowering bushes (azaleas, any course): a dark green mound under a cap of blossom, tinted per bush. Three instanced draws for all of them ---- */
 const BUSHTEX = {}; /* the azalea blossom + leaf textures, made by the first hole with bushes */
@@ -1688,7 +1697,7 @@ function buildBushes() { if (!BUSHES.length) return;
       mound.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r, r * h, r)), c: lf, r: rr });
       cap.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r * 1.035, r * h * 1.04, r * 1.035)), c: fl, r: rr });
       ink.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r + .14, r * h + .12, r + .14)), r: rr }); }); }
-  if (mound.length) { cullInst(domeI, toon(0xffffff, { map: lt }), mound, { lod: far && far.domeI }); cullInst(domeI, toon(0xffffff, { map: ft, alphaTest: .5 }), cap, { lod: far && far.domeI }); cullInst(dome, inkMat, ink, { lod: far && far.dome }); }
+  if (mound.length) { cullInst(domeI, toon(0xffffff, { map: lt }), mound, { lod: far && far.domeI }); cullInst(domeI, toon(0xffffff, { map: ft, alphaTest: .5 }), cap, { lod: far && far.domeI }); cullInst(dome, inkMat, ink, { lod: far && far.dome, farCut: AZ_INK_CUT }); }
   if (lMound.length) { const lump = (w, h) => { const g = new THREE.SphereGeometry(1, w, h), p = g.attributes.position; /* a leafy bush's lump: the crowns' lumpy ball in fewer facets (there are thousands of them), kept for every hole */
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), n = 1 + .1 * Math.sin(x * 5.1 + y * 3.3) + .08 * Math.sin(z * 6.7 - y * 4.1); p.setXYZ(i, x * n, y * n * .92, z * n); } g.computeVertexNormals(); SHARED.add(g); return g; };
     const g = BUSHTEX.leaf || (BUSHTEX.leaf = lump(7, 5)) /* 56 tris */, gf = BUSH_FAR ? BUSHTEX.leafFar || (BUSHTEX.leafFar = lump(5, 4)) /* 30 tris */ : null;
