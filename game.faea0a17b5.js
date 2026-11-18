@@ -40,7 +40,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v427'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v428'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -51,6 +51,7 @@ const HUD_PAR = true; /* undo switch: the pink score-to-par box by the name unde
    prebuilt in the background (HOLESYS) and the URL hash follows the hole, so a reload lands back on it. To add a hole: its data entry (the Hunt: HUNT_HOLES,
    Augusta: AUG_HOLES, plus its card line in COURSE_DEF), no code. */
 /* which course and hole the page opens on: no hash (or #hole-N) is the Toronto Hunt; #augusta (or #augusta-hole-11 to -18) is the Augusta National preview: holes 10 to 18, starting at 10 (AUG_FRONT: the front-nine holes built so far first, from #augusta = hole 1; #augusta-hole-2 ...) */
+const OSL_M = OSLER_DEV ? /^#ob-004b22b2(?:-hole-(\d+))?$/.exec(location.hash) : null;
 const AUG_M = /^#augusta(?:-hole-(\d+))?$/.exec(location.hash) || (!location.hash && window.__augPick ? ['#augusta', undefined] : null); /* a fresh load (no hash) picks its course at random (Neil): the intro's crest and "live from" line, the home fly-over and the picked tile all follow */
 const HUNT_CARD = {"1":{"par":4,"hcp":7},"2":{"par":4,"hcp":5},"3":{"par":3,"hcp":2},"4":{"hcp":4},"5":{"par":5,"hcp":1},"6":{"hcp":6},"7":{"hcp":9},"8":{"hcp":8},"9":{"hcp":3}}; /* the Hunt's scorecard (Neil): par and stroke index by hole number */
 /* FESCUE: a new lie, tall fescue (Neil 16 Nov, for OslerBrook): see FESCUE below AUGUSTA's notes. Undo switch: false = exactly as before (no hole has fescue until its data does) */
@@ -70,6 +71,7 @@ const h9Bare = (u, v) => Math.sin(u * .22 + .5) * Math.cos(v * .19 + 1.7) + .6 *
 const HUNT_PINES = true; /* Hunt 7, 8, 9 (Neil: "some pine trees in the mix. Not like Christmas trees ... fuller a bit"; then: white pines, "about 50%" down 9 and on the left of 8): pines drawn in natural clumps, eastern-white-pine style: a bare trunk up to a high, flat-topped crown of flat, irregular tiers, each tier a couple of lumps off to different sides, about as wide as the lidar crown. Same crown mesh, colours and ink as Augusta's loblollies (no new geometry). Share of each treeline: HUNT_PINE_SHARE. false = all broadleaf */
 const NO_DOMES = true; /* Neil (11-16 10:44): "I don't like when we do far off bumps in the background, let's just have it be plain grass": no background domes (Hunt 1, Augusta); the Hunt's lake and its low crown rings stay. false = the domes as before */
 const AUG_DOMES = true; /* Neil (11-17 19:50): "We removed the background bumps at Augusta. Let's bring them back (not too many, it's just a bit boring now)": with NO_DOMES on, Augusta gets back half of its old far domes (the same ones, every other one); the Hunt stays plain. false = no domes (as v422) */
+const AUG_DOMES_K = { h: .38, r: .8 }; /* Neil (11-17 21:36): "Augusta bumps are too big. They look like big hills / mountains": each dome's height x .38 and its width x .8 (a gentle roll on the skyline). { h: 1, r: 1 } = v423's size */
 const H5_TEE_GRASS = true; /* Neil (11-16 10:19): "Hunt 5 tee is continuous grass not pine straw": the back box and the next one joined into one long tee on the lidar's raised deck (as his photo; the tee in use), and the straw strips over the tee area (the data's two PINE beds there) turned back to grass. The forward box past the cart path stays. false = the boxes and straw as before */
 const HUNT_TEE5 = { box: [[-12.0, 43.6], [-5.5, 44.9], [4.5, -5.7], [-2.0, -7.0]], join: [[0, 0], [-6.1, 30.9]], straw: [-15, 25, -12, 85] }; /* box: the long tee; join: the boxes it replaces (centres); straw: PINE beds wholly inside [u0, u1, v0, v1] go */
 const H9_FRAME = true; /* Neil (11-16 09:15, photo from the 9 tee): the tee shot is framed by a full leafy mass on the left and tall broadleaf trees plus one dark spruce on the right. Within 120 yd of the tee: no pines on the left, and on the right only the nearest tall one (the spruce's stand-in); the rest of 9 keeps HUNT_PINE_SHARE's ~50%. Only which trees draw as pines changes (no tree moves or resizes). false = as before */
@@ -113,6 +115,20 @@ const AUG_EDITS = { 18: { along: [20, 240], band: 27, left: 3.5, right: 1.5 } };
 const H3_FLOWERS_MORE = true; /* Neil (22:41, on the H3_FLOWERS before/after): "A few more flowers to the left and thicker clumps over all there": beds round the back of 3 green carried on round to its left along the foot of the trees (rays 35-195 deg, not 35-150, the trees to the left of the green counting as the backdrop too), fewer gaps between beds, and each bed 8-11 clumps of 1.5-2.4 yd (were 4-6 of 1.1-1.65) packed into a wider, overlapping drift. Same colour mix, still instanced azalea bushes, still no lie. false = the beds as before */
 const H3F = H3_FLOWERS_MORE ? { a1: 195, st: 10, jit: 5, skip: .12, k0: 8, kr: 4, r0: 1.5, rr: .9, sp: 3.6, tries: 3 } : { a1: 150, st: 13, jit: 6, skip: .25, k0: 4, kr: 3, r0: 1.1, rr: .55, sp: 2.6, tries: 1 }; /* H3_FLOWERS' bed layout: ray end (deg), ray step + jitter, chance a ray has no bed, clumps per bed (k0 + 0..kr-1), clump radius r0 + 0..rr (yd), bed spread (yd), placement tries per clump */
 const H3_FLOWERS = true; /* Neil: "Put some flowers behind 3 too where the trees are behind the green": a few beds of flowering shrubs (the azalea bushes, instanced: one mesh set for the hole) at the foot of the trees round the back of Hunt 3's green, in a soft mix. Scenery only: no lie, no play. false = none */
+const HUNT_OPINE = false; /* (v428: OFF until Neil OKs the sheet) */  /* Neil 17 Nov 19:19 ("add some of those at the hunt too: right side of 7, left side of 8, left side of 9; trade a few existing trees for those"): OslerBrook's Ontario white and red pines (opinePine) in clumps among the Hunt's trees there. Swaps only (no new trees). false = today's trees exactly */
+const AUG_OPINE = false; /* (v428: OFF until Neil OKs the sheet) */  /* (Neil: "a few at Augusta too where they fit"): a few small clumps among Augusta's broadleaf trees, accents only (it stays loblolly country). Swaps only. false = today's trees exactly */
+const OPINE_HUNT = { 7: { side: 1, n: 9 }, 8: { side: -1, n: 9 }, 9: { side: -1, n: 9 } }; /* HUNT_OPINE: per hole, the side (+1 right of the line, -1 left) and how many */
+const OPINE_AUG = { 1: [[32, 140, 3, 'white']], 5: [[-52, 382, 3, 'white']], 8: [[78, 435, 2, 'red']] }; /* AUG_OPINE: per hole, clumps at [u, v, how many, 'white' | 'red'] (the nearest swappable broadleaf within 20 yd): 1's right-side stand off the tee, 5's trees left of the green, two red pines right of 8's green */
+function opineTrees(d, TREES) { /* HUNT_OPINE / AUG_OPINE: which existing trees become Ontario pines (t.osq). Their own seeded stream; only trees that take the crown stream's 10 draws (broadleaf, Hunt pines), so the rest draw as before */
+  const n = d.HOLE.n, hunt = d.course === 'hunt', S = hunt ? HUNT_OPINE && OPINE_HUNT[n] : d.course === 'augusta' && AUG_OPINE && OPINE_AUG[n]; if (!S) return;
+  const ok = t => !t.lob && !t.op && !t.leaf && !t.bloom && !t.pine && !t.slim && !t.osq && !t.lobe, R = rng(7700 + n * 31 + (hunt ? 0 : 5000)), dist = (a, b) => Math.hypot(a.u - b.u, a.v - b.v);
+  if (Array.isArray(S)) { for (const [u, v, k, sp] of S) TREES.filter(t => ok(t) && Math.hypot(t.u - u, t.v - v) < 20).sort((a, b) => Math.hypot(a.u - u, a.v - v) - Math.hypot(b.u - u, b.v - v)).slice(0, k).forEach((t, i) => { t.osq = i === 2 ? (sp === 'red' ? 'white' : 'red') : sp; }); return; } /* (the third of a clump the other kind) */
+  const CL = d.CL, off = t => { let m = 1e9, sg = 1; for (let k = 1; k < CL.length; k++) { const [a, b] = CL[k - 1], [c, e] = CL[k], ex = c - a, ey = e - b, L2 = ex * ex + ey * ey || 1, q = clamp(((t.u - a) * ex + (t.v - b) * ey) / L2, 0, 1), dd = Math.hypot(t.u - a - ex * q, t.v - b - ey * q); if (dd < m) { m = dd; sg = (t.u - a) * ey - (t.v - b) * ex >= 0 ? 1 : -1; } } return m * sg; }; /* (+ right of the hole line) */
+  const C = TREES.filter(t => ok(t) && t.h >= 12 && S.side * off(t) > 8 && S.side * off(t) < 70), key = new Map(C.map(t => [t, t.h + 7 * R() - .45 * Math.abs(off(t))])) /* (taller first, and the front rows, seen from the fairway) */, seeds = []; let got = 0, red = 0;
+  for (const c of C.slice().sort((a, b) => key.get(b) - key.get(a))) { if (got >= S.n) break; if (c.osq || seeds.some(s => dist(s, c) < 40)) continue; /* clumps: from the tallest crowns, 40+ yd apart, each with its nearest neighbours */
+    seeds.push(c); const k = 3 + Math.floor(R() * 3), r0 = got ? red / got < .34 && (red + k) / (got + k) < .6 : R() < .34; /* (a clump goes red while reds are short of a third) */
+    for (const t of C.filter(t => !t.osq && dist(t, c) < 18).sort((a, b) => dist(a, c) - dist(b, c)).slice(0, Math.min(k, S.n - got))) { t.osq = (R() < .15) !== r0 ? 'red' : 'white'; got++; red += t.osq === 'red'; } } }
+const OPINE_PADS = { osler: true }; /* OPINE: courses whose Ontario pines draw their pads in their own scalloped pad mesh (+2 draws); the rest put them in the trees' crown mesh (no new draws) */
 const ACCENT_PAL = (cid, h) => cid === 'hunt' ? ['gold', 'orange', 'lime'] : null; /* the Toronto Hunt only (Neil): Augusta's trees stay as they are */
 function huntTrees(n, d, TREES, BUSHES, hAt, hAt0) { /* the Hunt's tree changes on a data hole (H9_RAVINE, HUNT_PINES, HUNT_BIG_PINES, HUNT_OPEN) */
   const B = HUNT_BIG_PINES && HUNT_BIG[n], plain = t => !t.lob && !t.slim && !t.bloom && !t.pine, [o0, o1] = d.off || [0, 0], near = (t, P) => Math.hypot(t.u + o0 - P[0], t.v + o1 - P[1]) < 1; /* (d.off: a re-origined hole, H4_TIPS: the edit tables are in its old frame) */
@@ -168,6 +184,7 @@ const COURSE_DEF = { /* every course: its name, crest, what its flag carries (th
     holes: () => [{ n: 1, par: 4, yds: 300, hcp: 7 }, ...Object.keys(HUNT_HOLES).map(k => holeMeta(normHole(HUNT_HOLES[k], 'hunt')))] },
   augusta: { id: 'augusta', name: 'Augusta National', logo: AUG_LOGO, flag: () => { const im = new Image(); im.src = AUG_LOGO; return { img: im, w: 166, oval: false }; },
     holes: () => [...(AUG_FRONT ? AUG_FRONT_CARD : []), { n: 10, par: 4, yds: 450, hcp: 6, name: 'Camellia' }, { n: 11, par: 4, yds: 400, hcp: 8, name: 'White Dogwood' }, { n: 12, par: 3, yds: 145, hcp: 16, name: 'Golden Bell' }, { n: 13, par: 5, yds: 455, hcp: 4, name: 'Azalea' }, { n: 14, par: 4, yds: 380, hcp: 12, name: 'Chinese Fir' }, { n: 15, par: 5, yds: 475, hcp: 2, name: 'Firethorn' }, { n: 16, par: 3, yds: 145, hcp: 18, name: 'Redbud' }, { n: 17, par: 4, yds: 370, hcp: 14, name: 'Nandina' }, { n: 18, par: 4, yds: 385, hcp: 10, name: 'Holly' }] } }; /* optional name: shown on the fly-over card */
+if (OSLER_DEV && /^#ob-004b22b2(?:-hole-\d+)?$/.test(location.hash)) COURSE_DEF.osler = { id: 'osler', name: 'OslerBrook', dev: true, logo: OSLER_LOGO, flag: () => { const im = new Image(); im.src = OSLER_LOGO; return { img: im, w: 150, oval: false }; }, holes: () => Object.keys(OSLER_HOLES).map(k => holeMeta(normHole(OSLER_HOLES[k], 'osler'))) };
 let CID, HOLES, HOLE_N, HOLE, COURSE_LOGO, COURSE_NAME; /* the hole on screen (HOLESYS swaps them; a hole being prebuilt sees its own for the length of each build step) */
 let MAP = null, GREENTEX = null, courseTex = null, CUPMESH = null, HS = null, AUGCAM = null, homePath = null; /* the hole's scene side: painted-map frame, green art, map texture, cup, scene group (HS: { group, cull, ud }), drone and home-camera paths */
 const HOME_BG_WARM = true; /* Neil (11-16 22:55): after a round (MP or not) the home screen was slow to show the other course: its first hole, dropped for the round, rebuilt at the background rate and only then could the tap swap to it. On: (1) on the home screen that rebuild runs at the home rate (BUDGET.home, as a course switch there already does); (2) on a round's last hole its first hole is prebuilt in the next hole's place (no extra memory: the round holds two holes everywhere else), so Home / Play again / the MP lobby land on it at once and the other course starts building straight away; (3) HOMESNAP: a ~25 KB still of each course's home view, shown under the sky dip of a course switch (or a quit home) while its hole still builds, the live fly-over fading in over it. Undo switch: false = v393 */
@@ -186,11 +203,11 @@ const NINE = { mp: null, /* NINES_PICK: which holes a round on this course plays
   sub(cid, v) { v = v || NINE.get(cid); const [a, b] = NINE.span(cid, v), H = NINE.list(cid).slice(a - 1, b); return `${v === 'f9' ? 'Front 9' : v === 'b9' ? 'Back 9' : H.length + ' holes'} · Par ${H.reduce((t, h) => t + h.par, 0)}`; },
   name: cid => ({ f9: 'Front 9', b9: 'Back 9' })[NINE.get(cid)] || '' };
 function setCourse(cid) { const c = COURSE_DEF[cid] || COURSE_DEF.hunt; CID = c.id; HOLES = c.list || (c.list = c.holes()); COURSE_LOGO = c.logo; COURSE_NAME = c.name; FLAG_ART = c.art || (c.art = c.flag()); }
-setCourse(AUG_M ? 'augusta' : 'hunt');
-HOLE_N = (() => { if (AUG_M) { if (!AUG_M[1]) return NINE.first(CID); /* NINES_PICK: #augusta is the round's first hole (10 on the back 9) */ const k = HOLES.findIndex(h => h.n === +AUG_M[1]); return k >= 0 ? k + 1 : Math.max(1, Math.min(HOLES.length, +AUG_M[1])); }
+setCourse(AUG_M ? 'augusta' : OSL_M ? 'osler' : 'hunt');
+HOLE_N = (() => { if (OSL_M) { const k = OSL_M[1] ? HOLES.findIndex(h => h.n === +OSL_M[1]) : 0; return k >= 0 ? k + 1 : 1; } if (AUG_M) { if (!AUG_M[1]) return NINE.first(CID); /* NINES_PICK: #augusta is the round's first hole (10 on the back 9) */ const k = HOLES.findIndex(h => h.n === +AUG_M[1]); return k >= 0 ? k + 1 : Math.max(1, Math.min(HOLES.length, +AUG_M[1])); }
   const m = /^#hole-(\d+)$/.exec(location.hash); return m ? Math.max(1, Math.min(HOLES.length, +m[1])) : 1; })(); HOLE = HOLES[HOLE_N - 1];
-try { if (!HOLE_URL && /^#(augusta|augusta-hole-\d+|hole-\d+)$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); } catch (e) {} /* HOLE_URL: read, then off the address */
-const holeHash = i => CID === 'augusta' ? (i === 1 ? 'augusta' : 'augusta-hole-' + HOLES[i - 1].n) : 'hole-' + i; /* the page for the round's i-th hole */
+try { if (!HOLE_URL && (/^#(augusta|augusta-hole-\d+|hole-\d+)$/.test(location.hash) || (OSLER_DEV && /^#(ob-004b22b2|ob-004b22b2-hole-\d+)$/.test(location.hash)))) history.replaceState(null, '', location.pathname + location.search); } catch (e) {} /* HOLE_URL: read, then off the address */
+const holeHash = i => CID === 'osler' ? (i === 1 ? 'ob-004b22b2' : 'ob-004b22b2-hole-' + HOLES[i - 1].n) : CID === 'augusta' ? (i === 1 ? 'augusta' : 'augusta-hole-' + HOLES[i - 1].n) : 'hole-' + i; /* the page for the round's i-th hole */
 const TO_HOME = (() => { try { const f = sessionStorage.getItem('tp_home'); sessionStorage.removeItem('tp_home'); return !!f; } catch (e) { return false; } })(); /* just picked this course on the home screen */
 const ROUND = (() => { let r = null; try { r = JSON.parse(sessionStorage.getItem('tp_round') || 'null'); sessionStorage.removeItem('tp_round'); } catch (e) {}
   const at = h => { const k = HOLES.findIndex(x => x.n === h.n); return k >= 0 ? k + 1 : h.n; }, holes = r && Array.isArray(r.holes) ? r.holes.filter(h => at(h) < HOLE_N) : []; /* by place in the round (Augusta's holes are 10 to 18; with AUG_FRONT, 1, 2, ... then 10 to 18) */ return { holes: HOLE_N > NINE.first(CID) ? holes : [], auto: HOLE_N > NINE.first(CID) || !!(r && r.go) }; })(); /* (NINES_PICK: past the nine's first hole) */
@@ -198,7 +215,7 @@ const HOLELOAD = { /* the big loader card: only covers a page opened straight on
   show(h) { const el = document.getElementById('holeLdr'); el.querySelector('img').src = h.logo || COURSE_LOGO; el.querySelector('img').classList.toggle('thin', CID === 'augusta');el.querySelector('b').textContent = h.title || `Hole ${h.n}`; el.querySelector('b').style.fontSize = h.title ? '34px' : ''; el.querySelector('span').textContent = h.sub || `Par ${h.par} · ${h.yds} yds`; el.hidden = false; requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on'))); },
   hide() { const el = document.getElementById('holeLdr'); el.classList.remove('on'); document.documentElement.classList.remove('holeNext'); setTimeout(() => { el.hidden = true; }, 450); },
   go(n, holes) { HOLESYS.go(CID, n, holes, () => { if (n === NINE.first(CID)) FLY.reset(); playHole(); }); } }; /* (a new round gets its fly-over again, as the reload used to give it) */ /* the next hole loads in place (HOLESYS): only a small pill over the card if it isn't ready yet */
-if (ROUND.auto && !(RESUME_SPLASH && !document.documentElement.classList.contains('holeNext'))) HOLELOAD.show(HOLE); else if (ROUND.auto) {} /* RESUME_SPLASH: the splash stays up until the hole starts */ else if (TO_HOME) HOLELOAD.show({ title: COURSE_NAME, sub: NINE.has(CID) ? NINE.sub(CID) : CID === 'augusta' ? '18 holes · Par 72' : '9 holes · Par 35' }); else document.documentElement.classList.remove('holeNext');
+if (ROUND.auto && !(RESUME_SPLASH && !document.documentElement.classList.contains('holeNext'))) HOLELOAD.show(HOLE); else if (ROUND.auto) {} /* RESUME_SPLASH: the splash stays up until the hole starts */ else if (TO_HOME) HOLELOAD.show({ title: COURSE_NAME, sub: NINE.has(CID) ? NINE.sub(CID) : OSLER_DEV && CID === 'osler' ? HOLES.length + (HOLES.length > 1 ? ' holes' : ' hole') + ' · Par ' + HOLES.reduce((t, h) => t + h.par, 0) : CID === 'augusta' ? '18 holes · Par 72' : '9 holes · Par 35' }); else document.documentElement.classList.remove('holeNext');
 const HP_CLEAR = true; if (HP_CLEAR) document.getElementById('app').classList.add('hpClear'); /* undo switch (Neil 11-15): the RH/LH badge clear of the big yardage (in front of it, never behind) with its text centred in the pill (CSS: #app.hpClear); false = v353 */
 const RES_BIG = true; if (RES_BIG) document.getElementById('app').classList.add('resBig'); /* undo switch (Neil 11-15): the shot card's carry / roll / total / pin / spin / apex, its labels, the swing note and tempo all bigger, the card a little wider (CSS: #app.resBig); false = v353 sizes */
 const OSM_HUNT = true; /* undo switch (Neil 11-15): the fly-over's "© OpenStreetMap contributors" credit on every Toronto Hunt hole too (hole 1 is traced on the OSM hole); false = only on holes built from data (v353) */
@@ -276,7 +293,7 @@ function* buildDataHoleG(d) { /* d: one hole's data in the AUG_HOLES shape (norm
     for (let k = 0, i = 0; k < n; k++) { const s = k / n * T; while (L[i + 1] < s) i++; const t = (s - L[i]) / (L[i + 1] - L[i] || 1), a = P[i], b = P[(i + 1) % P.length]; out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); } return out; };
   const fs = chaikin(grow(gs, 2.6), 1), fb = box(fs), FRINGE = { c: d.GREEN.c, sm: fs, box: fb, rx: (fb[1] - fb[0]) / 2, ry: (fb[3] - fb[2]) / 2, rot: 0, s: 2 };
   const pb = P => ({ P, b: box(P) }), COLS = ['pink', 'magenta', 'white', 'coral', 'blush', 'crimson'], R = rng(42);
-  const TREES = treeFix(d).map(([u, v, r, h, lob, lean, leanA, bl]) => lob ? { u, v, r, h, lob: true, lean, leanA, pine: false, k: R() } : bl === 1 ? { u, v, r, h, pine: false, bloom: 'white', k: R() } : bl === 5 ? { u, v, r, h, pine: false, bloom: 'pink', k: R() } : bl === 6 ? { u, v, r, h, pine: false, bloom: 'plum', k: R() } : bl === 3 ? { u, v, r, h, pine: false, bloom: 'yellow', k: R() } : bl === 4 ? { u, v, r, h, pine: false, slim: true, k: R() } : bl === 2 ? { u, v, r, h, pine: true, fir: true, k: R() } : { u, v, r, h, pine: false, k: R() }); /* bl: 1 a dogwood in white blossom, 5 one in pink (Augusta 2's, PINK_DOGWOOD), 3 a tree in yellow flower (the Hunt's), 6 a purple-leaf maple (13's, AUG13_MAPLE), 2 a fir (14's Chinese firs: drawn as the conifer, in a darker green), 4 a tall, slim broadleaf (Hunt 5's chute) */
+  const TREES = treeFix(d).map(([u, v, r, h, lob, lean, leanA, bl]) => lob ? { u, v, r, h, lob: true, lean, leanA, pine: false, k: R() } : bl === 1 ? { u, v, r, h, pine: false, bloom: 'white', k: R() } : bl === 5 ? { u, v, r, h, pine: false, bloom: 'pink', k: R() } : bl === 6 ? { u, v, r, h, pine: false, bloom: 'plum', k: R() } : bl === 3 ? { u, v, r, h, pine: false, bloom: 'yellow', k: R() } : bl === 4 ? { u, v, r, h, pine: false, slim: true, k: R() } : OSLER_DEV && (bl === 7 || bl === 8) ? { u, v, r, h, pine: false, hp: true, osp: true, ...(OSLER_PINE ? { osq: bl === 8 ? 'red' : 'white' } : {}), k: R() } : bl === 2 ? { u, v, r, h, pine: true, fir: true, k: R() } : { u, v, r, h, pine: false, k: R() }); /* bl: 1 a dogwood in white blossom, 5 one in pink (Augusta 2's, PINK_DOGWOOD), 3 a tree in yellow flower (the Hunt's), 6 a purple-leaf maple (13's, AUG13_MAPLE), 2 a fir (14's Chinese firs: drawn as the conifer, in a darker green), 4 a tall, slim broadleaf (Hunt 5's chute) */
   const BUSHES = d.BUSH.map(([u, v, r, c]) => ({ u, v, r, c: COLS[c] }));
   /* ground height: bilinear on the lidar grid (held flat past its edge) */
   const hAt = (u, v) => { const fx = clamp((u - H.u0) / H.d, 0, H.nu - 1.001), fy = clamp((v - H.v0) / H.d, 0, H.nv - 1.001), i = fx | 0, j = fy | 0, s = fx - i, t = fy - j, k = j * H.nu + i;
@@ -374,12 +391,13 @@ function normHole(j, course) { if (j._norm) return j._norm;
     FWY: j.fairways.map(f => f.poly), FWO: j.fairways.map((f, i) => f.own ? i : -1).filter(i => i >= 0), TEES: j.tees.map(t => [t.used ? 1 : 0, t.poly]),
     BUNK: j.bunkers.map(b => b.poly), WATER: (j.water || []).map(w => w.poly || w), /* the builder writes water as {kind, poly}; the hole code takes bare outlines (Hunt 5's pond) */ OB: j.ob || [], PINE: j.PINE || [], PATHS: j.paths || [], CROP: j.crop, H: j.H,
     BUSH: (j.BUSHES || []).map(b => Array.isArray(b) ? b : [b.u, b.v, b.r, Math.max(0, BC.indexOf(b.c))]),
-    TREE: j.TREES.map(t => [t.u, t.v, t.r, t.h, t.lob ? 1 : 0, t.lean || 0, t.leanA || 0, TB[t.bloom] || (t.form === 'slim' ? 4 : 0)]),
+    TREE: j.TREES.map(t => [t.u, t.v, t.r, t.h, t.lob ? 1 : 0, t.lean || 0, t.leanA || 0, TB[t.bloom] || (t.form === 'slim' ? 4 : OSLER_DEV && t.form === 'pine' ? 7 : OSLER_DEV && t.form === 'rpine' ? 8 : 0)]),
     greenK: (m.green_slope && m.green_slope.soften_k) || null, /* the green's relief scaled like Augusta's (Hunt 3: .57) */
     FOUNTAIN: j.fountain || null, /* the pond's aerating fountain (Hunt 5, 6): scenery on the water */
     lake: course === 'hunt' && HUNT_LAKE[n] ? mkLake(HUNT_LAKE[n]) : null, /* the lake off the bluff, for the horizon (buildLake, buildOuter, buildScenery) */
     bluff: B ? { lip: B.lip, drop: (B.drop_ft || 60) / 3 } : null }; /* the lip of the lake bluff, where the hole has one (Hunt 2, behind the tee) */
-  if (FESCUE && j.FESCUE && j.FESCUE.length) d.FESCUE = j.FESCUE; /* FESCUE: the builder's fescue outlines (same shape as PINE) */
+  if (FESCUE && j.FESCUE && j.FESCUE.length) d.FESCUE = j.FESCUE;
+  if (OSLER_DEV && course === 'osler' && m.frame) d.osl = { tee: m.frame.tee_utm17n, brg: m.frame.bearing_deg_grid, z0: m.ztee_m }; /* FESCUE: the builder's fescue outlines (same shape as PINE) */
   if (course === 'hunt' && H4_BUNKER && HUNT_SAND_ED[n]) { const E = HUNT_SAND_ED[n], cen = P => P.reduce((a, p) => [a[0] + p[0] / P.length, a[1] + p[1] / P.length], [0, 0]); /* Hunt 4's fairway bunkers (H4_BUNKER) */
     const at = (u, v) => d.BUNK.findIndex(Q => { const c = cen(Q); return Math.hypot(c[0] - u, c[1] - v) < 3; });
     if (H4_GREEN_SAND) for (const [[u, v], P] of E.green || []) { const i = at(u, v); if (i >= 0) d.BUNK[i] = P; } /* (before the fairway one: their traced centres, not the new ones) */
@@ -417,10 +435,12 @@ function mkBluff(B, hAt, H) { /* a data hole's lake bluff (Hunt 2, behind the te
   return { P, L, past, at, band, lakeY: lo - .45, mid: at(L / 2), n: N[m] }; }
 function holeMeta(d) { return d.HOLE; } /* a hole's card line: n, par, yds, hcp (+ an optional name) */
 function* holeAUGDg(cid, n) { /* holeAUGD as build steps (HOLESYS, BDH_CHUNK) */
+  if (OSLER_DEV && cid === 'osler') return OSLER_HOLES[n] ? yield* buildDataHoleG(normHole(OSLER_HOLES[n], 'osler')) : null;
   if (cid === 'augusta') while (typeof AUG_HOLES === 'undefined') { window.__augLoad(); yield HATCH_WAIT; } /* SPLIT: Augusta's data on its way (an idle step: the frame's slice ends) */
   if (cid === 'augusta') return AUG_HOLES[n] ? yield* buildDataHoleG(Object.assign({ course: 'augusta', osm: true }, AUG_HOLES[n])) : null;
   return HUNT_HOLES[n] ? yield* buildDataHoleG(normHole(HUNT_HOLES[n], cid)) : null; }
 function holeAUGD(cid, n) { /* a course's hole number, built from its data (null: the Hunt's hand-tuned hole 1) */
+  if (OSLER_DEV && cid === 'osler') return OSLER_HOLES[n] ? buildDataHole(normHole(OSLER_HOLES[n], 'osler')) : null;
   if (cid === 'augusta') return AUG_HOLES[n] ? buildDataHole(Object.assign({ course: 'augusta', osm: true }, AUG_HOLES[n])) : null;
   return HUNT_HOLES[n] ? buildDataHole(normHole(HUNT_HOLES[n], cid)) : null; }
 let AUGD = holeAUGD(CID, HOLE.n); /* the hole's data when it's built from data (Augusta, the Hunt from hole 2); null on Hunt 1 (its hand-traced shapes below) */
@@ -1204,11 +1224,11 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   else { /* Augusta: the other holes' greens, then Rae's Creek: a grassy bank, deep blue in the middle and lighter at the edges, ripples, an inked rim */
     for (const q of AUGD.og) { g.save(); g.lineJoin = 'round'; path(q.P); g.lineWidth = 5.2 * ppy; g.strokeStyle = '#8fd255'; g.stroke(); path(q.P); g.fillStyle = '#a9ea6d'; g.fill(); g.restore(); sketch(q.P, 2, .55); }
     for (const q of AUGD.water) { const P = q.P; g.save(); g.lineJoin = 'round'; path(P); g.lineWidth = 2.6 * ppy; g.strokeStyle = '#9fd36a'; g.stroke(); g.restore();
-      path(P); g.fillStyle = '#3fb2e0'; g.fill(); g.save(); path(P); g.clip(); g.lineJoin = 'round';
-      path(P); g.lineWidth = 3.6 * ppy; g.strokeStyle = 'rgba(115,211,242,.8)'; g.stroke(); path(P); g.lineWidth = 1.6 * ppy; g.strokeStyle = '#73d3f2'; g.stroke();
-      g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2; g.lineCap = 'round';
+      const OSW = OSLER_DEV && AUGD.course === 'osler'; path(P); g.fillStyle = OSW ? '#1d4566' : '#3fb2e0'; g.fill(); g.save(); path(P); g.clip(); g.lineJoin = 'round';
+      path(P); g.lineWidth = 3.6 * ppy; g.strokeStyle = OSW ? 'rgba(52,104,140,.8)' : 'rgba(115,211,242,.8)'; g.stroke(); path(P); g.lineWidth = 1.6 * ppy; g.strokeStyle = OSW ? '#3f7aa3' : '#73d3f2'; g.stroke();
+      g.strokeStyle = OSW ? 'rgba(200,225,240,.35)' : 'rgba(255,255,255,.75)'; g.lineWidth = 2; g.lineCap = 'round';
       let area = 0; for (let i = 0, j = P.length - 1; i < P.length; j = i++) area += (P[j][0] + P[i][0]) * (P[j][1] - P[i][1]); area = Math.abs(area / 2);
-      for (let i = 0, n = 0; i < area * 2 && n < Math.min(500, area / 60); i++) { const u = q.b[0] + R() * (q.b[1] - q.b[0]), v = q.b[2] + R() * (q.b[3] - q.b[2]); if (!inPoly(u, v, P)) continue; n++; const x = X(u), y = Y(v); g.beginPath(); g.moveTo(x - 12, y); g.quadraticCurveTo(x - 6, y - 5, x, y); g.quadraticCurveTo(x + 6, y + 5, x + 12, y); g.stroke(); }
+      for (let i = 0, n = 0; i < area * 2 && n < Math.min(500, area / (OSW ? 160 : 60)); i++) { const u = q.b[0] + R() * (q.b[1] - q.b[0]), v = q.b[2] + R() * (q.b[3] - q.b[2]); if (!inPoly(u, v, P)) continue; n++; const x = X(u), y = Y(v); g.beginPath(); g.moveTo(x - 12, y); g.quadraticCurveTo(x - 6, y - 5, x, y); g.quadraticCurveTo(x + 6, y + 5, x + 12, y); g.stroke(); }
       g.restore(); sketch(P, 3, .9);
       const Fq = AUGD.FOUNTAIN; if (Fq && inPoly(Fq.u, Fq.v, P)) { const fx = X(Fq.u), fy = Y(Fq.v), rr = rng(77); /* the fountain's churn: a white boil at its foot, broken rings of foam round it (painted once, no cost per frame) */
         g.save(); path(P); g.clip(); g.lineCap = 'round'; g.fillStyle = 'rgba(255,255,255,.92)'; g.beginPath(); g.arc(fx, fy, 1.5 * ppy, 0, 7); g.fill();
@@ -1277,10 +1297,10 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   yield (chunk && flushCv(cv));
   // bunkers
   BUNKERS.forEach(b => {
-    const bp = elPts(b, 180); if (b.sm) { g.save(); g.lineJoin = 'round'; path(bp); g.lineWidth = 5.4 * ppy; g.strokeStyle = 'rgba(46,96,34,.35)'; g.stroke(); path(bp); g.lineWidth = 2.6 * ppy; g.strokeStyle = '#8fcf55'; g.stroke(); g.restore(); } else { path(elPts(b, 180, 1.3)); g.fillStyle = 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = '#8fcf55'; g.fill(); } /* the raised grass lip, with a shadow falling off it */
+    const bp = elPts(b, 180), OSB = OSLER_DEV && AUGD && AUGD.course === 'osler'; if (b.sm) { g.save(); g.lineJoin = 'round'; path(bp); g.lineWidth = (OSB ? 2.8 : 5.4) * ppy; g.strokeStyle = OSB ? 'rgba(46,96,34,.2)' : 'rgba(46,96,34,.35)'; g.stroke(); path(bp); g.lineWidth = (OSB ? 1.4 : 2.6) * ppy; g.strokeStyle = '#8fcf55'; g.stroke(); g.restore(); } else { path(elPts(b, 180, 1.3)); g.fillStyle = 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = '#8fcf55'; g.fill(); } /* the raised grass lip, with a shadow falling off it */
     path(bp); g.fillStyle = '#f6ecd4'; g.fill(); g.save(); path(bp); g.clip();
     g.fillStyle = 'rgba(205,180,130,.45)'; for (let i = 0; i < 160; i++) { g.beginPath(); g.arc(X(b.c[0] + (R() - .5) * b.rx * 2.4), Y(b.c[1] + (R() - .5) * b.ry * 2.4), .6 + R() * .9, 0, 7); g.fill(); }
-    g.lineWidth = 2.4 * ppy; g.strokeStyle = 'rgba(176,146,96,.42)'; g.translate(0, 2.2 * ppy); path(bp); g.stroke(); g.restore(); /* the shaded face under the far lip */
+    g.lineWidth = (OSB ? 1.4 : 2.4) * ppy; g.strokeStyle = OSB ? 'rgba(176,146,96,.25)' : 'rgba(176,146,96,.42)'; g.translate(0, (OSB ? 1.2 : 2.2) * ppy); path(bp); g.stroke(); g.restore(); /* the shaded face under the far lip */
     sketch(bp, 3, .9);
   });
   yield (chunk && flushCv(cv));
@@ -1476,6 +1496,42 @@ function updateCull() {
   }
 }
 
+function opinePlateGeo(ws, hs) { /* OPINE: a pad of pine needles: a lens with a scalloped edge, a bumpy top and a flatter underside (unit size; stretched per pad) */
+  const g = new THREE.SphereGeometry(1, ws, hs), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), n = 1 + .14 * Math.sin(a * 5 + .7) + .08 * Math.sin(a * 8 + 2.1), b = 1 + .26 * Math.sin(x * 4.3 + z * 3.1 + 1); p.setXYZ(i, x * n, y * (y > 0 ? b : .55), z * n); }
+  g.computeVertexNormals(); return g; }
+function opinePine(t, ti, tw, Rp, trunks, crowns, plates) { /* OPINE (osler2, Neil 17 Nov): the Ontario pines, one model for every course that has them (t.osq: 'white' | 'red'). Seeded per tree (Rp); the height from the data.
+  white (eastern white pine): a tall straight dark trunk, bare for its lower half; 3-5 open, flat, irregular layers of needle pads with sky between them, the lower ones either side of the trunk, all reaching
+    further downwind (east: the prevailing westerlies; OslerBrook knows its bearing, elsewhere the hole's frame); a flattish, lopsided, windswept top; deep blue-green.
+  red (red pine): a tall clean trunk, grey-brown low and orange-red up high; a compact, rounded, tufted crown at the top only; a darker yellow-green.
+  The same instancing and ink hulls as the other trees: pads and tufts go in plates (OslerBrook: their own scalloped pad mesh) or, where that would add draws, the crown mesh; the hit test is what is drawn (t.blobs) and the leaning trunk (t.lx) */
+  const F = AUGD && AUGD.osl, wd = (F ? -F.brg * Math.PI / 180 : 0) + (Rp() - .5) * .7, h = t.h, r = t.r, Y = new THREE.Vector3(0, 1, 0); /* wd: downwind, in the scene's x/z */
+  const red = t.osq === 'red', L = red ? Rp() * .025 : .015 + Rp() * .04, la = wd + (Rp() - .5) * .8, lx = Math.sin(L) * Math.cos(la), lz = Math.sin(L) * Math.sin(la); t.lx = lx; t.lv = -lz; /* the lean (with the wind) */
+  const tq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.sin(la), 0, -Math.cos(la)), L);
+  const at = (x, y, z) => tw.clone().add(new THREE.Vector3(x + lx * y, y, z + lz * y));
+  if (!red) { const G = ['#2c5a48', '#31604c', '#28533f', '#376752', '#2f5c50'];
+    trunks.push({ p: tw.clone(), s: [.62, h * .93, .62], q: tq, tid: ti, c: '#4a3c33' });
+    const pad = (a, o, y, rl, rw, vh, c) => { const x = Math.cos(a) * o, z = Math.sin(a) * o, p = at(x, y, z); /* a pad o yd out from the trunk toward a: rl long (radially), rw wide, vh half-thick */
+      plates.push({ p, s: [rl, vh, rw], q: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a + (Rp() < .5 ? Math.PI : 0), (Rp() - .5) * .22, 'YXZ')), c, r: 0, tid: ti }); /* (a slight tilt: no two pads quite level) */
+      const ca = Math.cos(a), sa = Math.sin(a), d = Math.max(0, rl - rw) * .7, px = p.x - tw.x, pz = p.z - tw.z; for (const k of [-1, 1]) t.blobs.push([px + ca * d * k, y, -(pz + sa * d * k), rw * 1.02, vh / rw * 1.1]); };
+    const f0 = .45 + Rp() * .1, f1 = .86, nT = Math.max(3, Math.min(5, Math.floor((f1 - f0) * h / 2.8 + Rp() * .9))), a0 = Rp() * 6.28;
+    for (let i = 0; i < nT; i++) { const k = i / (nT - 1), hh = h * (f0 + (f1 - f0) * Math.min(1, Math.max(0, k + (i && i < nT - 1 ? (Rp() - .5) * .4 / (nT - 1) : 0)))); /* the tiers: up the top half, a little irregular */
+      const reach = r * (1.25 - .5 * k) * (.85 + Rp() * .3), vh = .68 + Rp() * .26 + h * .008; /* vh: thin pads, so the sky shows between the tiers */
+      const a = Rp() < .6 ? wd + (Rp() - .5) * 2 : a0 + i * 2.3 + (Rp() - .5) * .8, rl = reach * .64; pad(a, reach - rl, hh, rl, rl * .72, vh, G[(i + (Rp() * 2 | 0)) % G.length]);
+      if (i < nT - 1) { const b = a + Math.PI + (Rp() - .5) * 1.4, dw = .5 + .5 * Math.max(0, Math.cos(b - wd)), r2 = reach * (.62 + Rp() * .16) * dw + .6, rl2 = r2 * .62; /* the other side: shorter, shortest upwind */
+        pad(b, r2 - rl2, hh + (Rp() - .5) * .7, rl2, rl2 * .78, vh * .9, G[(i + 1) % G.length]); }
+      if (i === 0 && Rp() < .6) { const c = a + (Rp() < .5 ? 1.6 : -1.6), rl3 = reach * .3 + .5; pad(c, reach * .5 - rl3 * .3, hh - .4, rl3, rl3 * .8, vh * .85, G[2]); } }
+    const tl = r * (.5 + Rp() * .1); pad(wd + (Rp() - .5) * .4, r * .32, h * .94, tl, tl * .62, .95, G[3]); /* the top: flat, swept downwind */
+    const sl = r * .3; pad(wd + .6, r * .62, h * .89, sl, sl * .75, .7, G[1]); }
+  else { const G = ['#3c5b25', '#44652a', '#375322', '#4b6c2d'];
+    trunks.push({ p: tw.clone(), s: [.7, h * .44, .7], q: tq, tid: ti, c: '#5a4a3f' }); /* grey-brown, scaly low */
+    trunks.push({ p: at(0, h * .42, 0), s: [.47, h * .5, .47], q: tq, tid: ti, c: '#cc6a37' }); /* the orange-red upper bark */
+    const tuft = (x, y, z, bs, vh, c) => { const p = at(x, y, z); plates.push({ p, s: [bs, vh, bs * (.85 + Rp() * .15)], q: new THREE.Quaternion().setFromAxisAngle(Y, Rp() * 6.28), c, r: 0, tid: ti }); t.blobs.push([p.x - tw.x, y, -(p.z - tw.z), bs, vh / bs * 1.1]); }; /* a dome of needles */
+    const rc = Math.min(r * .8, h * .2 + 1), cy = h - rc * 1.05, n = 4 + (Rp() < .5 ? 1 : 0), a0 = Rp() * 6.28;
+    tuft(0, cy, 0, rc * .7, rc * .62, G[0]); /* a compact, rounded crown: a core, */
+    for (let k = 0; k < n; k++) { const a = a0 + k * 6.28 / n + (Rp() - .5) * .7, o = rc * (.52 + Rp() * .14), bs = rc * (.42 + Rp() * .1), lo = k % 2 === 0; tuft(Math.cos(a) * o, cy + (lo ? -.38 : .12) * rc + (Rp() - .5) * rc * .15, Math.sin(a) * o, bs, bs * .62, G[(k + 1) % G.length]); } /* tufts all round, in two rows */
+    const tb = rc * .4; tuft((Rp() - .5) * rc * .3, h - tb * .75, (Rp() - .5) * rc * .3, tb, tb * .7, G[3]); }
+  t.rh = Math.max(t.r * 1.6, ...t.blobs.map(b => Math.hypot(b[0], b[2]) + b[3])) + .3; /* its hit reach: the pads reach past the usual crown */ }
 /* ---- trees (instanced toon + ink hulls) ---- */
 function buildTrees() {
   const blobGeo = new THREE.SphereGeometry(1, 11, 8); const p = blobGeo.attributes.position;
@@ -1486,7 +1542,7 @@ function buildTrees() {
   TREES.geo = { blobFar }; /* the hole's crown mesh, shared with its leafy bushes (buildBushes: Hunt 9's ravine) */
   const coneGeo = new THREE.ConeGeometry(1, 1, 8, 1); coneGeo.translate(0, .5, 0);
   const trunkGeo = new THREE.CylinderGeometry(.32, .48, 1, 7); trunkGeo.translate(0, .5, 0);
-  const blobs = [], cones = [], trunks = [], crowns = [], branches = [];
+  const blobs = [], cones = [], trunks = [], crowns = [], branches = [], plates = OPINE_PADS[CID] ? [] : null; /* plates: the Ontario pines' own pad mesh (OPINE_PADS), else their pads go in the crown mesh */
   const R = rng(11), _q = new THREE.Quaternion(), _ax = new THREE.Vector3();
   if (TREE_ACCENTS && !TREES._acc) { TREES._acc = true; /* a couple of trees a hole in an accent colour (TREE_ACCENTS): their own seeded stream, so the rest draw as before */
     const Ra = rng((CID === 'augusta' ? 5100 : 4100) + HOLE.n * 37), pal = ACCENT_PAL(CID, HOLE), x = Ra(), n = x < .3 ? 0 : x < .8 ? 1 : 2;
@@ -1496,6 +1552,7 @@ function buildTrees() {
     C.sort((a, b) => a.d - b.d); const pool = C.slice(0, Math.max(4, Math.ceil(C.length * .3))), got = []; /* the front row: the crowns nearest the hole line, seen from the tee and the aim view */
     for (let k = 0; k < 40 && got.length < n && pool.length; k++) { const o = pool[Math.floor(Ra() * pool.length)]; if (got.some(g => Math.hypot(g.u - o.t.u, g.v - o.t.v) < 45)) continue; o.t.bloom = pal[Math.floor(Ra() * pal.length)]; got.push(o.t); }
     TREES.accents = got.map(t => ({ u: t.u, v: t.v, c: t.bloom })); }
+  if ((HUNT_OPINE || AUG_OPINE) && AUGD && !TREES._opine) { TREES._opine = true; opineTrees(AUGD, TREES); } /* HUNT_OPINE / AUG_OPINE: a few trees become Ontario pines (after the accent trees are picked, so those stay the same) */
   TREES.forEach((t, ti) => {
     if (t.rSkip) for (let i = 0; i < t.rSkip; i++) R(); /* the draws of trees dropped before it (HUNT_OPEN) */
     const gy = groundHeight(t.u, t.v), tw = W(t.u, t.v, gy);
@@ -1511,12 +1568,13 @@ function buildTrees() {
         if (!top && off > bs * .6) { const hb = hh - bs * .9, A = tw.clone().add(new THREE.Vector3(lx * hb, hb, lz * hb)), B = tw.clone().add(new THREE.Vector3(bx, hh - bs * .25, bz)), dv = B.clone().sub(A), L = dv.length(); /* the bare branch out to it */
           branches.push({ p: A, s: [.2, L, .2], q: new THREE.Quaternion().setFromUnitVectors(up, dv.normalize()), tid: ti }); } }
       return; }
-    if (t.hp || t.op) { for (let i = 0; i < 10; i++) R(); /* (the shared stream left where a broadleaf leaves it: the hole's other trees draw as before) */
+    if (t.hp || t.op || t.osq) { for (let i = 0; i < 10; i++) R(); /* (t.osq: an Ontario pine, OPINE: the same 10 draws) */ /* (the shared stream left where a broadleaf leaves it: the hole's other trees draw as before) */
       const Rp = rng(Math.round(t.u * 97 + t.v * 13) + 7), up = new THREE.Vector3(0, 1, 0); t.blobs = [];
+      if (t.osq) { opinePine(t, ti, tw, Rp, trunks, crowns, plates || crowns); return; } /* OPINE: an Ontario white / red pine */
       if (t.hp) { /* a Hunt pine (HUNT_PINES): a bare trunk up to a high, full crown of rounded, irregular tiers: two lumps each in the lower tiers, off to different sides, then a single lump and a round top (fuller than Augusta's loblollies, nothing like a cone) */
-        trunks.push({ p: tw.clone(), s: [.7, t.h * .68, .7], tid: ti }); const a0 = Rp() * 6.28;
+        trunks.push({ p: tw.clone(), s: [.7, t.h * (t.osp ? .8 : .68), .7], tid: ti }); const a0 = Rp() * 6.28;
         [[.5, 2, .6, .38, .56], [.66, 2, .5, .32, .58], [.8, 1, .5, .14, .62], [.92, 1, .34, .06, .8]].forEach(([f, nb, k, o, vs], i) => { for (let j = 0; j < nb; j++) { /* [height, lumps, size, offset (of r), squash] */
-          const hh = t.h * (f + (Rp() - .5) * .05), bs = t.r * k * (.88 + Rp() * .24), a = a0 + i * 2.1 + j * (2.6 + Rp() * .8), off = t.r * o * (.8 + Rp() * .4), bx = Math.cos(a) * off, bz = Math.sin(a) * off;
+          const hh = t.h * ((t.osp ? .64 + (f - .5) * .76 : f) + (Rp() - .5) * .05), bs = t.r * k * (t.osp ? .78 : 1) * (.88 + Rp() * .24), a = a0 + i * 2.1 + j * (2.6 + Rp() * .8), off = t.r * o * (.8 + Rp() * .4), bx = Math.cos(a) * off, bz = Math.sin(a) * off;
           crowns.push({ p: tw.clone().add(new THREE.Vector3(bx, hh, bz)), s: [bs, bs * vs, bs * (.85 + Rp() * .15)], r: Rp(), tid: ti }); t.blobs.push([bx, hh, -bz, bs, vs]); } });
         return; }
       /* a big old open pine (HUNT_BIG_PINES): a tall bare trunk, near-level limbs round it up the top half, a flat pad of needles on each limb's end (and one partway along every other limb), a pad on top */
@@ -1559,11 +1617,14 @@ function buildTrees() {
   inst(coneGeo, toon(0xffffff), cones, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), (o, i) => o.fir ? (i % 2 ? '#2d6331' : '#25552b') : i % 2 ? '#3d7f3a' : '#346f34'); /* fir: a darker, bluer green */
   inst(coneGeo, inkMat, cones, (o, s) => s.set(o.s[0] + .3, o.s[1] + .45, o.s[2] + .3), null, new THREE.Vector3(0, -.2, 0));
   const pineGreens = ['#3e7330', '#467d35', '#356628', '#4f8a3a']; /* the loblollies' crowns: a deeper, bluer green than the broadleaf trees */
-  inst(blobGeo, toon(0xffffff), crowns, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => pineGreens[Math.floor(o.r * pineGreens.length)], null, blobFar);
+  inst(blobGeo, toon(0xffffff), crowns, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || pineGreens[Math.floor(o.r * pineGreens.length)], null, blobFar);
   inst(blobGeo, inkMat, crowns, (o, s) => s.set(o.s[0] + .28, o.s[1] + .26, o.s[2] + .28), null, null, blobFar);
+  if (plates && plates.length) { const pG = opinePlateGeo(14, 6), pF = opinePlateGeo(9, 4); /* OPINE_PADS: the Ontario pines' needle pads in their own scalloped mesh (near and far; two draws with the ink) */
+    inst(pG, toon(0xffffff), plates, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c, null, pF); inst(pG, inkMat, plates, (o, s) => s.set(o.s[0] + .28, o.s[1] + .22, o.s[2] + .28), null, null, pF); }
   inst(trunkGeo, toon(0x8a5a35), branches, (o, s) => s.set(o.s[0], o.s[1], o.s[2]));
   inst(trunkGeo, inkMat, branches, (o, s) => s.set(o.s[0] * 1.6, o.s[1], o.s[2] * 1.6));
-  inst(trunkGeo, toon(0x8a5a35), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]));
+  if (trunks.some(o => o.c)) inst(trunkGeo, toon(0xffffff), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || '#8a5a35'); /* OPINE: the Ontario pines' dark and orange-red bark (a colour per trunk; the rest the same brown) */
+  else inst(trunkGeo, toon(0x8a5a35), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]));
   inst(trunkGeo, inkMat, trunks, (o, s) => s.set(o.s[0] * 1.45, o.s[1], o.s[2] * 1.45));
 }
 /* ---- flowering bushes (azaleas, any course): a dark green mound under a cap of blossom, tinted per bush. Three instanced draws for all of them ---- */
@@ -1717,6 +1778,7 @@ function buildFountain() { const F = AUGD && AUGD.FOUNTAIN; if (!F) return; /* H
       }` });
   m.uniforms.map.value = fountTex || (fountTex = fountainArt()); m.uniforms.t = FOUNT_T; /* (merge copies uniforms: the clock is put back as the shared one) */
   const mesh = new THREE.Mesh(geo, m); mesh.position.copy(W(F.u, F.v, gy - .05)); mesh.renderOrder = 4; mesh.userData.ink = false; mesh.castShadow = mesh.receiveShadow = false; HS.add(mesh); }
+const OSLX = OSLER_DEV && OSL_M ? eval(OSLER_SRC) : null; /* OSLER_LIVE: OslerBrook's scenery functions (OSLER_SRC, from osler.<hash>.js), in this scope */
 function buildLake() { if (AUGD && AUGD.lake) { /* the Hunt's data holes: Lake Ontario below the bluff, out to the horizon. One sheet, one draw call: flat at lake level from under the bluff out past the shore,
      then rising gently with distance so its far edge meets the sky at the horizon. Inland it lies under the land (buildOuter holds the ground under it only past the lip), so it never shows on the course */
     const K = AUGD.lake, [nu, nv] = K.n, tu = -nv, tv = nu, Y0 = AUGD.bluff ? AUGD.bluff.lakeY : K.y, rim = AUGD.hFar - 1.5, cu = (MAP.U0 + MAP.U1) / 2, cv = (MAP.V0 + MAP.V1) / 2, s0 = K.s(cu, cv), fu = cu - nu * s0, fv = cv - nv * s0;
@@ -1751,20 +1813,21 @@ function* buildSceneryG() { /* BUILD_CHUNK2: yields between its parts and throug
   // background hills must never overlap the playable area (+ room for the cameras), or a camera can end up inside one
   const HB = AUGD ? { x0: MAP.U0 - 40, x1: MAP.U1 + 40, z0: -MAP.V1 - 40, z1: -MAP.V0 + 40, cx: (MAP.U0 + MAP.U1) / 2, cz: -(MAP.V0 + MAP.V1) / 2, y: AUGD.hFar - 2 } : { x0: -170, x1: 170, z0: -480, z1: 70, cx: 0, cz: -200, y: -2 }; /* Augusta: hills all the way round, clear of its map */
   const clearOf = (x, z, r) => { const dx = Math.max(HB.x0 - x, 0, x - HB.x1), dz = Math.max(HB.z0 - z, 0, z - HB.z1); return Math.hypot(dx, dz) > r + 6; };
-  const K = AUGD && AUGD.lake; if (K) { /* the Hunt (data holes): no domes. Lake Ontario lies off the bluff (buildLake); inland, toward Kingston Rd, a low, dark, inked line of the streets' trees rings the land side.
+  const K = AUGD && AUGD.lake, OE = OSLER_DEV && AUGD && AUGD.osl; if (K || OE) { /* the Hunt (data holes): no domes. Lake Ontario lies off the bluff (buildLake); inland, toward Kingston Rd, a low, dark, inked line of the streets' trees rings the land side.
      Three rows of low-poly crowns, one draw (culled per frame like the trees) plus one for their ink */
     const Rk = rng(5), tc = ['#2f5a2b', '#36652f', '#2a5228', '#3d6b34', '#31592c'], crowns = [], E = (x, z) => Math.hypot(Math.max(MAP.U0 - x, 0, x - MAP.U1), Math.max(MAP.V0 + z, 0, -z - MAP.V1));
     const RW = [[8, 5, 25, 40, .55], [12, 6, 75, 60, .5], [16, 8, 150, 90, .42]]; /* per row: radius, + random, set back, + random, height / radius */
     for (const [r0, rr, back, br, hk] of RW) for (let a = Rk() * .05; a < Math.PI * 2;) { const r = r0 + Rk() * rr; let d = 120; while (!clearOf(HB.cx + Math.cos(a) * d, HB.cz + Math.sin(a) * d, r)) d += 10; d += back + Rk() * br;
       const x = HB.cx + Math.cos(a) * d, z = HB.cz + Math.sin(a) * d; a += .95 * r / d;
-      if ((x - HB.cx) * K.n[0] - (z - HB.cz) * K.n[1] > .2 * d || K.s(x, -z) > -60 - r || (AUGD.bluff && AUGD.bluff.past(x, -z) > -r)) continue; /* only on the land side, well back from the bluff: the lake stays open behind the greens (Neil: 4) */
+      if (K && ((x - HB.cx) * K.n[0] - (z - HB.cz) * K.n[1] > .2 * d || K.s(x, -z) > -60 - r || (AUGD.bluff && AUGD.bluff.past(x, -z) > -r))) continue; /* only on the land side, well back from the bluff: the lake stays open behind the greens (Neil: 4) */
       crowns.push({ p: new THREE.Vector3(x, lerp(AUGD.hAt(x, -z), AUGD.hFar, smooth(20, 380, E(x, z))) - .2 * r, z), s: new THREE.Vector3(r * (1 + Rk() * .25), r * (hk + Rk() * .2), r), c: tc[(Rk() * tc.length) | 0] }); }
     const cg = new THREE.SphereGeometry(1, 7, 3, 0, Math.PI * 2, 0, Math.PI / 2), Qk = new THREE.Quaternion(), Sk = new THREE.Vector3();
     cullInst(cg, toon(0xffffff), crowns.map(h => ({ p: h.p, m: new THREE.Matrix4().compose(h.p, Qk, h.s), c: new THREE.Color(h.c), r: Math.max(h.s.x, h.s.z) + 2.5 })));
-    cullInst(cg, inkMat, crowns.map(h => ({ p: h.p, m: new THREE.Matrix4().compose(h.p, Qk, Sk.set(h.s.x + 2.5, h.s.y + 2.5, h.s.z + 2.5)), r: Math.max(h.s.x, h.s.z) + 2.5 })));
+    { const ik = OE ? 1.1 : 2.5; cullInst(cg, inkMat, crowns.map(h => ({ p: h.p, m: new THREE.Matrix4().compose(h.p, Qk, Sk.set(h.s.x + ik, h.s.y + ik, h.s.z + ik)), r: Math.max(h.s.x, h.s.z) + 2.5 }))); }
+    if (OE) OSLX.oslerEsc();
   } else if (!NO_DOMES || (AUG_DOMES && AUGD && AUGD.course === 'augusta')) { /* (AUG_DOMES: Augusta's come back, every other one) */
   for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(HB.cx + Math.cos(a) * d, HB.cz + Math.sin(a) * d, r)) d += 15; if (Math.cos(a) * d - r < 60 && false) continue; if (!AUGD && Math.cos(a) * d > 40) continue; hills.push({ p: new THREE.Vector3(HB.cx + Math.cos(a) * d, HB.y, HB.cz + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
-  if (NO_DOMES && AUG_DOMES) for (let i = hills.length - 1; i >= 0; i--) if (i % 2) hills.splice(i, 1); /* AUG_DOMES: the same domes as before NO_DOMES, every other one (8 of 16) */
+  if (NO_DOMES && AUG_DOMES) for (let i = hills.length - 1; i >= 0; i--) if (i % 2) hills.splice(i, 1); if (NO_DOMES && AUG_DOMES) for (const h of hills) { h.s.y *= AUG_DOMES_K.h; h.s.x *= AUG_DOMES_K.r; h.s.z *= AUG_DOMES_K.r; } /* (AUG_DOMES_K: low, gentle rises, not hills) */ /* AUG_DOMES: the same domes as before NO_DOMES, every other one (8 of 16) */
   const hm = new THREE.InstancedMesh(geo, toon(0xffffff), hills.length), inked = hills.filter(h => h.ink), ho = new THREE.InstancedMesh(geo, inkMat, inked.length);
   const M4 = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), C0 = new THREE.Color(), S0 = new THREE.Vector3();
   hills.forEach((h, i) => { hm.setMatrixAt(i, M4.compose(h.p, Q0, h.s)); hm.setColorAt(i, C0.set(h.c)); });
@@ -1805,6 +1868,7 @@ function* buildSceneryG() { /* BUILD_CHUNK2: yields between its parts and throug
     sets.forEach((L, k) => { if (!L.length) return; cullInst(fg, tuftMat(mk(k === 1)), L.map(([u, v]) => { const sz = k ? .42 + Rp() * .18 : .7 + Rp() * .6; ee.set(0, Rp() * 6.28, 0); qq.setFromEuler(ee); const p = W(u, v, groundHeight(u, v) + .025); return { p, m: new THREE.Matrix4().compose(p, qq, new THREE.Vector3(sz, 1, sz)), r: sz }; }), { ud: { tuft: true }, hideBeyond: 70 }); });
   }
   if (BUILD_CHUNK2) yield;
+  if (OSLER_DEV && AUGD && AUGD.osl) yield* OSLX.oslerWaterEdgeG();
   if (FESCUE) yield* FESCUE_FX.buildG(); /* FESCUE: the hole's tall fescue tufts */
   // clouds
   const cc = document.createElement('canvas'); cc.width = 256; cc.height = 128; const cg = cc.getContext('2d');
@@ -3779,7 +3843,7 @@ function treeHit(t, u, v, y) {
   const rel = y - (t.gy ?? (t.gy = groundHeight(t.u, t.v))), h = t.h;
   if (rel < 0) return false;
   if (t.lob) { if (rel < h * .86 && Math.hypot(u - (t.u + t.lx * rel), v - (t.v + t.lv * rel)) < .3 + BALL_R) return true; } /* a loblolly's long, leaning trunk */
-  else if (t.op && t.lx != null) { if (rel < h * .9 && Math.hypot(u - (t.u + t.lx * rel), v - (t.v + t.lv * rel)) < .55 + BALL_R) return true; } /* a big open pine's leaning trunk (HUNT_BIG) */
+  else if ((t.op || t.osq) && t.lx != null) { if (rel < h * .9 && Math.hypot(u - (t.u + t.lx * rel), v - (t.v + t.lv * rel)) < (t.osq ? .42 : .55) + BALL_R) return true; } /* (OPINE: an Ontario pine's leaning trunk) */ /* a big open pine's leaning trunk (HUNT_BIG) */
   else if (d < (t.op ? .55 : .48) + BALL_R && rel < h * (t.pine ? .3 : t.op ? .9 : t.hp ? .66 : .55)) return true; /* (a Hunt pine's bare trunk runs up to its crown; a big open pine's, nearly to its top) */                          // trunk (as drawn, plus the ball)
   if (t.pine) { const c = (base, H, R) => rel >= base && rel <= base + H ? R * (1 - (rel - base) / H) : 0; return d < Math.max(c(h * .22, h * .55, t.r * .95), c(h * .5, h * .5, t.r * .7)) + BALL_R; }
   if (t.blobs) { for (const [bx, by, bv, br, bvs = 1] of t.blobs) { const dx = u - (t.u + bx), dz = v - (t.v + bv), dy = rel - by, hr = br * .97 + BALL_R, vr = dy < 0 ? br * bvs * 1.08 + .3 + BALL_R : br * bvs * .97 + BALL_R; // canopy: each drawn blob;
@@ -4189,7 +4253,7 @@ function finishShot() {
     if (pickup) { if (water) L[L.length - 1].pen = 1; L.push({ n: G.stroke, club: '', pickup: true, conceded: true, lie: lie, pin: toPin, holed: true }); } }
   $('#result').classList.toggle('final', holed); $('#result').classList.remove('round'); $('#resCard').innerHTML = holed ? holeCard(G.log) : '';
   $('#resWord').textContent = word;
-  $('#resSub').textContent = holed ? `${COURSES.find(c => c.id === MENU.course)?.name || 'Toronto Hunt'} · Hole ${HOLE.n} · Par ${HOLE.par}` : `Shot ${G.stroke} · ${S.putt ? 'Putt' : (['chip', 'pitch', 'flop', 'sand'].includes(G.mode) ? '' : S.shape + ' · ') + club().name + (G.mode !== 'full' ? ' ' + MODES[G.mode].name : '')}` + (S.lieLoss >= 1 ? ` · lie cost ${S.lieLoss} yds` : '');
+  $('#resSub').textContent = holed ? `${COURSES.find(c => c.id === MENU.course)?.name || (OSLER_DEV && CID === 'osler' ? COURSE_NAME : 'Toronto Hunt')} · Hole ${HOLE.n} · Par ${HOLE.par}` : `Shot ${G.stroke} · ${S.putt ? 'Putt' : (['chip', 'pitch', 'flop', 'sand'].includes(G.mode) ? '' : S.shape + ' · ') + club().name + (G.mode !== 'full' ? ' ' + MODES[G.mode].name : '')}` + (S.lieLoss >= 1 ? ` · lie cost ${S.lieLoss} yds` : '');
   const pinTxt = lie === 'green' ? `${Math.round(toPin * 3)} ft` : `${Math.round(toPin)} yds`;
   const stats = [['Carry', Math.round(S.carry), S.pinHigh], ['Roll', S.roll < -.5 ? `${Math.round(S.roll)} ↩` : Math.round(S.roll), S.roll < -.5], ['Total', Math.round(total), false], ['To pin', water ? '—' : pinTxt, lie === 'green'], ['Spin rpm', (Math.round(S.spin / 10) * 10).toLocaleString(), false], ['Apex', `${Math.round(S.apex * 3)} ft`, false]];
   // tempo meter: where the downswing landed against the perfect window (log scale, quick on the left)
@@ -5009,6 +5073,8 @@ app.addEventListener('pointerdown', e => { if (G.view === 'flight' || (FLY_FF &&
 function ffTipMaybe() { if (store.get('ffUsed', false)) return; const n = store.get('ffTips', 0); if (n >= 2) return;
   clearTimeout(G.ffTipTO); G.ffTipTO = setTimeout(() => { if (G.view !== 'flight' || G.ff || store.get('ffUsed', false)) return; store.set('ffTips', n + 1); const t = $('#ffTip'); t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 2600); }, 2000); }
 window.addEventListener('pointercancel', () => { G.ff = false; });
+const FF_UNSTICK = true; /* Neil (11-17 21:37): "Now sometimes 3x stays on the screen": a release some control kept to itself (the golfer's face stops its pointerup) or one lost to an app switch left G.ff on, so the 3x badge stayed and the next flight or fly-over ran fast with no finger down. Fingers are now counted at the window before anything else sees them; with none down, fast-forward is off. false = as v427 */
+const FFP = new Set(); window.addEventListener('pointerdown', e => FFP.add(e.pointerId), true); window.addEventListener('pointerup', e => FFP.delete(e.pointerId), true); window.addEventListener('pointercancel', e => FFP.delete(e.pointerId), true); window.addEventListener('blur', () => FFP.clear()); document.addEventListener('visibilitychange', () => { if (document.hidden) FFP.clear(); });
 canvas.addEventListener('pointerdown', e => {
   if (!$('#result').hidden) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -5709,12 +5775,12 @@ const HOLESYS = (() => {
     ahead(); }
   function ahead() { /* prebuild the next AHEAD holes of this course; on the home screen instead every other course's first hole, so picking a course swaps at once (Neil); anything else prebuilt goes */
     if (!cur) return; const need = new Set(); let home = false; try { home = MENU.on || INTRO.on; } catch (e) {} /* (the first hole is built before MENU exists); during the intro too, so the other course is usually ready before the home screen shows */
-    if (home) { for (const id in COURSE_DEF) if (id !== CID) need.add(keyOf(id, NINE.first(id))); } else { for (let k = 1; k <= AHEAD && cur.i + k <= NINE.last(CID); k++) need.add(keyOf(CID, cur.i + k)); if (HOME_BG_WARM && cur.i >= NINE.last(CID) && cur.i !== NINE.first(CID) && !(CID === 'hunt' && HUNT_PIN_ROT)) need.add(keyOf(CID, NINE.first(CID))); } /* HOME_BG_WARM: the last hole has no next hole to hold: its first hole instead, for Home / Play again (not the Hunt's: building its hole 1 deals the next round's pins, which a reload on this hole must not see) */
+    if (home) { for (const id in COURSE_DEF) if (id !== CID && !COURSE_DEF[id].dev) need.add(keyOf(id, NINE.first(id))); } else { for (let k = 1; k <= AHEAD && cur.i + k <= NINE.last(CID); k++) need.add(keyOf(CID, cur.i + k)); if (HOME_BG_WARM && cur.i >= NINE.last(CID) && cur.i !== NINE.first(CID) && !(CID === 'hunt' && HUNT_PIN_ROT)) need.add(keyOf(CID, NINE.first(CID))); } /* HOME_BG_WARM: the last hole has no next hole to hold: its first hole instead, for Home / Play again (not the Hunt's: building its hole 1 deals the next round's pins, which a reload on this hole must not see) */
     if (want) need.add(want.HD.key); for (const HD of [...jobs.values()]) if (!need.has(HD.key)) drop(HD);
     for (const k of need) if (!jobs.has(k)) { const [c, i] = k.split(':'); start(c, +i); } }
   function boot() { /* the page's first hole: built at once, under the boot cover (the warm-up draw compiles and uploads it) */
     const HD = { cid: CID, i: HOLE_N, key: keyOf(CID, HOLE_N), v: null, n: 0 }; const it = steps(HD, false); while (!it.next().done) HD.n++; HD.v = holeVars(); HD.ready = true; use(HD);
-    if (HOLE_N === NINE.first(CID)) for (const id in COURSE_DEF) if (id !== CID && !(id === 'augusta' && typeof AUG_HOLES === 'undefined') /* SPLIT */ && !jobs.has(keyOf(id, NINE.first(id)))) { const J = start(id, NINE.first(id)); while (!J.ready) step(J); } } /* every other course's first hole too, under the same boot cover (Neil: switching course on the home screen is then just the fade; revisit if there are many courses) */
+    if (HOLE_N === NINE.first(CID)) for (const id in COURSE_DEF) if (!COURSE_DEF[id].dev) if (id !== CID && !(id === 'augusta' && typeof AUG_HOLES === 'undefined') /* SPLIT */ && !jobs.has(keyOf(id, NINE.first(id)))) { const J = start(id, NINE.first(id)); while (!J.ready) step(J); } } /* every other course's first hole too, under the same boot cover (Neil: switching course on the home screen is then just the fade; revisit if there are many courses) */
   /* "Next hole", "Play again", quitting to hole 1, another course on the home screen: swap to (cid, i) as soon as it's built. then: after the swap. pill: show the small loader while it builds */
   function go(cid, i, holes, then, { pill = true, hold = 0, fresh = false, card = false } = {}) { /* fresh: build it again even if it's built (or on screen): PINS.seed */
     if (!fresh && cur && cur.cid === cid && cur.i === i) { cancel(); if (then) then(); return; }
@@ -5816,6 +5882,7 @@ function frame(now) {
     const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null;
     try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
     requestAnimationFrame(frame); return; }
+  if (FF_UNSTICK && G.ff && !FFP.size) G.ff = false; /* FF_UNSTICK: no finger down: no fast-forward */
   { const ff = (G.ff || (MP_FF_SHARE && G.ffR && G.view === 'flight')) && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
   if (G.view === 'flight') updateFlight(dt * 1.15 * (G.ff || (MP_FF_SHARE && G.ffR) ? 3 : 1)); else updateCamera(dt); // flight plays 15% quicker than real time
   if (G.shake > 0) { G.shake -= dt; const k = G.shake * .06; camera.position.x += (Math.random() - .5) * k; camera.position.y += (Math.random() - .5) * k; }
@@ -6161,7 +6228,7 @@ async function runIntro() {
       mid.innerHTML = `<div class="cred"><small>${n === 0 ? 'starring' : n === cast.length - 1 && cast.length > 1 ? 'with' : 'and'}</small>${name}</div>`; await wait(per); }
     if (stop) return; const crest = C.find(c => c.classList.contains('p-crest'));
     C.forEach(c => c.classList.toggle('hl', c === crest)); faces.forEach(o => crest && lookAt(o, +crest.dataset.k));
-    mid.innerHTML = CID === 'augusta' ? `<div class="cred"><small>all live from</small>Augusta National</div>` : `<div class="cred"><small>all live from the</small>Toronto Hunt</div>`; await wait(1100);
+    mid.innerHTML = OSLER_DEV && CID === 'osler' ? `<div class="cred"><small>all live from</small>OslerBrook</div>` : CID === 'augusta' ? `<div class="cred"><small>all live from</small>Augusta National</div>` : `<div class="cred"><small>all live from the</small>Toronto Hunt</div>`; await wait(1100);
     end();
   })();
   await fin; clearInterval(blinkT); clearInterval(moodT);
@@ -6891,7 +6958,7 @@ if (MULTI) try { MPX = (() => {
   $('#quitUI').addEventListener('pointerup', e => { const b = e.target.closest('[data-q="quit"]'); if (b && S.code) leave(); }, true);
 
   /* ---------- home: the Multiplayer button and the room-code modal ---------- */
-  const btn = el('mpBtn'); btn.hidden = false; btn.classList.toggle('offline', !CAN && !MP_BTN_PINK); /* MP_BTN_PINK (Neil 11-16): the button stays pink even where there's no game server (the artifact viewer); tapping it still explains */
+  const btn = el('mpBtn'); btn.hidden = !!(OSLER_DEV && CID === 'osler'); btn.classList.toggle('offline', !CAN && !MP_BTN_PINK); /* MP_BTN_PINK (Neil 11-16): the button stays pink even where there's no game server (the artifact viewer); tapping it still explains */
   const CODE_RE = /^[A-Z0-9]{1,10}$/; /* room codes: 1-10 letters or digits, case-insensitive (upper case) */
   function codeVal() { return (el('mpCodeIn').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10); }
   function tiles() { const i = el('mpCodeIn'), v = codeVal(); if (i.value !== v) i.value = v; el('mpGo').disabled = !CODE_RE.test(v) || !CAN || !!S.joining || (MP_GO_SPIN && !!S.switchTo); goSpin(MP_GO_SPIN && !!(S.joining || S.switchTo)); }
@@ -7055,7 +7122,7 @@ if (MULTI) try { MPX = (() => {
   }
 
   /* ---------- boot: an invite link (#CODE) or a refresh mid-room goes straight back in ---------- */
-  { let code = null, quiet = false; try { const h = window.__mpHash || ''; if (MP_SHARE && window.__mpRoom) code = window.__mpRoom; /* MP_SHARE: a ?room=CODE link (read and taken off the address by the head script) */ else if (/^#[A-Za-z0-9]{1,10}$/.test(h) && !/^#augusta$/i.test(h)) code = h.slice(1).toUpperCase(); const j = JSON.parse(sessionStorage.getItem('tp_mp') || 'null'); if (!code && j && /^[A-Z0-9]{1,10}$/.test(j.code)) { code = j.code; quiet = true; } /* (#augusta is the game's own page; #hole-N and #augusta-hole-N have a dash so never match) */ } catch (e) {}
+  { let code = null, quiet = false; try { const h = window.__mpHash || ''; if (MP_SHARE && window.__mpRoom) code = window.__mpRoom; /* MP_SHARE: a ?room=CODE link (read and taken off the address by the head script) */ else if (/^#[A-Za-z0-9]{1,10}$/.test(h) && !/^#augusta$/i.test(h) && !(OSLER_DEV && /^#ob-004b22b2$/i.test(h))) code = h.slice(1).toUpperCase(); const j = JSON.parse(sessionStorage.getItem('tp_mp') || 'null'); if (!code && j && /^[A-Z0-9]{1,10}$/.test(j.code)) { code = j.code; quiet = true; } /* (#augusta is the game's own page; #hole-N and #augusta-hole-N have a dash so never match) */ } catch (e) {}
     if (code && (WSURL || MP_CONNECT_FIRST)) { const go = () => { if (!$('#boot.home') || document.getElementById('intro')) { setTimeout(go, 300); return; } join(code, quiet); }; go(); } } /* MP_CONNECT_FIRST: a room link opens the code modal, connecting (or says multiplayer needs teeparty.fun) */
   function hit(o = {}) { /* test hook: the active phone strikes (power k x the right power, tempo k x perfect, curve in degrees); optional ball placement {at:{u,v,lie}} */
     if (!S.mine && !S.shootAs) return false; if (o.at) { setupShot(o.at.u, o.at.v, o.at.lie); } if (MP_TURN_SLICE && CJ.g) caddieSync(); /* (MP_TURN_SLICE: the right power is the final pick's) */
