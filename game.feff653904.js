@@ -40,7 +40,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v421'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v423'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -69,6 +69,7 @@ const H9_BARE = false; /* Neil (11-16 10:28): "I like bare off for hunt 9" (the 
 const h9Bare = (u, v) => Math.sin(u * .22 + .5) * Math.cos(v * .19 + 1.7) + .6 * Math.sin((u * .7 - v) * .15 + 2.3) + .4 * Math.sin((u + v * .5) * .11 + .9); /* below H9_BUSH.bare: a bare patch (H9_BARE): ~50 patches 8-20 yd across, about 27% of the ravine, rather than one big band */
 const HUNT_PINES = true; /* Hunt 7, 8, 9 (Neil: "some pine trees in the mix. Not like Christmas trees ... fuller a bit"; then: white pines, "about 50%" down 9 and on the left of 8): pines drawn in natural clumps, eastern-white-pine style: a bare trunk up to a high, flat-topped crown of flat, irregular tiers, each tier a couple of lumps off to different sides, about as wide as the lidar crown. Same crown mesh, colours and ink as Augusta's loblollies (no new geometry). Share of each treeline: HUNT_PINE_SHARE. false = all broadleaf */
 const NO_DOMES = true; /* Neil (11-16 10:44): "I don't like when we do far off bumps in the background, let's just have it be plain grass": no background domes (Hunt 1, Augusta); the Hunt's lake and its low crown rings stay. false = the domes as before */
+const AUG_DOMES = true; /* Neil (11-17 19:50): "We removed the background bumps at Augusta. Let's bring them back (not too many, it's just a bit boring now)": with NO_DOMES on, Augusta gets back half of its old far domes (the same ones, every other one); the Hunt stays plain. false = no domes (as v422) */
 const H5_TEE_GRASS = true; /* Neil (11-16 10:19): "Hunt 5 tee is continuous grass not pine straw": the back box and the next one joined into one long tee on the lidar's raised deck (as his photo; the tee in use), and the straw strips over the tee area (the data's two PINE beds there) turned back to grass. The forward box past the cart path stays. false = the boxes and straw as before */
 const HUNT_TEE5 = { box: [[-12.0, 43.6], [-5.5, 44.9], [4.5, -5.7], [-2.0, -7.0]], join: [[0, 0], [-6.1, 30.9]], straw: [-15, 25, -12, 85] }; /* box: the long tee; join: the boxes it replaces (centres); straw: PINE beds wholly inside [u0, u1, v0, v1] go */
 const H9_FRAME = true; /* Neil (11-16 09:15, photo from the 9 tee): the tee shot is framed by a full leafy mass on the left and tall broadleaf trees plus one dark spruce on the right. Within 120 yd of the tee: no pines on the left, and on the right only the nearest tall one (the spruce's stand-in); the rest of 9 keeps HUNT_PINE_SHARE's ~50%. Only which trees draw as pines changes (no tree moves or resizes). false = as before */
@@ -1761,8 +1762,9 @@ function* buildSceneryG() { /* BUILD_CHUNK2: yields between its parts and throug
     const cg = new THREE.SphereGeometry(1, 7, 3, 0, Math.PI * 2, 0, Math.PI / 2), Qk = new THREE.Quaternion(), Sk = new THREE.Vector3();
     cullInst(cg, toon(0xffffff), crowns.map(h => ({ p: h.p, m: new THREE.Matrix4().compose(h.p, Qk, h.s), c: new THREE.Color(h.c), r: Math.max(h.s.x, h.s.z) + 2.5 })));
     cullInst(cg, inkMat, crowns.map(h => ({ p: h.p, m: new THREE.Matrix4().compose(h.p, Qk, Sk.set(h.s.x + 2.5, h.s.y + 2.5, h.s.z + 2.5)), r: Math.max(h.s.x, h.s.z) + 2.5 })));
-  } else if (!NO_DOMES) {
+  } else if (!NO_DOMES || (AUG_DOMES && AUGD && AUGD.course === 'augusta')) { /* (AUG_DOMES: Augusta's come back, every other one) */
   for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(HB.cx + Math.cos(a) * d, HB.cz + Math.sin(a) * d, r)) d += 15; if (Math.cos(a) * d - r < 60 && false) continue; if (!AUGD && Math.cos(a) * d > 40) continue; hills.push({ p: new THREE.Vector3(HB.cx + Math.cos(a) * d, HB.y, HB.cz + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
+  if (NO_DOMES && AUG_DOMES) for (let i = hills.length - 1; i >= 0; i--) if (i % 2) hills.splice(i, 1); /* AUG_DOMES: the same domes as before NO_DOMES, every other one (8 of 16) */
   const hm = new THREE.InstancedMesh(geo, toon(0xffffff), hills.length), inked = hills.filter(h => h.ink), ho = new THREE.InstancedMesh(geo, inkMat, inked.length);
   const M4 = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), C0 = new THREE.Color(), S0 = new THREE.Vector3();
   hills.forEach((h, i) => { hm.setMatrixAt(i, M4.compose(h.p, Q0, h.s)); hm.setColorAt(i, C0.set(h.c)); });
@@ -2989,7 +2991,7 @@ const CADDIE_SLICE = true; const CJ = { g: null }; let WSNAP = null; /* ROLLBACK
 const CJ_END = {}; function* cjEndG(g) { yield* g; if (F4.end) { if (PT_PL && PT_PL.lz) { void PT_PL.ptree; yield; } if (planCache && planCache.lz && G.mode !== 'putt') { void planCache.tree; yield; } } yield CJ_END; } /* (CADDIE_FAST4 end: the plans plSettle and the next frame's line read, finished in slices of their own: the same quiet force they'd get there) */ /* CADDIE_FAST3: a sliced setup ends with one more pause, so the HUD refresh (caddieDone) gets a frame's slice of its own */
 function caddieStep(ms) { if (!CJ.g) return; if (CJ.wait && ms < 1e8) { CJ.wait = false; return; } /* CARD_FAST: the set-up's slices start a frame after the shot card's frame */ const t0 = performance.now(); let n = 0; try { do { const r = CJ.g.next(); if (r.done) { caddieDone(); return; } if (r.value === CJ_END && n && ms < 1e8) return; n++; } while (performance.now() - t0 < ms); } catch (e) { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); console.error(e); } }
 function cjLazyEnd() { if (F3.lazy && PL_LAZY > 0 && --PL_LAZY === 0) plSettle(); } /* CADDIE_FAST3: a sliced setup holds lazy plans from its start to its end */
-function caddieDone() { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); if (HUD_FAST3 && STRIKE_FAST) { HUD_LATER = true; try { updateHUD(); } finally { HUD_LATER = false; } } else updateHUD(); tracerDirty = true; /* (HUD_FAST3: its fits at the frame's end) */ if (G.view !== 'flight' && !(typeof FLY === 'object' && FLY.on)) tracer.visible = tracerInk.visible = rings.visible = true; if (CJ.after) { const f = CJ.after; CJ.after = null; try { f(); } catch (e) { console.error(e); } } /* PRE_WAIT: a pre-shot line that waited for this pick */ }
+function caddieDone() { CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); if (HUD_FAST3 && STRIKE_FAST) { HUD_LATER = true; try { updateHUD(); } finally { HUD_LATER = false; } } else updateHUD(); tracerDirty = true; /* (HUD_FAST3: its fits at the frame's end) */ if (G.view !== 'flight' && !(typeof FLY === 'object' && FLY.on)) tracer.visible = tracerInk.visible = rings.visible = true; try { previewRetarget(); } catch (e) { console.error(e); } if (CJ.after) { const f = CJ.after; CJ.after = null; try { f(); } catch (e) { console.error(e); } } /* PRE_WAIT: a pre-shot line that waited for this pick */ }
 function caddieSync() { if (CJ.g) caddieStep(1e9); } /* finish it now (a strike, a drag, a pick) */
 function caddieCancel() { CJ.after = null; /* PRE_WAIT */ if (CJ.g) { try { CJ.g.return(); } catch (e) {} CJ.g = null; WSNAP = null; HUD_HOLD--; cjLazyEnd(); } } /* a new setup replaces it */
 function setupShotSliced(u, v, lie, first = 6) { if (!(CADDIE_FAST2 && CADDIE_SLICE)) { setupShot(u, v, lie); return; } /* (CARD_FAST: first = the first slice's ms) */ hushPre(); caddieCancel(); HUD_HOLD++; if (F3.lazy) PL_LAZY++; WSNAP = { ...G.wind }; CJ.g = F3.slice ? cjEndG(setupShotG(u, v, lie)) : setupShotG(u, v, lie); tracer.visible = tracerInk.visible = rings.visible = false; CJ.wait = false; caddieStep(first); if (CARD_FAST && first === 0 && CJ.g) CJ.wait = true; }
@@ -4459,16 +4461,23 @@ function zoomAim(k, cx, cy) {
   A.zoom = nz; clampPan(A);
 }
 // after a shot lands: rise up behind the ball to show what's next (the green, or 200 yds out if it's further), hold, then settle into the shot view
-function startPreview() {
-  const L0 = pinDist(); if (L0 <= 30) return;
-  const L = Math.min(L0, 200), f = new THREE.Vector3(G.dir.u, 0, -G.dir.v).normalize();
-  const T = L0 <= 200 ? new THREE.Vector3(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v) : new THREE.Vector3(G.ball.u + G.dir.u * L, 0, -(G.ball.v + G.dir.v * L)).setY(groundHeight(G.ball.u + G.dir.u * L, G.ball.v + G.dir.v * L));
+const PREVIEW_AIM = true; /* ROLLBACK: false -> as v421. Neil (11-17 19:36): after a long shot lands, the look out at the target sometimes faced right of the green. Since CARD_FAST (v419) the caddie picks the next aim a few frames AFTER the ball stops, and the look-out took its heading from the aim still left from the last shot (the old line, carried over to the new spot). Now it heads at the pin until the caddie's aim is in, then eases round onto that aim */
+function previewPose(d) { /* the look-out along heading d from the ball */
+  const L0 = pinDist(), L = Math.min(L0, 200), f = new THREE.Vector3(d.u, 0, -d.v).normalize();
+  const T = L0 <= 200 ? new THREE.Vector3(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v) : new THREE.Vector3(G.ball.u + d.u * L, 0, -(G.ball.v + d.v * L)).setY(groundHeight(G.ball.u + d.u * L, G.ball.v + d.v * L));
   const b = L * .15 + 8, H = L * .35 + 12, pos = new THREE.Vector3(G.ball.u, groundHeight(G.ball.u, G.ball.v) + H, -G.ball.v).addScaledVector(f, -b);
   // pitch so the green sits in the top half of the screen (the result card is low)
   const horiz = Math.hypot(T.x - pos.x, T.z - pos.z), dep = Math.atan2(pos.y - T.y, horiz) + Math.atan(.38 * Math.tan(26 * Math.PI / 180));
   const look = pos.clone().addScaledVector(f, 50 * Math.cos(dep)); look.y = pos.y - 50 * Math.sin(dep);
+  return { pos, look };
+}
+function startPreview() {
+  const L0 = pinDist(); if (L0 <= 30) return;
+  let d = G.dir; if (PREVIEW_AIM && CJ.g) { const du = PIN.u - G.ball.u, dv = PIN.v - G.ball.v, n = Math.hypot(du, dv) || 1; d = { u: du / n, v: dv / n }; } /* PREVIEW_AIM: the caddie's still picking: the pin until its aim is in */
+  const { pos, look } = previewPose(d);
   G.preview = { t: 0, r: 1.4, h: 1.05, f: 1.3, w: 0, pos, look };
 }
+function previewRetarget() { const P = G.preview; if (!PREVIEW_AIM || !P || P.cancel || pinDist() <= 30) return; P.to = previewPose(G.dir); } /* PREVIEW_AIM: the caddie's aim is in: ease the look-out round onto it */
 function startCamTween(dur, noHop) { G.camTween = { from: camera.position.clone(), fromLook: camLook.clone(), t: 0, dur, noHop: !!noHop }; }
 function enterAim() { caddieSync(); if (G.view !== 'swing') return; measure(); aimFrame = null; G.view = 'aim'; G.aimGoal = 1; sfx('pop'); $('#coach').classList.add('off'); if (!G.aimed) { G.aimed = true; store.set('aimed', true); } }
 function exitAim() { G.aimGoal = 0; G.view = 'swing'; sfx('pop'); }
@@ -4483,6 +4492,7 @@ function updateCamera(dt) {
   const look = _cl.copy(s.look).lerp(a.look, Math.pow(e, .8));
   if (G.camTween) { const T = G.camTween; T.t += dt / T.dur; const k = easeIO(clamp(T.t, 0, 1)); const hop = T.noHop ? 0 : Math.min(8, T.from.distanceTo(pos) * .3); pos.lerpVectors(T.from, pos, k).y += Math.sin(k * Math.PI) * hop; /* a little hop over long moves only: a short putt-to-putt move stays smooth instead of zooming out and back */ look.lerpVectors(T.fromLook, look, k); if (T.t >= 1) G.camTween = null; }
   if (G.preview) { const P = G.preview; P.t += dt;
+    if (P.to) { const k = 1 - Math.exp(-dt * 4.5); P.pos.lerp(P.to.pos, k); P.look.lerp(P.to.look, k); } /* PREVIEW_AIM */
     if (G.aimGoal || SW.phase === 'back' || SW.phase === 'down') P.cancel = true; // you're playing: get out of the way
     let w; if (P.cancel) { const X = P.cx || (P.cx = { w: P.w, v: (P.wv || 0) * .7, t: 0 }); X.t += dt; const s = Math.min(1, X.t / .7); /* Hermite exit: current weight + rate -> 0 in 0.7 s */
       w = s >= 1 ? 0 : clamp(X.w * (2 * s * s * s - 3 * s * s + 1) + X.v * (s * s * s - 2 * s * s + s), 0, 1); }
@@ -6416,7 +6426,8 @@ const WIND_HIDE_PUTT = true; /* Neil (11-16 22:15): no wind card while the shot 
 const MP_CHAT_BOX = true; /* Neil (11-16 21:52, "all like one box"): the chat box is one pill with a round pink send arrow inside its right end (iMessage style; the same box in the docked keyboard strip); its text 17 -> 19px (already over iOS's 16px focus-zoom line); chat bubbles 17 -> 18px. false = v390's box + SEND button */
 const MP_ONE_HOLE_CARD = true; /* Neil (11-16 21:30, "At the end"): in multiplayer a golfer holing out gets the normal result card for that shot (the score word, the shot's stats), not the single-player end-of-hole card (the whole hole's shot list); the one end-of-hole card is the group card when everyone has finished. The holes' timing (the 2.6 s hold, NEXT_HOLD, who taps Next hole) is unchanged. false = v390 */
 const MP_SLOPE_MINE = true; /* Neil (11-16 20:45): watching someone else putt, no slope legend (the green's slope key); your own putt keeps it. false = shown to watchers too */
-try { const H = document.documentElement; if (WIND_HIDE_PUTT) H.classList.add('windPutt'); if (MP_CHAT_BOX) H.classList.add('mpChatBox'); if (MP_SIDE_LEFT) H.classList.add('mpSideLeft'); if (MP_SLOPE_MINE) H.classList.add('mpSlopeMine'); if (MP_NO_TOP) H.classList.add('mpNoTop'); if (MP_SIDE_UP) H.classList.add('mpSideUp'); } catch (e) {}
+const MP_BV_MINE = true; /* Neil (11-17 19:58): "In multiplayer I can see opponents ball view button": the Ball view button (back from the overhead aim view) shows on your own turn only; watching someone else, it stays hidden (a tap on it was exitAim on their view). false = as v422 */
+try { const H = document.documentElement; if (WIND_HIDE_PUTT) H.classList.add('windPutt'); if (MP_CHAT_BOX) H.classList.add('mpChatBox'); if (MP_SIDE_LEFT) H.classList.add('mpSideLeft'); if (MP_SLOPE_MINE) H.classList.add('mpSlopeMine'); if (MP_BV_MINE) H.classList.add('mpBvMine'); if (MP_NO_TOP) H.classList.add('mpNoTop'); if (MP_SIDE_UP) H.classList.add('mpSideUp'); } catch (e) {}
 /* MP_BUBBLE_RECT (perf2): a chat bubble, typing dots or a reaction arriving placed itself by reading its anchor's and the app's boxes right after the frame had already written to the page
    (HUD, dial, avatar), so each one forced a full style + layout pass mid-frame (up to ~57 ms on the test box in a burst of chat). true: the anchors of the bubbles this frame will place
    are read at the very start of the frame, while the layout is still clean, and placed from those (the same boxes: nothing that runs before the chat moves them; a room / turn message

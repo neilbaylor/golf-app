@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.04feb1ad5a.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.feff653904.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -901,7 +901,7 @@ html.mpChatBox #mpSend:active{transform:scale(.9);box-shadow:none}html.mpChatBox
 html.mpNoTop #mpPanel .mpTop{display:none}html.mpNoTop #mpPanel{padding-top:10px}html.mpNoTop #app:not(.mp2p) #mpPanel:not(.sheet){padding-top:16px} /* MP_NO_TOP: the strip's AIMING tag gets the room the top row gave it */
 html.mpNoTop #mpPanel>#mpConn{position:absolute;z-index:1;top:-14px;right:16px;font:12px/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;color:#fff;background:#c0306f;border:2px solid var(--ink);border-radius:8px;padding:5px 7px 2px;box-shadow:1.5px 2px 0 var(--ink);transform:rotate(2deg);white-space:nowrap} /* MP_NO_TOP: "Reconnecting…" on the panel's top edge */
 html.windPutt #app.putting #wind{visibility:hidden} /* WIND_HIDE_PUTT */
-#app.mp2p #mpStrip{display:none}html.mpSlopeMine #app.mp.mpWatch #slopeKey{display:none} /* MP_SLOPE_MINE */ /* MP_STRIP_3: 2 golfers: no strip */
+#app.mp2p #mpStrip{display:none}html.mpSlopeMine #app.mp.mpWatch #slopeKey{display:none} /* MP_SLOPE_MINE */html.mpBvMine #app.mp.mpWatch #ballView{opacity:0!important;pointer-events:none!important} /* MP_BV_MINE */ /* MP_STRIP_3: 2 golfers: no strip */
 #app.mpResUp.mpWatch #result{bottom:calc(var(--mpPT,150px) + 14px)}#app.mpResUp.mpWatch #result.final{bottom:auto;top:var(--mpFinTop,calc(208px + env(safe-area-inset-top,0px)))} /* MP_RES_UP: the watcher's card just above the panel (--mpPT: the panel's top, from the bottom) */
 html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-area-inset-top,0px) + 170px));align-items:flex-end}html.mpSideUp #mpSide .mpW i{right:auto;left:-6px}html.mpSideUp.mpSideLeft #mpSide{right:auto;left:max(10px,env(safe-area-inset-left,0px));align-items:flex-start}html.mpSideUp.mpSideLeft #mpSide .mpW i{left:auto;right:-6px;bottom:auto;top:-4px}html.mpSideLeft #mpSide{gap:14px}html.mpSideLeft #mpMe{position:relative}html.mpSideLeft #mpMe .mpWs{font-size:11px;bottom:-8px;padding:3px 4px 0}html.mpSideLeft .mpWs{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%) rotate(-2deg);font:12px/1 var(--font-display);font-style:normal;letter-spacing:.02em;color:#fff;text-shadow:0 1px 0 rgba(29,42,26,.45);background:var(--pink);border:2px solid var(--ink);border-radius:7px 5px 8px 5px;padding:4px 5px 0;min-width:12px;text-align:center;white-space:nowrap} /* MP_SIDE_LEFT: the column on the left; each face's score to par in the HUD's pink pill */ /* MP_SIDE_UP: just under the top HUD, on the right */
 #app.mpTyping #mpPanel{top:calc(var(--kbTop,0px) + 8px + env(safe-area-inset-top,0px));bottom:auto;animation:none;z-index:16}#app.mpTyping #mpStrip{display:none} /* MP_KB_TOP: typing: the panel at the top of what you can see */
@@ -1172,5 +1172,5 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
 if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror="__splitFail()"><\/script>');</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.04feb1ad5a.js" onerror="__splitFail()"></script>
+<script src="game.feff653904.js" onerror="__splitFail()"></script>
 
