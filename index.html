@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.d204623c58.js", "osler": "osler.f5ef422a43.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.5e8999eaf7.js", "osler": "osler.f5ef422a43.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); if (/^#ob-004b22b2(?:-hole-\d+)?$/.test(h || at)) pre(N.osler); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -80,8 +80,9 @@ const SA_FIT_EARLY = true, SA_INSET_MEMO = true;
    false = exactly the old 520px column. UIS.s is the scale in force, for the few spots in the code that turn screen px into layout px. */
 const TABLET_FILL = true;
 const UIS = { s: 1 };
+const DESK_BOX = .75; /* Neil (11-18 15:02): "make it work a little nicer on desktop... just do it with a max width and letter box it like a tablet": a window wider than it is tall (and at least 600 px tall, so a phone on its side is left alone) gets the game in a centred portrait box, 3:4 like a tablet, with the dark backdrop either side; its stickers scale from the box. 0 = full width, as v441 */
 (function () { if (!TABLET_FILL) return; const H = document.documentElement; H.classList.add('tfill');
-  const set = () => { const w = innerWidth, h = innerHeight, s = w < 600 ? 1 : Math.round(Math.min(1.6, Math.max(1, Math.min(w / 430, h / 932))) * 1000) / 1000; /* a 430x932 phone's layout, grown to fit the screen (portrait iPad Air 1.27, iPad Pro 12.9 1.47; landscape stays 1) */
+  const set = () => { const W = innerWidth, h = innerHeight, box = DESK_BOX && W > h && h >= 600, w = box ? Math.round(Math.min(W, h * DESK_BOX)) : W; H.classList.toggle('dbox', box); if (box) H.style.setProperty('--boxW', w + 'px'); /* DESK_BOX */ const s = w < 600 ? 1 : Math.round(Math.min(1.6, Math.max(1, Math.min(w / 430, h / 932))) * 1000) / 1000; /* a 430x932 phone's layout, grown to fit the screen (portrait iPad Air 1.27, iPad Pro 12.9 1.47; landscape stays 1) */
     UIS.s = s; H.style.setProperty('--ui', s); H.classList.toggle('uiS', s > 1); };
   set(); addEventListener('resize', set); addEventListener('orientationchange', () => setTimeout(set, 200)); })();
 /* COURSE_TOP (Neil): the two home-screen course cards together span exactly the stats card's width, each with its name on one line
@@ -755,6 +756,7 @@ html.holeNext #holeLdr[hidden]{display:flex!important}
    piece's own transform and animations) from the corner or edge it's pinned to; its offset from that edge grows by --ui too.
    Touch areas scale with the pictures (scale is a real transform). */
 html.tfill #app{max-width:none}
+html.tfill.dbox #app{max-width:var(--boxW);box-shadow:0 0 0 3px var(--ink),0 0 60px rgba(0,0,0,.45)} /* DESK_BOX */
 html.tfill .sheet{max-width:496px;margin:0 auto} /* wide windows: the pickers keep a phone sheet's width, centred (never binds on a phone) */
 @media (min-width:521px){html.tfill #bottom{grid-template-columns:minmax(0,87px) minmax(0,1fr) minmax(0,87px)}html.tfill #dialWrap{justify-self:center}} /* wider than any phone: strike and club/map stay out by the screen edges (as on a 430px phone) instead of drifting in to the middle of half the screen */
 html.uiS #app #top{right:auto;box-sizing:border-box;width:calc(100% / var(--ui));transform-origin:0 0;scale:var(--ui)}
@@ -1179,5 +1181,5 @@ if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror
 if (/^#ob-004b22b2(?:-hole-\d+)?$/.test(location.hash)) document.write('<script src="' + __splitN.osler + '" onerror="__splitFail()"><\/script>'); /* OslerBrook: only on its own boot */</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.d204623c58.js" onerror="__splitFail()"></script>
+<script src="game.5e8999eaf7.js" onerror="__splitFail()"></script>
 
