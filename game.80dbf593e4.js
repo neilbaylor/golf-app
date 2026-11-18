@@ -40,7 +40,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v424'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v426'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -4714,6 +4714,7 @@ function plSettle() { if (PT_PL) { const pl = PT_PL; PT_PL = null; PLAN_TREE = p
 function plRun(fn) { PL_LAZY++; try { return fn(); } finally { if (--PL_LAZY === 0) plSettle(); } } /* run caddie work with lazy plans */
 
 /* ================= GREEN READING: contour grid + slope streaks that flow downhill ================= */
+const SLOPE_PIT = true; /* Neil (11-17 20:39): "At the front of the 7th at Hunt green there is a contour arrow that spins around": an arrow drifting downhill into a hollow kept crossing its low point and flipping round (and the same at a saddle). An arrow whose heading swings over 60 deg in a frame starts again elsewhere (it fades in from nothing). false = as v424 */
 let READ_ZS = 1; const _gc = new THREE.Vector3(), RC0 = new THREE.Color(0xffffff), RC1 = new THREE.Color(0xffe066), RC2 = new THREE.Color(0xff8a3d), _rc = new THREE.Color();
 const READ = (() => {
   let U0, U1, V0, V1, GW, GH, gH, gU, gV, gIn, grid = null, gridG = null; const step = 1.5, lift = .045, GS = .5; /* the hole's reading grid: make() builds one for the hole being built, use() switches to it */
@@ -4752,7 +4753,7 @@ const READ = (() => {
   const P = Array.from({ length: N }, () => ({ u: 0, v: 0, life: 0, max: 1 }));
   const F = { on: false, u: 0, v: 0, r: 0 }; // zoomed in on a short putt: most new arrows appear in the patch you're looking at, so it never reads blank
   const NF = 34; /* arrows kept for the close-up */
-  const spawn = (q, i = N) => { const near = F.on && i < NF; for (let k = 0; k < 20; k++) { const u = near ? F.u + (Math.random() * 2 - 1) * F.r : U0 + Math.random() * (U1 - U0), v = near ? F.v + (Math.random() * 2 - 1) * F.r : V0 + Math.random() * (V1 - V0); if (insideAt(u, v)) { q.u = u; q.v = v; break; } } q.life = 0; q.max = 1.2 + Math.random() * 1.4; };
+  const spawn = (q, i = N) => { const near = F.on && i < NF; for (let k = 0; k < 20; k++) { const u = near ? F.u + (Math.random() * 2 - 1) * F.r : U0 + Math.random() * (U1 - U0), v = near ? F.v + (Math.random() * 2 - 1) * F.r : V0 + Math.random() * (V1 - V0); if (insideAt(u, v)) { q.u = u; q.v = v; break; } } q.life = 0; q.max = 1.2 + Math.random() * 1.4; q.pd = 0; };
   const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), qn = new THREE.Quaternion(), nrm = new THREE.Vector3(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   let on = false;
   function update(dt, show) {
@@ -4766,6 +4767,7 @@ const READ = (() => {
     { const hgt = camera.position.y - groundHeight(camLook.x, -camLook.z); F.on = G.mode === 'putt' && hgt < 22; if (F.on) { F.u = camLook.x; F.v = -camLook.z; F.r = Math.max(2.5, hgt * Math.tan(camera.fov * Math.PI / 360) * 1.15); } }
     for (let i = 0; i < N; i++) {
       const q = P[i], gd = look(q.u, q.v), sl = Math.hypot(gd.u, gd.v); q.life += dt;
+      if (SLOPE_PIT && sl > 1e-4) { const du = gd.u / sl, dv = gd.v / sl; if (q.pd && du * q.pu + dv * q.pv < .5) { spawn(q, i); continue; } q.pu = du; q.pv = dv; q.pd = 1; } /* SLOPE_PIT: it swung more than 60 deg in one frame (it slid into a hollow and is flipping back and forth, or onto a saddle): a fresh arrow somewhere else */
       if (sl > 1e-4) { const sp = (.45 + sl * 24) * READ_ZS; /* a slow drift downhill */ q.u -= gd.u / sl * sp * dt; q.v -= gd.v / sl * sp * dt; }
       if (q.life > q.max || !gd.inside || (F.on && i < NF && Math.hypot(q.u - F.u, q.v - F.v) > F.r * 1.6)) spawn(q, i);
       const k = q.life / q.max, len = .9 + Math.min(1.4, sl * 36), cd = Math.hypot(camera.position.x - q.u, camera.position.y - gd.h, camera.position.z + q.v), fade = Math.min(1, Math.sin(Math.PI * Math.min(1, k)) * 1.6) * smooth(2.2, 5.5, cd);
@@ -5714,12 +5716,12 @@ const HOLESYS = (() => {
     const HD = { cid: CID, i: HOLE_N, key: keyOf(CID, HOLE_N), v: null, n: 0 }; const it = steps(HD, false); while (!it.next().done) HD.n++; HD.v = holeVars(); HD.ready = true; use(HD);
     if (HOLE_N === NINE.first(CID)) for (const id in COURSE_DEF) if (id !== CID && !(id === 'augusta' && typeof AUG_HOLES === 'undefined') /* SPLIT */ && !jobs.has(keyOf(id, NINE.first(id)))) { const J = start(id, NINE.first(id)); while (!J.ready) step(J); } } /* every other course's first hole too, under the same boot cover (Neil: switching course on the home screen is then just the fade; revisit if there are many courses) */
   /* "Next hole", "Play again", quitting to hole 1, another course on the home screen: swap to (cid, i) as soon as it's built. then: after the swap. pill: show the small loader while it builds */
-  function go(cid, i, holes, then, { pill = true, hold = 0, fresh = false } = {}) { /* fresh: build it again even if it's built (or on screen): PINS.seed */
+  function go(cid, i, holes, then, { pill = true, hold = 0, fresh = false, card = false } = {}) { /* fresh: build it again even if it's built (or on screen): PINS.seed */
     if (!fresh && cur && cur.cid === cid && cur.i === i) { cancel(); if (then) then(); return; }
     let HD = jobs.get(keyOf(cid, i)); if (!HD || HD.err || fresh) { if (HD) drop(HD); HD = start(cid, i); }
     const fin = () => { const t0 = performance.now(); ROUND.holes = holes; use(HD); MENU.course = CID; const t1 = performance.now(); if (then) then(); swapMs = [Math.round(t1 - t0), Math.round(performance.now() - t1)]; }; /* (timings: HOLESYS.swapMs = [swap, then]) */
     if (HD.ready && !hold) { cancel(); fin(); return; }
-    want = { HD, done: fin, pill, meta: meta(cid, i), at: performance.now() + hold }; ahead(); if (pill) { PILL.show(pill === 'home', want.meta); PILL.set(HD.n / est); } }
+    want = { HD, done: fin, pill, card, meta: meta(cid, i), at: performance.now() + hold }; ahead(); if (pill) { PILL.show(pill === 'home', want.meta); PILL.set(HD.n / est); } }
   function meta(cid, i) { const c = COURSE_DEF[cid]; return (c.list || (c.list = c.holes()))[i - 1]; } /* the card line of the hole being waited on (for the pill) */
   function then(fn) { if (!want) { fn(); return; } const d = want.done; want.done = () => { d(); fn(); }; if (!want.pill && !(typeof MENU === 'object' && MENU.on)) { want.pill = true; PILL.show(false, want.meta); PILL.set(want.HD.n / est); } } /* after the hole being waited on (Play pressed while it builds: now with the pill) */
   function cancel() { if (want) { want = null; PILL.hide(); } }
@@ -5728,12 +5730,12 @@ const HOLESYS = (() => {
     return !MENU.on && !INTRO.on && !FLY.on && now >= FLY_CALM_AT && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && !G.preview && Math.abs(G.aimT - G.aimGoal) < 1e-3 && !down && now - lastPtr > 400; }
   function tick(now) {
     const W = want && want.HD, HD = W && !W.ready ? W : W ? null : [...jobs.values()].find(j => !j.ready);
-    if (HD) { if (!W && !calm(now) && !((MENU.on || INTRO.on) && !down && now - lastPtr > 400 && now > (INTRO.calm || 0))) return; const budget = !W ? (HOME_BG_WARM && MENU.on ? BUDGET.home : BUDGET.calm) : MENU.on ? BUDGET.home : BUDGET.wait, t0 = performance.now(); /* HOME_BG_WARM: the home screen's background builds (another course's first hole) at the home rate too */
+    if (HD) { if (!W && !calm(now) && !((MENU.on || INTRO.on) && !down && now - lastPtr > 400 && now > (INTRO.calm || 0))) return; const budget = !W ? (HOME_BG_WARM && MENU.on ? BUDGET.home : BUDGET.calm) : MENU.on && !want.card ? BUDGET.home : BUDGET.wait, /* (MP_LOAD_CARD: under the loader card, full speed) */ t0 = performance.now(); /* HOME_BG_WARM: the home screen's background builds (another course's first hole) at the home rate too */
       do step(HD); while (!HD.ready && !HD.idle && performance.now() - t0 < budget);
       if (W && want.pill) PILL.set(HD.n / est); }
     if (want && want.HD.ready && now >= (want.at || 0)) { const w = want; want = null; PILL.hide(); if (w.HD.err) { console.error('hole build failed', w.HD.key); drop(w.HD); return; } w.done(); } }
   function isReady(cid, i) { const k = keyOf(cid, i), j = jobs.get(k); return !!(cur && cur.key === k) || !!(j && j.ready && !j.err); } /* (HOMESNAP: is that hole up or prebuilt) */
-  return { boot, go, then, tick, cancel, ahead, forget, isReady, get busy() { return !!want; }, get cur() { return cur; }, get jobs() { return [...jobs.values()].map(j => ({ key: j.key, ready: j.ready, n: j.n, ms: Math.round(j.ms || 0), max: +(j.max || 0).toFixed(1), slow: j.slow || 0 })); }, get last() { return last; }, get swapMs() { return swapMs; }, AHEAD,
+  return { boot, go, then, tick, cancel, ahead, forget, isReady, get busy() { return !!want; }, get prog() { return want ? Math.min(1, want.HD.n / est) : 1; }, /* MP_LOAD_CARD: the hole being waited on, 0..1 */ get cur() { return cur; }, get jobs() { return [...jobs.values()].map(j => ({ key: j.key, ready: j.ready, n: j.n, ms: Math.round(j.ms || 0), max: +(j.max || 0).toFixed(1), slow: j.slow || 0 })); }, get last() { return last; }, get swapMs() { return swapMs; }, AHEAD,
     get mem() { /* (test hook) bytes each held hole owns: geometry buffers and its own textures (mip chain counted), not the SHARED ones */
       const sz = grp => { const G0 = new Set(), T0 = new Set(); let g = 0, t = 0; const tx = x => { if (x && x.isTexture && !SHARED.has(x) && !T0.has(x)) { T0.add(x); const im = x.image; if (im && im.width) t += im.width * im.height * 4 * (x.generateMipmaps !== false ? 4 / 3 : 1); } };
         grp.traverse(o => { const q = o.geometry; if (q && !G0.has(q)) { G0.add(q); for (const k in q.attributes) g += q.attributes[k].array.byteLength; if (q.index) g += q.index.array.byteLength; } if (o.isInstancedMesh) g += o.instanceMatrix.array.byteLength; for (const m of [].concat(o.material || [])) { for (const k in m) tx(m[k]); if (m.uniforms) for (const k in m.uniforms) tx(m.uniforms[k].value); } }); return { geoMB: +(g / 1048576).toFixed(2), texMB: +(t / 1048576).toFixed(2) }; };
@@ -6414,6 +6416,9 @@ const MP_CHAT_LEFT = true; /* Neil (11-16 16:10): the chat button on your turn s
 const MP_CHAT_HOME = true; /* Neil (11-17 20:03): "Move small chat button below home button": on your turn the chat button rides in the right-hand column, under HOME (the column grows up to make room), so it also slides away with the swing HUD (fly-over, flight, cards). false = above the STRIKE ball (MP_CHAT_LEFT, v423) */ try { if (MP_CHAT_HOME) { const c = document.getElementById('mpChatBtn'), h = document.getElementById('homeBtn'); if (c && h) { h.before(c); /* (Neil 20:13: above HOME) */ document.documentElement.classList.add('mpChatHome'); } } } catch (e) {}
 const MP_FLY_NO_CHAT = true; /* Neil (11-17 20:04): "We don't want chat up during the flyover": during a hole's fly-over the chat panel (watching) and the chat button stay hidden. false = as v423 */ try { if (MP_FLY_NO_CHAT) document.documentElement.classList.add('mpFlyNoChat'); } catch (e) {}
 const MP_BUB_FOLLOW = true; /* Neil (11-17 20:05): "Sometimes chat bubble is in wrong spot when player who is hitting changes": a bubble (or typing dots) already up is placed once, on whoever's face it was then; when the turn changes the faces move (the hitter's big avatar, the strip, the panel), so the bubbles on screen move to their golfer's new spot, again once the panel has slid in. false = as v423 */
+const MP_ME_BUB = true; /* Neil (11-17 20:22, 2-player chat): "it sits above the chat not above my face": watching, your own bubble sits just over your face (bottom left of the panel, its tail on it), not up on the panel's top line, and your reactions float up from your face (or beside your bubble). false = as v424 */
+const MP_BALL_CHECK = true; /* Neil (11-17 20:36): "Sometimes in multiplayer when you chip close you get to the green and not as close I think". The ball's spot travels exactly (the shot's end -> your 'next' -> the server -> your turn), so this is a check, not a fix: when your turn starts on the green more than 1 ft from where your last shot stopped, the console log keeps both spots (Neil 20:43: no toast). false = no check */
+const MP_LOAD_CARD = true; /* Neil (11-17 20:40): "After you start a multiplayer game it shows the Home Screen while loading. Very confusing. Let's show a loading bar instead"; (20:57) "No blue loader. Just a small loading bar like between holes over top of the lobby": tee off keeps the lobby up, with the small Loading pill (Hole N, par and yards, a filling bar) over it, until hole 1 is ready; the build runs at full speed meanwhile. false = as v424 (home screen while it builds) */
 const MP_KB_LIFT = true; /* Neil (11-16 16:11): on iOS the chat box rides up above the keyboard as soon as it's focused (visualViewport), not only once you start typing. false = as v374 */
 const MP_CHAT_BLUR = true; /* Neil (11-16 14:11): after you send a chat message the text box blurs (keyboard away), watching or not. false = it kept focus while watching */
 /* mpui (Neil 11-16 20:19-20:24, tested on real iOS and Android phones). Each false = v387 */
@@ -6550,8 +6555,9 @@ if (MULTI) try { MPX = (() => {
   /* ---------- room state: lobby, round, cards ---------- */
   function room(R, fresh) {
     const was = S.room; S.room = R; if (NINES_PICK) NINE.mp = R.nine || '18'; /* NINES_PICK: in a room, the room's nine */ { const m = R.players.find(p => p.id === S.you); if (m && m.who !== S.myWho) { S.myWho = m.who; S.myLefty = m.who === S.homeWho ? S.homeLefty : handFor(m.who); const f = el('mpMe'); if (f && S.inRound) f.innerHTML = face(m.who); } } /* my golfer is the room's record of me (a rejoin keeps its seat's golfer) */
-    if (R.phase === 'lobby') { if (S.inRound) endRound(); LOBBY.show(); LOBBY.draw(); CARD.hide(); return; }
-    LOBBY.hide();
+    if (R.phase === 'lobby') { S.lobHold = false; el('mpLobby').classList.remove('ld'); if (S.inRound) endRound(); LOBBY.show(); LOBBY.draw(); CARD.hide(); return; }
+    if (MP_LOAD_CARD && !S.inRound && !el('mpLobby').hidden && R.phase === 'play') { S.lobHold = true; el('mpLobby').classList.add('ld'); } /* MP_LOAD_CARD: teeing off: the lobby stays until hole 1 is ready (loadHole) */
+    if (!S.lobHold) LOBBY.hide();
     if (R.phase === 'play' || R.phase === 'hole' || R.phase === 'done') {
       if (!S.inRound) startRound(R);
       if (R.hole !== S.hole) { S.Q.push({ k: 'hole', n: R.hole, course: R.course }); S.hole = R.hole; S.logs = {}; S.flySkip = 0; }
@@ -6573,7 +6579,9 @@ if (MULTI) try { MPX = (() => {
     S.loaded = false; const seedH = (S.room.seed ^ Math.imul(n, 0x9E3779B1)) >>> 0, cid = course || S.room.course;
     let fresh = false; if (MP_PIN_SEED && cid === 'hunt' && typeof PINS === 'object') { const ps = pinSeed(); S.pinSeeded = true; if (PINS.seed() !== ps) { PINS.seed(ps); fresh = true; log('pins seed', ps); } } /* MP_PIN_SEED: the room's pins on every phone (a late joiner or a reload with a stale tp_pins too); a hole built with other pins (the home's Hunt 1) is built again */
     const go = () => { WIND.rng(rng(seedH)); if (n === 1) FLY.reset(); BOOT.on = false; if (MENU.on) setHome(false); playHole(); const bt = $('#boot'); if (bt && !bt.hidden) { bt.classList.add('done'); setTimeout(() => { if (!BOOT.on) bt.hidden = true; }, 600); } S.loaded = true; log('hole', n, 'ready'); pump(); };
-    if (MENU.on) { MENU.course = cid; } HOLESYS.go(cid, NINE.first(cid) + n - 1, [], go, { pill: !MENU.on, fresh }); /* NINES_PICK: the room's hole n is the n-th of its nine */
+    const card = !!(MP_LOAD_CARD && MENU.on); /* MP_LOAD_CARD: from the lobby: the lobby stays up with the small Loading pill over it (as between holes) until the hole is ready, built at full speed */
+    const goC = () => { if (S.lobHold) { S.lobHold = false; LOBBY.hide(); el('mpLobby').classList.remove('ld'); } go(); };
+    if (MENU.on) { MENU.course = cid; } HOLESYS.go(cid, NINE.first(cid) + n - 1, [], goC, { pill: !MENU.on || card, fresh, card }); /* NINES_PICK: the room's hole n is the n-th of its nine */
   }
   const pinSeed = () => (S.room.seed ^ 0x2C1B3C6D) | 0; /* the Hunt's pins: from the room's per-game seed (the server deals a new one at every TEE OFF), kept apart from the wind's */
   function unpin() { if (!S.pinSeeded) return; S.pinSeeded = false; try { PINS.seed(null); } catch (e) {} } /* out of the round: single player's own random pins again */
@@ -6601,6 +6609,7 @@ if (MULTI) try { MPX = (() => {
     clearTimeout(G.resTO); $('#result').hidden = true; app.classList.remove('resulting', 'flying', 'previewing', 'swinging'); if (G.drop) DROP.close();
     if (G.who !== p.who) { G.who = AV.has(p.who) ? p.who : 'neil'; AV.setChar(G.who); } G.lefty = S.mine ? S.myLefty : !!p.lefty; setHand(false);
     G.stroke = p.ball.stroke; G.log = S.logs[p.id] || (S.logs[p.id] = []); G.gimmeAdd = 0;
+    if (MP_BALL_CHECK && S.mine) try { const e = [...S.ends].reverse().find(x => x.by === 'me'), d = e && !e.holed && e.lie === 'green' && p.ball.lie === 'green' && p.ball.stroke > 1 ? Math.hypot(p.ball.u - e.u, p.ball.v - e.v) : 0; if (d > .33) { log('ball-check', 'moved', (d * 3).toFixed(1), 'ft', JSON.stringify({ end: [e.u, e.v], now: [p.ball.u, p.ball.v] })); } } catch (er) {} /* MP_BALL_CHECK */
     if (MP_TURN_SLICE) { setupShotSliced(p.ball.u, p.ball.v, p.ball.lie === 'tee' && p.ball.stroke === 1 ? 'tee' : p.ball.lie); S.preAfter = !!(PRE_LINE_LIVE && PRE_HUSHED && S.mine); if (S.preAfter && !CJ.g) { S.preAfter = false; AV.say(preShotLine(), { pre: true }); } } /* MP_TURN_SLICE: in slices (the pre-shot line, if one was hushed, once it's done: MPX.frame) */
     else { setupShot(p.ball.u, p.ball.v, p.ball.lie === 'tee' && p.ball.stroke === 1 ? 'tee' : p.ball.lie); if (PRE_LINE_LIVE && PRE_HUSHED && S.mine) AV.say(preShotLine(), { pre: true }); } /* PRE_LINE_LIVE: the line it took down named the last setup's club */
     G.view = 'swing'; G.aimGoal = 0; aimFrame = null; G.preview = null; if (!(MP_TURN_SLICE && CJ.g)) rings.visible = tracer.visible = tracerInk.visible = true; tracerDirty = true; /* (MP_TURN_SLICE: still setting up: caddieDone shows them) */
@@ -6776,7 +6785,7 @@ if (MULTI) try { MPX = (() => {
       else if (lt) { b.style.left = ''; b.style.right = (A.width - x + 10) + 'px'; b.style.top = (y + r.height / 2) + 'px'; b.style.bottom = ''; }
       else if (big) { b.style.left = (x + 4) + 'px'; b.style.top = (y + r.height + 14) + 'px'; b.style.bottom = ''; }
       else if (MP_BUB_ALIGN && !side && a.closest('#mpPanel')) { const L = panelLine(), mine = a.closest('#mpMe'); /* MP_BUB_ALIGN: on the panel's line */
-        b.classList.toggle('up', !mine); b.classList.toggle('upl', !!mine); b.style.top = ''; b.style.bottom = (A.height - L + 10) + 'px';
+        b.classList.toggle('up', !mine); b.classList.toggle('upl', !!mine); b.style.top = ''; b.style.bottom = (MP_ME_BUB && mine ? A.height - y + 8 : A.height - L + 10) + 'px'; b.classList.toggle('me', !!(MP_ME_BUB && mine)); /* MP_ME_BUB: yours sits right on your face (its tail on it), not up on the panel's line */
         if (mine) b.style.left = Math.max(8, Math.round(x + r.width / 2 - 25)) + 'px'; /* the tail (18 px in) on your face */
         else { const w = b.offsetWidth, c = x + r.width / 2; b.style.left = Math.round(Math.min(Math.max(c, 8 + w / 2), A.width - 8 - w / 2)) + 'px'; } }
       else if (side) { b.style.left = (x + r.width + 10) + 'px'; b.style.top = (y + r.height / 2) + 'px'; b.style.bottom = ''; }
@@ -6792,7 +6801,9 @@ if (MULTI) try { MPX = (() => {
       setTimeout(() => { b.classList.add('out'); setTimeout(() => { b.remove(); if (showing[pid] === b) showing[pid] = null; if (dots[pid]) showDots(pid); next(pid); }, 240); }, K.BUB_MS); }
     function react(pid, e) { if (midSwing()) { held.push(['r', pid, e]); return; } if (S.mute && pid !== S.you) return; const a = anchor(pid); if (!a) return;
       const f = document.createElement('div'); f.className = MP_EMO_LONG ? 'mpEmo long' : 'mpEmo'; f.textContent = e; fx().appendChild(f); const A = rect(app), r = rect(a);
-      if (MP_BUB_ALIGN && a.closest && a.closest('#mpPanel')) { const sb = showing[pid]; let cx = r.left - A.left + r.width / 2; if (sb && sb.isConnected && !sb.hidden) cx = (sb.classList.contains('up') ? sb.offsetLeft + sb.offsetWidth / 2 : sb.offsetLeft + sb.offsetWidth) + 22; /* their bubble is up: the emoji starts just right of it, not on it */
+      if (MP_ME_BUB && a.closest && a.closest('#mpMe')) { const sb = showing[pid]; let cx = r.left - A.left + r.width / 2, top = r.top - A.top - 42; if (sb && sb.isConnected && !sb.hidden) { cx = sb.offsetLeft + sb.offsetWidth + 22; top = sb.offsetTop + sb.offsetHeight / 2 - 17; } /* MP_ME_BUB: your emoji from your face, or beside your bubble at its middle */
+        f.style.left = Math.round(Math.min(cx, A.width - 24) + (Math.random() - .5) * 12) + 'px'; f.style.top = Math.round(top) + 'px'; }
+      else if (MP_BUB_ALIGN && a.closest && a.closest('#mpPanel')) { const sb = showing[pid]; let cx = r.left - A.left + r.width / 2; if (sb && sb.isConnected && !sb.hidden) cx = (sb.classList.contains('up') ? sb.offsetLeft + sb.offsetWidth / 2 : sb.offsetLeft + sb.offsetWidth) + 22; /* their bubble is up: the emoji starts just right of it, not on it */
         f.style.left = Math.round(Math.min(cx, A.width - 24) + (Math.random() - .5) * 12) + 'px'; f.style.top = (panelLine() - 44) + 'px'; } /* MP_BUB_ALIGN: where a one-line bubble sits (its middle), a touch of spread for a burst */
       else { f.style.left = (r.left - A.left + r.width / 2 + (Math.random() - .5) * r.width * .5) + 'px'; f.style.top = (r.top - A.top + r.height * .3) + 'px'; } setTimeout(() => f.remove(), MP_EMO_LONG ? 3700 : 1600); }
     function typing(pid, on, quiet) { if (pid === S.you) return; if (on) { dots[pid] = performance.now(); if (!S.mute && !midSwing()) showDots(pid); } else { delete dots[pid]; hideDots(pid); } }
@@ -6823,7 +6834,7 @@ if (MULTI) try { MPX = (() => {
       if (document.activeElement === inp) inp.blur(); typeOut(false); counter(); if (was && S.mine && !silent) send({ t: 'act', hold: false }); }
     function yourTurn() { S.compOpen = true; app.classList.add('mpComp'); el('mpPanel').classList.add('sheet'); el('mpTurnTag').hidden = false; send({ t: 'act', hold: true }); } /* typing as the turn arrives: the keyboard stays, the swing HUD slides in behind */
     function watchMode() { if (S.compOpen) { S.compOpen = false; app.classList.remove('mpComp'); el('mpPanel').classList.remove('sheet'); el('mpTurnTag').hidden = true; } counter(); }
-    function mount() { if (inp) return; inp = el('mpIn'); cnt = el('mpCnt');
+    function mount() { if (inp) return; inp = el('mpIn'); cnt = el('mpCnt'); if (MP_BUB_FOLLOW && window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (!S.inRound) return; follow(); setTimeout(follow, 350); }); /* MP_BUB_FOLLOW: the keyboard came up or went down: the bubbles follow their faces (a bubble sent with the keyboard up was left half way up the screen) */
       if (KBT && !el('mpLog')) { const L = document.createElement('div'); L.id = 'mpLog'; L.setAttribute('aria-live', 'polite'); el('mpComp').insertBefore(L, el('mpComp').firstChild); }
       if (MP_NO_TOP) { const c = el('mpConn'), p = el('mpPanel'); if (c && p && c.parentNode !== p) p.appendChild(c); if (S.mute) { S.mute = false; store.set('mpMute', false); } } /* MP_NO_TOP: no mute button any more: a saved mute would never lift */ el('mpMe').innerHTML = face(S.myWho); el('mpReacts').innerHTML = K.EMO.map(e => `<button type="button" data-e="${e}" aria-label="React ${e}">${e}</button>`).join('');
       inp.addEventListener('input', () => { let v = inp.value; if (cps(v) > K.CHAT_MAX) { v = [...v].slice(0, K.CHAT_MAX).join(''); inp.value = v; } counter(); const now = performance.now(); S.typeT = now; if (v.trim()) typeOut(true); else typeOut(false); });

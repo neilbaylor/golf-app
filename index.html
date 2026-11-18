@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.cfc9ad48cf.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.80dbf593e4.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -485,7 +485,7 @@ html.holeNext #holeLdr[hidden]{display:flex!important}
 #holeLdr .hlc.thin{filter:none} /* Augusta's line-art crest: no drop shadow (it reads as a ghost copy) */
 #holeLdr b{font:46px/1 var(--font-display);letter-spacing:.04em;color:var(--sun);-webkit-text-stroke:2px var(--ink);paint-order:stroke;text-shadow:3px 4px 0 var(--ink)}
 #holeLdr span{font:18px/1 var(--font-display);letter-spacing:.06em;color:#fffaf0}
-#holeLdr .hlBar{display:none;width:190px;height:16px;margin-top:18px;border:3px solid var(--ink);border-radius:999px;background:#fffaf0;overflow:hidden;box-shadow:2px 3px 0 var(--ink)}#holeLdr .hlBar u{display:block;height:100%;width:0;background:var(--sun);border-right:2.5px solid var(--ink);transition:width .25s}#holeLdr.bar .hlBar{display:block}#holeLdr.bar .hlb{display:none} /* MP_LOAD_CARD */
+#mpLobby.ld{pointer-events:none} /* MP_LOAD_CARD: teeing off: the lobby waits under the Loading pill */
 #holeLdr .hlb{width:16px;height:16px;margin-top:16px;border-radius:50%;background:#fff;border:3px solid var(--ink);animation:hlBounce .6s cubic-bezier(.3,0,.7,1) infinite alternate}
 @keyframes hlBounce{from{transform:translateY(0)}to{transform:translateY(-18px)}}
 #app #ver{z-index:999}#app.atHome #ver{pointer-events:auto;cursor:pointer}
@@ -1164,7 +1164,7 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
   <div id="perf">–</div>
   <div id="ver" aria-hidden="true"></div>
   <div id="holePill" hidden aria-live="polite"><div class="hpl"><div class="hr"><b>Hole 2</b><span>Par 4 · 300 yds</span></div><i class="hb"><s></s></i></div></div>
-  <div id="holeLdr" hidden aria-live="polite"><div class="hl"><img alt="" class="hlc"><b>Hole 1</b><span>Par 4</span><i class="hlb"></i><i class="hlBar"><u></u></i></div></div>
+  <div id="holeLdr" hidden aria-live="polite"><div class="hl"><img alt="" class="hlc"><b>Hole 1</b><span>Par 4</span><i class="hlb"></i></div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1173,5 +1173,5 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
 if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror="__splitFail()"><\/script>');</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.cfc9ad48cf.js" onerror="__splitFail()"></script>
+<script src="game.80dbf593e4.js" onerror="__splitFail()"></script>
 
