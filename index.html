@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.14c6fef43e.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.cfc9ad48cf.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -485,6 +485,7 @@ html.holeNext #holeLdr[hidden]{display:flex!important}
 #holeLdr .hlc.thin{filter:none} /* Augusta's line-art crest: no drop shadow (it reads as a ghost copy) */
 #holeLdr b{font:46px/1 var(--font-display);letter-spacing:.04em;color:var(--sun);-webkit-text-stroke:2px var(--ink);paint-order:stroke;text-shadow:3px 4px 0 var(--ink)}
 #holeLdr span{font:18px/1 var(--font-display);letter-spacing:.06em;color:#fffaf0}
+#holeLdr .hlBar{display:none;width:190px;height:16px;margin-top:18px;border:3px solid var(--ink);border-radius:999px;background:#fffaf0;overflow:hidden;box-shadow:2px 3px 0 var(--ink)}#holeLdr .hlBar u{display:block;height:100%;width:0;background:var(--sun);border-right:2.5px solid var(--ink);transition:width .25s}#holeLdr.bar .hlBar{display:block}#holeLdr.bar .hlb{display:none} /* MP_LOAD_CARD */
 #holeLdr .hlb{width:16px;height:16px;margin-top:16px;border-radius:50%;background:#fff;border:3px solid var(--ink);animation:hlBounce .6s cubic-bezier(.3,0,.7,1) infinite alternate}
 @keyframes hlBounce{from{transform:translateY(0)}to{transform:translateY(-18px)}}
 #app #ver{z-index:999}#app.atHome #ver{pointer-events:auto;cursor:pointer}
@@ -891,7 +892,7 @@ html.mpChatBox #mpSend:active{transform:scale(.9);box-shadow:none}html.mpChatBox
 #mpTurnTag{position:absolute;left:50%;top:-30px;transform:translateX(-50%) rotate(-3deg);font:20px/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;background:var(--sun);border:3px solid var(--ink);border-radius:12px 9px 13px 8px;padding:10px 14px 4px;box-shadow:3px 4px 0 var(--ink);white-space:nowrap;animation:drop .5s cubic-bezier(.3,1.6,.5,1)}
 #mpChatBtn{position:absolute;z-index:7;right:12px;bottom:calc(88px + max(0px,env(safe-area-inset-bottom,0px) - 22px));width:44px;height:40px;align-items:center;justify-content:center;padding:0;color:#fff;background:var(--paper);border:2.5px solid var(--ink);border-radius:12px 10px 13px 9px;box-shadow:2px 3px 0 var(--ink)}
 #app.chatL #mpChatBtn{right:auto;left:calc(max(10px,env(safe-area-inset-left,0px)) + 11px);bottom:calc(152px + max(0px,env(safe-area-inset-bottom,0px) - 22px))}#app.chatL:has(#ballView.on) #mpChatBtn{bottom:calc(232px + max(0px,env(safe-area-inset-bottom,0px) - 22px))} /* MP_CHAT_LEFT (Neil 11-16): on your turn the chat button sits above the STRIKE ball (bottom left), clear of the club card; higher still while the back-to-ball button shows */
-#mpChatBtn svg{width:30px;height:30px}html.mpChatHome #app #bottom .side #mpChatBtn{position:relative;z-index:auto;left:auto;right:auto;bottom:auto;width:46px;height:34px;transform:rotate(1.5deg) translateY(17px);margin-top:1px;margin-bottom:2px}html.mpChatHome #app.mp.mpMine:not(.mpComp) #homeBtn{transform:rotate(-1.5deg) translateY(17px)}html.mpChatHome #app.mp.mpMine:not(.mpComp) #homeBtn:active{transform:rotate(-1.5deg) translate(1px,19px)} /* (Neil 20:12: HOME and chat 10 px lower) */html.mpChatHome #app #bottom .side #mpChatBtn svg{width:26px;height:26px}html.mpFlyNoChat #app.droning :is(#mpChatBtn,#mpPanel,#mpFx .mpDots){opacity:0!important;pointer-events:none!important} /* MP_CHAT_HOME, MP_FLY_NO_CHAT */#mpChatBtn.dot::after{content:"";position:absolute;top:-5px;right:-5px;width:12px;height:12px;border-radius:50%;background:var(--pink);border:2px solid var(--ink)}
+#mpChatBtn svg{width:30px;height:30px}html.mpChatHome #app #bottom .side #mpChatBtn{position:relative;z-index:auto;left:auto;right:auto;bottom:auto;width:46px;height:34px;transform:rotate(1.5deg) translateY(17px);margin-top:1px;margin-bottom:2px}html.mpChatHome #app.mp.mpMine:not(.mpComp) #homeBtn{transform:rotate(-1.5deg) translateY(17px)}html.mpChatHome #app.mp.mpMine:not(.mpComp) #homeBtn:active{transform:rotate(-1.5deg) translate(1px,19px)} /* (Neil 20:12: HOME and chat 10 px lower) */html.mpChatHome #app.mp.mpMine:not(.mpComp) #bottom .side{margin-bottom:-8px} /* (Neil 20:22: the whole column, minimap, club, chat and HOME, 8 px lower; multiplayer, your turn only) */html.mpChatHome #app #bottom .side #mpChatBtn svg{width:26px;height:26px}html.mpFlyNoChat #app.droning :is(#mpChatBtn,#mpPanel,#mpFx .mpDots){opacity:0!important;pointer-events:none!important} /* MP_CHAT_HOME, MP_FLY_NO_CHAT */#mpChatBtn.dot::after{content:"";position:absolute;top:-5px;right:-5px;width:12px;height:12px;border-radius:50%;background:var(--pink);border:2px solid var(--ink)}
 #mpSide{position:absolute;z-index:7;left:10px;top:calc(env(safe-area-inset-top,0px) + 40%);flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none}
 #mpSide .lbl{font:11px/1 var(--font-display);letter-spacing:.07em;text-transform:uppercase;background:var(--paper);border:2px solid var(--ink);border-radius:6px;padding:4px 6px 2px;box-shadow:1.5px 2px 0 var(--ink)}
 .mpW{position:relative}.mpW .mpFace{width:44px;height:44px;box-shadow:2px 3px 0 var(--ink)}.mpW.off .mpFace{filter:grayscale(.8);opacity:.7}
@@ -915,7 +916,7 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
 .mpBub.up{transform:translateX(-50%)}.mpBub.rt{transform:translateY(-50%)}
 .mpBub::before{content:"";position:absolute;width:11px;height:11px;background:var(--paper);border:3px solid var(--ink);border-width:0 3px 3px 0}
 .mpBub.up::before{left:calc(50% - 7px);bottom:-8px;transform:rotate(45deg)}
-.mpBub.upl::before{left:18px;bottom:-8px;transform:rotate(45deg)} /* MP_BUB_ALIGN: your bubble, tail on your face */
+.mpBub.upl::before{left:18px;bottom:-8px;transform:rotate(45deg)}.mpBub.me{pointer-events:none;z-index:13} /* MP_ME_BUB: over the reaction row, never in the way of a tap */ /* MP_BUB_ALIGN: your bubble, tail on your face */
 .mpBub.dn::before{left:20px;top:-8px;transform:rotate(-135deg)}
 .mpBub.rt::before{left:-8px;top:calc(50% - 7px);transform:rotate(135deg)}
 .mpBub.out{opacity:0;transition:opacity .22s}
@@ -1163,7 +1164,7 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
   <div id="perf">–</div>
   <div id="ver" aria-hidden="true"></div>
   <div id="holePill" hidden aria-live="polite"><div class="hpl"><div class="hr"><b>Hole 2</b><span>Par 4 · 300 yds</span></div><i class="hb"><s></s></i></div></div>
-  <div id="holeLdr" hidden aria-live="polite"><div class="hl"><img alt="" class="hlc"><b>Hole 1</b><span>Par 4</span><i class="hlb"></i></div></div>
+  <div id="holeLdr" hidden aria-live="polite"><div class="hl"><img alt="" class="hlc"><b>Hole 1</b><span>Par 4</span><i class="hlb"></i><i class="hlBar"><u></u></i></div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1172,5 +1173,5 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
 if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror="__splitFail()"><\/script>');</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.14c6fef43e.js" onerror="__splitFail()"></script>
+<script src="game.cfc9ad48cf.js" onerror="__splitFail()"></script>
 
