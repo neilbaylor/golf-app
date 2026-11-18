@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v438'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v440'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1455,8 +1455,9 @@ const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 
 const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
 const SAY_DODGE = true; /* Neil 17 Nov (v404): "on long putts your character's speech bubble covers the hole ... maybe we just don't have the player talk when it's that situation": putting, if the hole is (or the putting view settles) under the bubble, the golfer doesn't say the line (one already up goes). Other shots unchanged. false = they always talk, as v403 */
 const ROUND_HOME_DIRECT = true; /* Neil 17 Nov (v403): Home on the finished-round scorecard goes straight home (the round is over: no "your score won't be kept" ask). false = it asks, as v402 */
-const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
-$('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
+const FAR_ALWAYS = true; /* Neil (11-18 12:24): the fps-meter toggle doesn't need to exist: far trees (crowns, trunks, azaleas) are always simple, whatever a device saved before; tapping the meter does nothing. false = as v438 */
+const FARLOD = { on: FAR_ALWAYS || !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
+$('#perf').addEventListener('click', () => { if (FAR_ALWAYS) return; FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
 const FAR_GROW = true; /* Neil (11-18 11:29, OslerBrook 2's fly-over): "The little trees on the right appear as the flyover is going". Ground cover with a draw limit (the wet meadow's reeds and cattails at 220 yd, fescue and reed clumps at 170, grass tufts at 70-102) popped in whole when the camera came within range. Now, over the last fifth of that range (at least 20 yd), each one is drawn scaled down, so it grows in instead of popping. false = as v435 */
 const FLY_FAR = 2.5; /* Neil (11-18 11:39): still saw them appear. During a hole's fly-over (the drone sees the whole hole from up high) ground cover is drawn out to 2.5x its usual distance (OslerBrook 2's cattails 550 yd, fescue clumps 425), so anything still coming in is tiny and far off, and grows in (FAR_GROW). Each is a 2-6 triangle card: ~19k on OslerBrook 2, the most of any hole. 1 = as v436 */
 const FADE_K = { value: 1 }; /* FLY_FAR: the ground cover's shader distance fade (tufts 85 -> 45 yd, fescue 100 -> 55, OslerBrook's reeds 170/220 -> 50 less) stretched by this; FLY_FAR during a fly-over, else 1 */
@@ -5720,6 +5721,7 @@ const SND = (() => {
   };
 })();
 /* the speaker buttons: home screen top-right (left of full screen) and the in-game Home dialog's corner */
+const QUIT_SND = false; /* Neil (11-18 12:46): "We don't need the sound button toggle on the quit modal": the speaker button in the in-game Quit dialog's corner is gone; sound stays togglable from the home screen's speaker button (top right). true = as v439 */
 if (SOUND && SND_TOGGLE) (() => {
   const ICON = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.3h3.6L11.6 5.4v13.2l-4.5-3.9H3.5z" fill="#fff" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>${on ? '<path d="M15 9.2a4 4 0 010 5.6M17.9 6.5a7.8 7.8 0 010 11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>' : '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>'}</svg>`;
   const btns = []; const sync = () => btns.forEach(b => { b.innerHTML = ICON(SND.on); b.setAttribute('aria-label', SND.on ? 'Sound on (tap to mute)' : 'Sound off (tap to turn on)'); b.setAttribute('aria-pressed', String(SND.on)); b.classList.toggle('off', !SND.on); });
@@ -5727,7 +5729,7 @@ if (SOUND && SND_TOGGLE) (() => {
   const fs = document.getElementById('fsBtn');
   if (fs) { const b = document.createElement('button'); b.type = 'button'; b.className = 'appBtn ic'; b.id = 'sndBtn'; fs.parentNode.insertBefore(b, fs); btns.push(b); b.addEventListener('click', e => { e.stopPropagation(); flip(); }); }
   const qc = document.querySelector('#quitUI .qcard');
-  if (qc) { const b = document.createElement('button'); b.type = 'button'; b.className = 'qsnd'; qc.appendChild(b); btns.push(b); let pu = 0;
+  if (qc && QUIT_SND) { const b = document.createElement('button'); b.type = 'button'; b.className = 'qsnd'; qc.appendChild(b); btns.push(b); let pu = 0;
     b.addEventListener('pointerup', e => { e.stopPropagation(); pu = performance.now(); flip(); }); /* the dialog closes on any button's release: keep this one to itself */
     b.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); if (performance.now() - pu > 600) flip(); }); } /* (a keyboard press only clicks) */
   sync();
