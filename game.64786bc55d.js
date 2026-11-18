@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v435'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v437'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -996,7 +996,7 @@ function tuftMat(map) {
   const m = new THREE.MeshBasicMaterial({ map, alphaTest: .5, side: THREE.DoubleSide, alphaToCoverage: true });
   m.onBeforeCompile = sh => {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vTD;').replace('#include <project_vertex>', '#include <project_vertex>\nvTD = -mvPosition.z;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTD;').replace('#include <alphatest_fragment>', 'diffuseColor.a *= smoothstep(85.0, 45.0, vTD);\n#include <alphatest_fragment>');
+    sh.uniforms.uFadeK = FADE_K; sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTD;\nuniform float uFadeK;').replace('#include <alphatest_fragment>', 'diffuseColor.a *= smoothstep(85.0, 45.0, vTD / uFadeK);\n#include <alphatest_fragment>');
   };
   return m;
 }
@@ -1024,7 +1024,7 @@ const FESCUE_FX = (() => { let tex = null, mat = null;
           'vec2 fB = instanceMatrix[3].xz - uFB.xy, fC = uFB.zw - uFB.xy; float fHd = (1.0 - smoothstep(1.2, 2.3, length(fB))) * smoothstep(-.35, .35, dot(fB, fC) / max(length(fC), .001));',
           'mvPosition.y = instanceMatrix[3].y + (mvPosition.y - instanceMatrix[3].y) * (1.0 - .85 * fHd); fS *= 1.0 - fHd;'] : []), '#endif',
         'float fK = position.y * position.y * fS;', 'mvPosition.xz += uFW * fK * (.6 + .3 * sin(uFT * 1.7 - fPh) + .1 * sin(uFT * 4.1 + fPh * 2.3));', 'mvPosition = modelViewMatrix * mvPosition;', 'gl_Position = projectionMatrix * mvPosition;', 'vTD = -mvPosition.z;'].join('\n'));
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTD;').replace('#include <alphatest_fragment>', 'diffuseColor.a *= smoothstep(100.0, 55.0, vTD);\n#include <alphatest_fragment>'); };
+      sh.uniforms.uFadeK = FADE_K; sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTD;\nuniform float uFadeK;').replace('#include <alphatest_fragment>', 'diffuseColor.a *= smoothstep(100.0, 55.0, vTD / uFadeK);\n#include <alphatest_fragment>'); };
     return mat; }
   const geo = () => { const tg = new THREE.BufferGeometry(); /* two crossed quads, 1 wide, 1 tall, standing on the ground */
     tg.setAttribute('position', new THREE.Float32BufferAttribute([-.5, 0, 0, .5, 0, 0, .5, 1, 0, -.5, 1, 0, 0, 0, -.5, 0, 0, .5, 0, 1, .5, 0, 1, -.5], 3));
@@ -1451,7 +1451,12 @@ const SAY_DODGE = true; /* Neil 17 Nov (v404): "on long putts your character's s
 const ROUND_HOME_DIRECT = true; /* Neil 17 Nov (v403): Home on the finished-round scorecard goes straight home (the round is over: no "your score won't be kept" ask). false = it asks, as v402 */
 const FARLOD = { on: !!store.get('farSimple', FAR_DEFAULT), d2: 120 * 120, noteT: 0 }; /* "far trees: simple" (tap the fps meter): tree crowns beyond 120 yd from the camera drawn with a simpler mesh. Off unless chosen; kept per device */
 $('#perf').addEventListener('click', () => { FARLOD.on = !FARLOD.on; store.set('farSimple', FARLOD.on); _ck.fill(NaN); FARLOD.noteT = performance.now() + 1500; $('#perf').textContent = FARLOD.on ? 'far trees: simple' : 'far trees: full'; });
+const FAR_GROW = true; /* Neil (11-18 11:29, OslerBrook 2's fly-over): "The little trees on the right appear as the flyover is going". Ground cover with a draw limit (the wet meadow's reeds and cattails at 220 yd, fescue and reed clumps at 170, grass tufts at 70-102) popped in whole when the camera came within range. Now, over the last fifth of that range (at least 20 yd), each one is drawn scaled down, so it grows in instead of popping. false = as v435 */
+const FLY_FAR = 2.5; /* Neil (11-18 11:39): still saw them appear. During a hole's fly-over (the drone sees the whole hole from up high) ground cover is drawn out to 2.5x its usual distance (OslerBrook 2's cattails 550 yd, fescue clumps 425), so anything still coming in is tiny and far off, and grows in (FAR_GROW). Each is a 2-6 triangle card: ~19k on OslerBrook 2, the most of any hole. 1 = as v436 */
+const FADE_K = { value: 1 }; /* FLY_FAR: the ground cover's shader distance fade (tufts 85 -> 45 yd, fescue 100 -> 55, OslerBrook's reeds 170/220 -> 50 less) stretched by this; FLY_FAR during a fly-over, else 1 */
+const FLY_NO_HIDE = true; /* the same report: during the hole's fly-over no tree steps aside for the line to the ball on the tee (the drone isn't looking at it; on its way back trees ahead of it were vanishing and reappearing). Only a crown the camera is actually inside still steps aside. false = as v435 */
 function updateCull() {
+  { const fk = FLY_FAR > 1 && FLY.on ? FLY_FAR : 1; if (FADE_K.value !== fk) FADE_K.value = fk; } /* FLY_FAR: the shader fade too (the cards fade out by distance in the shader, under their draw limit) */
   camera.updateMatrixWorld(); const e = camera.matrixWorld.elements; let same = true;
   for (let i = 0; i < 16; i++) if (_ck[i] !== e[i]) { same = false; _ck[i] = e[i]; }
   if (_ck[16] !== camera.projectionMatrix.elements[5]) { same = false; _ck[16] = camera.projectionMatrix.elements[5]; }
@@ -1465,13 +1470,13 @@ function updateCull() {
       const top = (t.gy ?? (t.gy = groundHeight(t.u, t.v))) + t.h; /* cached ground under the trunk (as treeHit) */
       if (t !== PLAN_TREE && cy0 < top + 4 && Math.hypot(tx - cx0, tz - cz0) < (TREE_UNSTICK ? treeExt(t) : t.r) + 1.5 && (!aimKeep || crownAt(t, cx0, -cz0, cy0, 1.2))) { _blk.add(i); continue; }
       if (TREE_UNSTICK && t === PLAN_TREE && crownAt(t, cx0, -cz0, cy0, 1.2)) { _blk.add(i); continue; } /* TREE_UNSTICK: blob crowns reach past t.r (Hunt 2's 13: r 11, leaves out to 17.5), and from inside the tree you're about to hit you see nothing but leaves */ /* the camera is in (or brushing) its crown: it steps aside in every view (12's back bunker sat the camera inside a pine) */
-      if (AIM_TREES && !MENU.on && G.view !== 'flight' && !aimKeep) { /* AIM_TREES: any crown that really sits on the sight line to the ball (or, overhead, to the target) steps aside, by its true reach */
+      if (AIM_TREES && !MENU.on && G.view !== 'flight' && !aimKeep && !(FLY_NO_HIDE && FLY.on)) { /* AIM_TREES: any crown that really sits on the sight line to the ball (or, overhead, to the target) steps aside, by its true reach */
         let hit = false; const tg = !line && !AIM_TREES_KEEP ? targetUV() : null; /* AIM_TREES_KEEP 'ball': the aim view tests only the line to the ball */
         for (const e of tg ? [[bx, by, bz, 1], [tg.u, groundHeight(tg.u, tg.v), -tg.v, 0]] : [[bx, by, bz, 1]]) { if (hit) break; if (!e[3] && t === PLAN_TREE) continue; /* the tree you're about to hit stays, unless it hides the ball itself */
           const sx = e[0] - cx0, sz = e[2] - cz0, l2 = sx * sx + sz * sz || 1e-6, kk = clamp(((tx - cx0) * sx + (tz - cz0) * sz) / l2, 0, 1); if (Math.hypot(cx0 + sx * kk - tx, cz0 + sz * kk - tz) > treeExt(t) + .5) continue;
           for (let j = 1; j < 16; j++) { const f = j / 16; if (crownAt(t, cx0 + sx * f, -(cz0 + sz * f), cy0 + (e[1] - cy0) * f, .4)) { hit = true; break; } } }
         if (hit) { _blk.add(i); continue; } }
-      if (!line) continue;
+      if (!line || (FLY_NO_HIDE && FLY.on)) continue; /* FLY_NO_HIDE: the drone isn't looking at the ball */
       const k = clamp(((tx - cx0) * dx + (tz - cz0) * dz) / L2, 0, 1), qx = cx0 + dx * k - tx, qz = cz0 + dz * k - tz, segY = cy0 + (by - cy0) * k;
       if (Math.hypot(qx, qz) < t.r + .8 && segY < top + .5 && t !== PLAN_TREE) _blk.add(i); } } /* never hide the tree you're about to hit */
   _cmx.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _cf.setFromProjectionMatrix(_cmx);
@@ -1484,13 +1489,14 @@ function updateCull() {
     if (C.lead) { V = C.lead.vl; nv = C.lead.nv; } /* a twin: its lead (just before it) has tested the same centres this frame */
     else { V = C.vl || (C.vl = new Int32Array(C.n));
       for (let i = 0; i < C.n; i++) {
-        { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far + r; if (dx * dx + dy * dy + dz * dz > fr * fr) continue; } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; }
+        { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far * (FLY_FAR > 1 && FLY.on ? FLY_FAR : 1) + r, d2 = dx * dx + dy * dy + dz * dz; if (d2 > fr * fr) continue; if (FAR_GROW) { const B = Math.max(20, C.far * .2), d = Math.sqrt(d2), gs = C.gs || (C.gs = new Float32Array(C.n)); gs[i] = d <= fr - B ? 1 : smooth(fr, fr - B, d); } } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; }
         V[nv++] = i; }
       C.nv = nv; }
     const im = C.m.instanceMatrix.array, ic = C.cols && C.m.instanceColor.array, A = C.all, Cc = C.cols; let k = 0, ch = false; const pi = C.pi || (C.pi = new Int32Array(C.n).fill(-1));
     const F = lod ? C.fm : null, fim = F && F.instanceMatrix.array, fic = F && Cc && F.instanceColor.array, fpi = C.fpi; let kf = 0, chf = false;
     for (let q = 0; q < nv; q++) { const i = V[q];
       if (F) { const j = i * 4, dx = S[j] - cx, dy = S[j + 1] - cy, dz = S[j + 2] - cz; if (dx * dx + dy * dy + dz * dz > FD2) { if (fpi[kf] !== i) { fpi[kf] = i; chf = true; const s0 = i * 16, d0 = kf * 16; for (let e = 0; e < 16; e++) fim[d0 + e] = A[s0 + e]; if (fic) { const s1 = i * 3, d1 = kf * 3; fic[d1] = Cc[s1]; fic[d1 + 1] = Cc[s1 + 1]; fic[d1 + 2] = Cc[s1 + 2]; } } kf++; continue; } }
+      const gsv = FAR_GROW && C.far < 1e9 ? (C.lead || C).gs : null, gk = gsv ? gsv[i] : 1; if (gk < 1) { pi[k] = -1; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = (e < 11 && e % 4 !== 3) ? A[s0 + e] * gk : A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } k++; continue; } /* FAR_GROW: near its draw limit it's scaled down, so it grows in rather than popping */
       if (pi[k] !== i) { pi[k] = i; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } } k++;
     }
     C.m.count = k; C.m.visible = k > 0;
