@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v443'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v445'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2433,6 +2433,8 @@ const MODES = {
   flop:  { name: 'Flop',  rate: 1.45, tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* risk: swing flaws cost more, and a bad tempo blades or chunks it */
   sand:  SAND_EASY ? { name: 'Sand', rate: 1.5, tempo: 3.4, perf: 0.085, tight: .9, risk: 1.2 } : { name: 'Sand',  rate: 1.5,  tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* the explosion: as touchy as a flop (and a mistimed one blades or chunks it). SAND_EASY: a wider window, smaller penalties */
   putt:  { name: 'Putt',  rate: 1.25, tempo: 3.1,  perf: .6, tight: 3 } };
+const SG_TEMPO_UP = { chip: 3.4, sand: 3.6 }; /* Neil (11-18 18:23): chips and bunker splashes "expecting too slow of a tempo, just slightly". Target ratio (backswing / downswing) chip 3.2 -> 3.4, sand 3.4 -> 3.6, about 6% quicker; window widths unchanged. null = as v444 */
+if (SG_TEMPO_UP) for (const k in SG_TEMPO_UP) MODES[k].tempo = SG_TEMPO_UP[k];
 const MODE_ORDER = ['power', 'full', 'punch', 'pitch', 'flop', 'sand', 'putt'];
 /* CLUB_DIFF (Neil): the longer the club, the harder a good shot. Each club scales the tempo window (perfect and good bands) and the dead-straight line window;
    the 7 iron keeps today's window, the driver is the tightest (88% of today), the lob wedge the most forgiving (110%). Golfer attributes still multiply on top. Full swings only (full, power, punch):
@@ -3944,10 +3946,11 @@ function launch(sw) {
   let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (PH_RULE ? PH_RULE.win : .009) * tight) { p = ps; pinHigh = true; }
   let carry = dOfP(p);
   const terr = Math.abs(Math.log(sw.ratio / TEMPO)); const tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .12 * clubK() ? 'good' : 'off'; const quick = sw.ratio > TEMPO; /* CLUB_DIFF: the good band scales with the club too */
-  carry *= 1 - clamp((terr - PERFECT) * .275 * risk, 0, .155 * risk);
+  const sgT = SG_TEMPO && (G.mode === 'sand' || G.mode === 'chip' || G.mode === 'flop' || (G.mode === 'pitch' && D <= 50)) ? SG_TEMPO : null; /* SG_TEMPO: around the green */
+  carry *= 1 - clamp((terr - PERFECT) * .275 * risk * (sgT ? sgT.carry : 1), 0, .155 * risk * (sgT ? sgT.carry : 1));
   { const L = LIES[G.lie]; if (L.r) { const k = SAND_CUT && G.lie === 'sand' && G.mode !== 'sand' ? clamp(.25 + .75 * (terr - PERFECT) / .2, .25, 1) : 1; G.lieRoll = 1 - Math.random() * k * L.r / L.f; carry *= G.lieRoll; } else G.lieRoll = 1; } /* SAND_CUT: out of sand the cut follows the strike (a perfect tempo loses at most a quarter of the range, the whole range is back by an off one) */ // bad lie: comes out anywhere in its range (shown number = top)
   const hs = G.lefty ? -1 : 1; let lat = 0;
-  if (terr > PERFECT) lat += (quick ? -1 : 1) * hs * Math.min(1, terr - PERFECT) * .078 * risk / att('aim', 'acc') * D;
+  if (terr > PERFECT) lat += (quick ? -1 : 1) * hs * Math.min(1, terr - PERFECT) * .078 * risk / att('aim', 'acc') * D * (sgT ? sgT.side : 1);
   let th = sw.curveDeg; const pureW = pureWin(tight), pure = Math.abs(th) < pureW; th = pure ? 0 : clamp((th - Math.sign(th) * pureW) * (1 + (risk - 1) * .6), -25, 25);
   // path physics (face square to target): ball starts a little along the path, then curves the OTHER way.
   // swipe right = in-to-out for a righty -> draw; swipe left = out-to-in -> fade/slice. Mirrored for lefties automatically.
@@ -3968,7 +3971,7 @@ function launch(sw) {
     const spread = .04 + .1 * (1 - q); launchA *= 1 + clamp((Math.random() * 2 - 1) * spread, -.13, .13); }
   const tilt = clamp(plan.tiltL - th * 1.6, -48, 48);                         // swing path: curve opposite the swipe
   let startDeg = th * .35;                                                     // ...after starting a touch along it
-  if (terr > PERFECT) startDeg += (quick ? -1 : 1) * hs * Math.min(1, terr - PERFECT) * 3.85; /* quick = pull, slow = push */
+  if (terr > PERFECT) startDeg += (quick ? -1 : 1) * hs * Math.min(1, terr - PERFECT) * 3.85 * (sgT ? sgT.side : 1); /* quick = pull, slow = push */
   if (p > 1) startDeg += (Math.random() * 2 - 1) * (p - 1) * 22;
   if (FESCUE && G.lie === 'fescue') startDeg += (Math.random() * 2 - 1) * FESCUE_SCATTER; /* FESCUE: the grass grabs the hosel: the start line wanders, even on a perfect strike */
   // table guess + one secant correction (≈0.4 ms) instead of a full bisection at the moment of impact
@@ -5721,7 +5724,9 @@ const SND = (() => {
   };
 })();
 /* the speaker buttons: home screen top-right (left of full screen) and the in-game Home dialog's corner */
+const LIE_CLIP = true; /* false = as v443 */ try { if (LIE_CLIP) document.documentElement.classList.add('lieClip'); } catch (e) {}
 const TAG_BOLD = true; /* the lie card's "Hole 1 · Par 4 · Shot 1" line in bold. false = as v442 */ try { if (TAG_BOLD) document.documentElement.classList.add('tagBold'); } catch (e) {}
+const SG_TEMPO = { carry: .6, side: .75 }; /* Neil (11-18 18:16-18:20): "still leaving chips short a lot, from good lies... up hill ones" / "reduce bad tempo affect on chips and bunker shots a bit". A mistimed tempo always costs carry (up to 15.5%), so on a chip it only ever comes up short. Around the green (chip, flop, sand, and pitches of 50 yd or less) that carry loss is x0.6 and the tempo's push/pull x0.75. Flubs (blade/chunk) unchanged. null = as v444 */
 const QUIT_SND = false; /* Neil (11-18 12:46): "We don't need the sound button toggle on the quit modal": the speaker button in the in-game Quit dialog's corner is gone; sound stays togglable from the home screen's speaker button (top right). true = as v439 */
 if (SOUND && SND_TOGGLE) (() => {
   const ICON = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.3h3.6L11.6 5.4v13.2l-4.5-3.9H3.5z" fill="#fff" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>${on ? '<path d="M15 9.2a4 4 0 010 5.6M17.9 6.5a7.8 7.8 0 010 11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>' : '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>'}</svg>`;
