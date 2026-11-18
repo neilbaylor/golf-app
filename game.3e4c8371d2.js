@@ -40,7 +40,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v428'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v430'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5074,7 +5074,7 @@ function ffTipMaybe() { if (store.get('ffUsed', false)) return; const n = store.
   clearTimeout(G.ffTipTO); G.ffTipTO = setTimeout(() => { if (G.view !== 'flight' || G.ff || store.get('ffUsed', false)) return; store.set('ffTips', n + 1); const t = $('#ffTip'); t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 2600); }, 2000); }
 window.addEventListener('pointercancel', () => { G.ff = false; });
 const FF_UNSTICK = true; /* Neil (11-17 21:37): "Now sometimes 3x stays on the screen": a release some control kept to itself (the golfer's face stops its pointerup) or one lost to an app switch left G.ff on, so the 3x badge stayed and the next flight or fly-over ran fast with no finger down. Fingers are now counted at the window before anything else sees them; with none down, fast-forward is off. false = as v427 */
-const FFP = new Set(); window.addEventListener('pointerdown', e => FFP.add(e.pointerId), true); window.addEventListener('pointerup', e => FFP.delete(e.pointerId), true); window.addEventListener('pointercancel', e => FFP.delete(e.pointerId), true); window.addEventListener('blur', () => FFP.clear()); document.addEventListener('visibilitychange', () => { if (document.hidden) FFP.clear(); });
+const FFP = new Set(); window.addEventListener('pointerdown', e => FFP.add(e.pointerId), true); window.addEventListener('pointerup', e => FFP.delete(e.pointerId), true); window.addEventListener('pointercancel', e => FFP.delete(e.pointerId), true); window.addEventListener('blur', () => FFP.clear()); ['touchstart', 'touchend', 'touchcancel'].forEach(k => window.addEventListener(k, e => { if (!e.touches.length) FFP.clear(); }, { capture: true, passive: true })); /* (iOS: a touch taken over by a system gesture can end with no pointerup or pointercancel at all; the touch list is the truth: no touches, no fingers down) */ document.addEventListener('visibilitychange', () => { if (document.hidden) FFP.clear(); });
 canvas.addEventListener('pointerdown', e => {
   if (!$('#result').hidden) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -7109,7 +7109,7 @@ if (MULTI) try { MPX = (() => {
   function frame(dt, now) {
     if (MP_FEEL && S.mine && (SW.phase === 'back' || SW.phase === 'down')) return; /* mid-swing on your turn: the frame is the swing's alone (the inbox, aim stream, bubbles and cards wait ~1 s for the launch) */
     if (MP_CATCHUP && S.hidAt && now - S.hidAt > 2000) { S.catchT = now + 600; S.hidAt = 0; } /* the first frame back (it can come before 'visibilitychange'): hold the inbox's backlog for the catch-up */
-    drain(); if (!S.inRound) return; if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
+    drain(); if (!S.inRound) { G.ffR = false; return; } /* (MP_FF_SHARE: out of a round, nobody else's fast-forward) */ if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
     if (MP_FF_SHARE) { const fl = G.view === 'flight', mineF = fl && !!S.pend && !S.replaying; if (mineF) { const on = !!G.ff; if (on !== !!S.ffSent) { S.ffSent = on; send({ t: 'ff', on }); } } else if (S.ffSent) { if (!fl) S.ffSent = false; } /* my shot in the air: my fast-forward goes to the others (on, off) */
       const R0 = S.replaying, F = S.ffR; G.ffR = !!(fl && R0 && F && F.on && F.from === R0.from && F.n === R0.n); } /* watching it: the shooter's fast-forward plays here too */
     if (S.mine && !S.pend && !S.shootAs) { if (!(MP_EARLY_NEXT && S.room && S.room.shotN !== S.curN)) aimOut(now); } else if (!S.mine) aimIn(dt); /* (MP_EARLY_NEXT: a newer turn is waiting under the card: no aim from the old one) */
