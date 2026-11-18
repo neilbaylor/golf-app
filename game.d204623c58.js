@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v439'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v441'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5721,6 +5721,7 @@ const SND = (() => {
   };
 })();
 /* the speaker buttons: home screen top-right (left of full screen) and the in-game Home dialog's corner */
+const QUIT_SND = false; /* Neil (11-18 12:46): "We don't need the sound button toggle on the quit modal": the speaker button in the in-game Quit dialog's corner is gone; sound stays togglable from the home screen's speaker button (top right). true = as v439 */
 if (SOUND && SND_TOGGLE) (() => {
   const ICON = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.3h3.6L11.6 5.4v13.2l-4.5-3.9H3.5z" fill="#fff" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>${on ? '<path d="M15 9.2a4 4 0 010 5.6M17.9 6.5a7.8 7.8 0 010 11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>' : '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>'}</svg>`;
   const btns = []; const sync = () => btns.forEach(b => { b.innerHTML = ICON(SND.on); b.setAttribute('aria-label', SND.on ? 'Sound on (tap to mute)' : 'Sound off (tap to turn on)'); b.setAttribute('aria-pressed', String(SND.on)); b.classList.toggle('off', !SND.on); });
@@ -5728,7 +5729,7 @@ if (SOUND && SND_TOGGLE) (() => {
   const fs = document.getElementById('fsBtn');
   if (fs) { const b = document.createElement('button'); b.type = 'button'; b.className = 'appBtn ic'; b.id = 'sndBtn'; fs.parentNode.insertBefore(b, fs); btns.push(b); b.addEventListener('click', e => { e.stopPropagation(); flip(); }); }
   const qc = document.querySelector('#quitUI .qcard');
-  if (qc) { const b = document.createElement('button'); b.type = 'button'; b.className = 'qsnd'; qc.appendChild(b); btns.push(b); let pu = 0;
+  if (qc && QUIT_SND) { const b = document.createElement('button'); b.type = 'button'; b.className = 'qsnd'; qc.appendChild(b); btns.push(b); let pu = 0;
     b.addEventListener('pointerup', e => { e.stopPropagation(); pu = performance.now(); flip(); }); /* the dialog closes on any button's release: keep this one to itself */
     b.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); if (performance.now() - pu > 600) flip(); }); } /* (a keyboard press only clicks) */
   sync();
