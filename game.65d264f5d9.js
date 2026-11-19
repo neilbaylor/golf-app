@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v460'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v462'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1082,6 +1082,8 @@ const BUILD_CHUNK2 = true;
    all at once inside its texture upload), and the mini map is shrunk in 4 bands plus the trees in batches (it was one long draw). Same draws in the same order: the same pixels.
    (The texture uploads were already one texture per step.) false = v370's steps. */
 const BUILD_CHUNK3 = true;
+const COURSE_CPU = true; /* Neil's ?prof logs (v461, 11-18 22:09-22:11): the big freezes (87-862 ms, game code 3-5 ms) followed the background build's map painting (courseSteps; greenTexG too). Safari hands canvas drawing to the same background process that draws the 3D view and does it later, so a slice of painting that took our script a few ms held up the next frames for hundreds. The hole's course map and green texture are now painted on the CPU (a canvas the browser keeps in memory: willReadFrequently), inside the build's own per-frame time budget, so it's spread out instead of piling up. Same pictures. false = as v461 */
+const AHEAD_DELAY = { ms: 4000, at: -1e9 }; /* the same logs: the 733-894 ms freeze on a new hole's first frames came with the NEXT hole's build starting in the same moment. The background build now waits 4 s after a hole swaps in (it only ever runs on calm frames anyway). null = straight away, as v461 */
 const FLUSH1 = document.createElement('canvas'); FLUSH1.width = FLUSH1.height = 1; const FLUSH1X = FLUSH1.getContext('2d');
 /* FLUSH_DROP (hatch, with HATCH_LEAN): the 1-px canvas kept the snapshot of the last canvas flushed into it, so the next drawing on that canvas had to copy the whole canvas first
    (copy-on-write: a map-sized copy, 25 MB and ~45-115 ms on this box for Augusta's map, after every flush that is followed by more drawing). true: the 1-px canvas is reset
@@ -1141,7 +1143,7 @@ function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats witho
   return g.createPattern(c, 'repeat'); }
 function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0; /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
   let needleP = null; /* one tile per painting */
-  const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d');
+  const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined); /* COURSE_CPU */
   const R = rng(7), ppy = MAP.ppy; const X = u => (u - MAP.U0) * ppy, Y = v => (MAP.V1 - v) * ppy;
   const path = (pts, close = true) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); if (close) g.closePath(); };
   const sketch = (pts, lw = 2.6, a = .85) => {
@@ -1356,7 +1358,7 @@ function greenTex() { const it = greenTexG(false); for (;;) { const r = it.next(
 function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS sets GREENTEX before the ground's material is made). BUILD_CHUNK3 (ck): rasterized and handed back a slice at a time */
   const fp = elPts(FRINGE, 128, 1.04); let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const [u, v] of fp) { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
   const S = 1024, ppy = S / Math.max(u1 - u0, v1 - v0), cv = document.createElement('canvas'); cv.width = Math.ceil((u1 - u0) * ppy); cv.height = Math.ceil((v1 - v0) * ppy);
-  const g = cv.getContext('2d'), R = rng(21), X = u => (u - u0) * ppy, Y = v => (v1 - v) * ppy;
+  const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined), R = rng(21), X = u => (u - u0) * ppy, Y = v => (v1 - v) * ppy; /* COURSE_CPU */
   const path = pts => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); };
   const ink = (pts, lw, a, j = .25) => { for (let pass = 0; pass < 2; pass++) { g.beginPath(); const jj = (pass ? 1.6 : .5) * j * ppy; pts.forEach((p, i) => { const x = X(p[0]) + (R() - .5) * jj, y = Y(p[1]) + (R() - .5) * jj; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.lineWidth = (pass ? lw * .55 : lw) * ppy; g.strokeStyle = `rgba(29,42,26,${pass ? a * .45 : a})`; g.lineJoin = 'round'; g.stroke(); } };
   const FR = elPts(FRINGE, 160), GR = elPts(GREEN, 160), gc = GREEN.c, GRs = k => GREEN.sm ? elPts(GREEN, 0, k) : elPts(Object.assign({}, GREEN, { rx: GREEN.rx * k, ry: GREEN.ry * k }), 160);
@@ -5994,7 +5996,7 @@ const HOLESYS = (() => {
   function go(cid, i, holes, then, { pill = true, hold = 0, fresh = false, card = false } = {}) { /* fresh: build it again even if it's built (or on screen): PINS.seed */
     if (!fresh && cur && cur.cid === cid && cur.i === i) { cancel(); if (then) then(); return; }
     let HD = jobs.get(keyOf(cid, i)); if (!HD || HD.err || fresh) { if (HD) drop(HD); HD = start(cid, i); }
-    const fin = () => { const t0 = performance.now(); ROUND.holes = holes; use(HD); MENU.course = CID; const t1 = performance.now(); if (then) then(); swapMs = [Math.round(t1 - t0), Math.round(performance.now() - t1)]; }; /* (timings: HOLESYS.swapMs = [swap, then]) */
+    const fin = () => { const t0 = performance.now(); ROUND.holes = holes; use(HD); if (AHEAD_DELAY) AHEAD_DELAY.at = t0; MENU.course = CID; const t1 = performance.now(); if (then) then(); swapMs = [Math.round(t1 - t0), Math.round(performance.now() - t1)]; }; /* (timings: HOLESYS.swapMs = [swap, then]) */
     if (HD.ready && !hold) { cancel(); fin(); return; }
     want = { HD, done: fin, pill, card, meta: meta(cid, i), at: performance.now() + hold }; ahead(); if (pill) { PILL.show(pill === 'home', want.meta); PILL.set(HD.n / est); } }
   function meta(cid, i) { const c = COURSE_DEF[cid]; return (c.list || (c.list = c.holes()))[i - 1]; } /* the card line of the hole being waited on (for the pill) */
@@ -6005,7 +6007,7 @@ const HOLESYS = (() => {
     return !MENU.on && !INTRO.on && !FLY.on && now >= FLY_CALM_AT && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && !G.preview && Math.abs(G.aimT - G.aimGoal) < 1e-3 && !down && now - lastPtr > 400; }
   function tick(now) {
     const W = want && want.HD, HD = W && !W.ready ? W : W ? null : [...jobs.values()].find(j => !j.ready);
-    if (HD) { if (!W && !calm(now) && !((MENU.on || INTRO.on) && !down && now - lastPtr > 400 && now > (INTRO.calm || 0))) return; const budget = !W ? (HOME_BG_WARM && MENU.on ? BUDGET.home : BUDGET.calm) : MENU.on && !want.card ? BUDGET.home : BUDGET.wait, /* (MP_LOAD_CARD: under the loader card, full speed) */ t0 = performance.now(); /* HOME_BG_WARM: the home screen's background builds (another course's first hole) at the home rate too */
+    if (HD) { if (!W && AHEAD_DELAY && !MENU.on && !INTRO.on && now - AHEAD_DELAY.at < AHEAD_DELAY.ms) return; /* AHEAD_DELAY: not in a new hole's first seconds */ if (!W && !calm(now) && !((MENU.on || INTRO.on) && !down && now - lastPtr > 400 && now > (INTRO.calm || 0))) return; const budget = !W ? (HOME_BG_WARM && MENU.on ? BUDGET.home : BUDGET.calm) : MENU.on && !want.card ? BUDGET.home : BUDGET.wait, /* (MP_LOAD_CARD: under the loader card, full speed) */ t0 = performance.now(); /* HOME_BG_WARM: the home screen's background builds (another course's first hole) at the home rate too */
       do step(HD); while (!HD.ready && !HD.idle && performance.now() - t0 < budget);
       if (W && want.pill) PILL.set(HD.n / est); }
     if (want && want.HD.ready && now >= (want.at || 0)) { const w = want; want = null; PILL.hide(); if (w.HD.err) { console.error('hole build failed', w.HD.key); drop(w.HD); return; } w.done(); } }
@@ -6171,10 +6173,14 @@ if (PROF) try { (() => {
   const tw = (f, kind) => typeof f !== 'function' ? f : function () { const t = performance.now(); try { return f.apply(this, arguments); } finally { const d = performance.now() - t; P.ts += d; if (d > 4) { const n = kind + ' ' + nmF(f); if (!P.tTop || d > P.tTop[0]) P.tTop = [d, n]; const T = P.tasks[n] || (P.tasks[n] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); } } };
   { const sT = window.setTimeout, sI = window.setInterval, rI = window.requestIdleCallback; window.setTimeout = function (f, ...a) { return sT.call(window, tw(f, 'timeout'), ...a); }; window.setInterval = function (f, ...a) { return sI.call(window, tw(f, 'interval'), ...a); }; if (rI) window.requestIdleCallback = function (f, ...a) { return rI.call(window, tw(f, 'idle'), ...a); }; }
   { const fs0 = finishShot; finishShot = function () { const t = performance.now(); try { return fs0.apply(this, arguments); } finally { const d = performance.now() - t; const T = P.tasks['frame finishShot (the result card)'] || (P.tasks['frame finishShot (the result card)'] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); } }; }
+  P.bs = new Set(); { const mark = n => P.bs.add(n); /* which hole-build steps ran this frame (background or waited-for) */
+    const wf = (n, f) => function () { mark(n); const r = f.apply(this, arguments); if (r && typeof r.next === 'function' && typeof r[Symbol.iterator] === 'function') { const nx = r.next.bind(r); r.next = v => { mark(n); return nx(v); }; } return r; };
+    for (const n of ['courseSteps', 'buildOuter', 'buildTrees', 'buildBushes', 'buildBridges', 'buildLake', 'buildFountain', 'buildSceneryG', 'buildScenery', 'buildCup', 'caddieWarmG', 'holeMap', 'greenTexG', 'greenTex', 'courseGeom', 'holeAUGDg', 'makeAugCam', 'makeHomePath']) { try { const f = eval(n); if (typeof f === 'function') eval(n + ' = wf(n, f)'); } catch (e) {} }
+    try { READ.make = wf('READ.make', READ.make); } catch (e) {} try { MINI.makeG = wf('MINI.makeG', MINI.makeG); MINI.make = wf('MINI.make', MINI.make); } catch (e) {} }
   const st = () => { const I = renderer.info; let hb = false; try { hb = !!HOLESYS.busy; } catch (e) {} return { wn: WARM_N, pg: I.programs ? I.programs.length : 0, ge: I.memory.geometries, tx: I.memory.textures, hb, hole: (() => { try { return CID + HOLE.n; } catch (e) { return ''; } })(), card: !!($('#result') && !$('#result').hidden) }; };
   let prevT = '', lastHole = '', holeAt = 0, cardAt = 0, endT = 0, postMs = 0, postPrev = 0; const mc = new MessageChannel(); mc.port1.onmessage = () => { postMs = performance.now() - endT; }; /* after the frame's script: the browser's own update (style, layout, paint, commit) until the next task */
   const f0 = frame; frame = function (now) { const t = performance.now(); P.s.rd = P.s.cu = P.s.cad = 0; const a = st(); f0(now); const js = performance.now() - t; const b = st(); if (b.hole !== lastHole) { lastHole = b.hole; holeAt = now; } if (b.card && !cardAt) cardAt = now; else if (!b.card) cardAt = 0; const pm = postMs; postMs = 0;
-    const tg = [b.wn > a.wn ? (b.wn - a.wn >= 100 ? 'warmAll' : 'warm') : '', b.pg > a.pg ? 'shader+' + (b.pg - a.pg) : '', b.ge > a.ge ? 'geo+' + (b.ge - a.ge) : '', b.tx > a.tx ? 'tex+' + (b.tx - a.tx) : '', b.hb ? 'building' : '', now - holeAt < 3000 ? 'newHole' : '', b.card ? `card ${Math.round(now - cardAt)}ms in` : '', js > 30 ? 'js' : '', pm > 8 ? `browser ${Math.round(pm)}ms` : '', P.ts > 5 ? `outside ${Math.round(P.ts)}ms` + (P.tTop ? ` (${Math.round(P.tTop[0])}: ${P.tTop[1].slice(0, 70)})` : '') : ''].filter(Boolean).join(','); P.ts = 0; P.tTop = null;
+    const bs = P.bs.size ? 'build:' + [...P.bs].join('+') : ''; P.bs.clear(); const tg = [bs, b.wn > a.wn ? (b.wn - a.wn >= 100 ? 'warmAll' : 'warm') : '', b.pg > a.pg ? 'shader+' + (b.pg - a.pg) : '', b.ge > a.ge ? 'geo+' + (b.ge - a.ge) : '', b.tx > a.tx ? 'tex+' + (b.tx - a.tx) : '', b.hb ? 'building' : '', now - holeAt < 3000 ? 'newHole' : '', b.card ? `card ${Math.round(now - cardAt)}ms in` : '', js > 30 ? 'js' : '', pm > 8 ? `browser ${Math.round(pm)}ms` : '', P.ts > 5 ? `outside ${Math.round(P.ts)}ms` + (P.tTop ? ` (${Math.round(P.tTop[0])}: ${P.tTop[1].slice(0, 70)})` : '') : ''].filter(Boolean).join(','); P.ts = 0; P.tTop = null;
     if (P.last && !document.hidden) { const dt = now - P.last; if (dt > 0 && dt < 1000) { const k = cat(), c = C(k); c.n++; c.ms += dt; c.dts.push(dt); c.js.push(js); if (c.dts.length > 30000) { c.dts.splice(0, 10000); c.js.splice(0, 10000); }
       c.rd += P.s.rd; c.cu += P.s.cu; c.cad += P.s.cad; const i = renderer.info.render; c.tris += i.triangles; c.calls += i.calls;
       if (dt > 20) { P.recent.push([dt, k, js, prevT + (prevT && tg ? ' | ' : '') + tg]); if (P.recent.length > 400) P.recent.splice(0, 100); } } }
