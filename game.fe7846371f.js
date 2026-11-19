@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v466'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v468'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2442,8 +2442,10 @@ const MODES = {
   flop:  { name: 'Flop',  rate: 1.45, tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* risk: swing flaws cost more, and a bad tempo blades or chunks it */
   sand:  SAND_EASY ? { name: 'Sand', rate: 1.5, tempo: 3.4, perf: 0.085, tight: .9, risk: 1.2 } : { name: 'Sand',  rate: 1.5,  tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* the explosion: as touchy as a flop (and a mistimed one blades or chunks it). SAND_EASY: a wider window, smaller penalties */
   putt:  { name: 'Putt',  rate: 1.25, tempo: 3.1,  perf: .6, tight: 3 } };
-const SG_TEMPO_UP = { chip: 3.4, sand: 3.6 }; /* Neil (11-18 18:23): chips and bunker splashes "expecting too slow of a tempo, just slightly". Target ratio (backswing / downswing) chip 3.2 -> 3.4, sand 3.4 -> 3.6, about 6% quicker; window widths unchanged. null = as v444 */
+const SG_TEMPO_UP = { chip: 4.05, sand: 4.25 }; /* v468 (Neil 11-18 22:48: "I still get quick too much on them. Even faster tempo. Another 9%"): 3.7 -> 4.05, 3.9 -> 4.25 (a full swing is 4.25) */ /* v467 (Neil 11-18 22:44: "tempo is also still too slow for a good one. Speed it up"): 3.4 -> 3.7 and 3.6 -> 3.9, ~9% quicker again */ /* Neil (11-18 18:23): chips and bunker splashes "expecting too slow of a tempo, just slightly". Target ratio (backswing / downswing) chip 3.2 -> 3.4, sand 3.4 -> 3.6, about 6% quicker; window widths unchanged. null = as v444 */
 if (SG_TEMPO_UP) for (const k in SG_TEMPO_UP) MODES[k].tempo = SG_TEMPO_UP[k];
+const SG_PERF = { chip: 1.15, sand: 1.15 }; /* Neil (11-18 22:44): chips and bunker shots "still too hard... make a touch more forgiving": their PERFECT tempo window 15% wider (the good band beyond it moves out with it). null = as v466 */
+if (SG_PERF) for (const k in SG_PERF) MODES[k].perf *= SG_PERF[k];
 const MODE_ORDER = ['power', 'full', 'punch', 'pitch', 'flop', 'sand', 'putt'];
 /* CLUB_DIFF (Neil): the longer the club, the harder a good shot. Each club scales the tempo window (perfect and good bands) and the dead-straight line window;
    the 7 iron keeps today's window, the driver is the tightest (88% of today), the lob wedge the most forgiving (110%). Golfer attributes still multiply on top. Full swings only (full, power, punch):
@@ -5742,7 +5744,7 @@ const SND = (() => {
 const LIE_PAINT = true; /* false = as v445 */ try { if (LIE_PAINT) document.documentElement.classList.add('liePaint'); } catch (e) {}
 const LIE_CLIP = false; /* v447: off (Neil 18:47 "do we need 444 clipping?"): LIE_PAINT fixed the corner without it */ /* false = as v443 */ try { if (LIE_CLIP) document.documentElement.classList.add('lieClip'); } catch (e) {}
 const TAG_BOLD = true; /* the lie card's "Hole 1 · Par 4 · Shot 1" line in bold. false = as v442 */ try { if (TAG_BOLD) document.documentElement.classList.add('tagBold'); } catch (e) {}
-const SG_TEMPO = { carry: .6, side: .75 }; /* Neil (11-18 18:16-18:20): "still leaving chips short a lot, from good lies... up hill ones" / "reduce bad tempo affect on chips and bunker shots a bit". A mistimed tempo always costs carry (up to 15.5%), so on a chip it only ever comes up short. Around the green (chip, flop, sand, and pitches of 50 yd or less) that carry loss is x0.6 and the tempo's push/pull x0.75. Flubs (blade/chunk) unchanged. null = as v444 */
+const SG_TEMPO = { carry: .5, side: .65 }; /* v467 (Neil 22:44, "a touch more forgiving"): .6 -> .5 and .75 -> .65 */ /* Neil (11-18 18:16-18:20): "still leaving chips short a lot, from good lies... up hill ones" / "reduce bad tempo affect on chips and bunker shots a bit". A mistimed tempo always costs carry (up to 15.5%), so on a chip it only ever comes up short. Around the green (chip, flop, sand, and pitches of 50 yd or less) that carry loss is x0.6 and the tempo's push/pull x0.75. Flubs (blade/chunk) unchanged. null = as v444 */
 const QUIT_SND = false; /* Neil (11-18 12:46): "We don't need the sound button toggle on the quit modal": the speaker button in the in-game Quit dialog's corner is gone; sound stays togglable from the home screen's speaker button (top right). true = as v439 */
 if (SOUND && SND_TOGGLE) (() => {
   const ICON = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.3h3.6L11.6 5.4v13.2l-4.5-3.9H3.5z" fill="#fff" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>${on ? '<path d="M15 9.2a4 4 0 010 5.6M17.9 6.5a7.8 7.8 0 010 11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>' : '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>'}</svg>`;
