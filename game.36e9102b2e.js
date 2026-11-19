@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v445'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v447'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1440,7 +1440,7 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
   items.forEach((it, i) => { it.m.toArray(all, i * 16); m.setMatrixAt(i, it.m); if (cols) { it.c.toArray(cols, i * 3); m.setColorAt(i, it.c); } sph[i * 4] = it.p.x + o.x; sph[i * 4 + 1] = it.p.y + o.y; sph[i * 4 + 2] = it.p.z + o.z; sph[i * 4 + 3] = it.r; if (it.tid != null) tid[i] = it.tid; });
   m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (m.instanceColor) m.instanceColor.setUsage(THREE.DynamicDrawUsage);
   if (opt.off) m.position.copy(opt.off); if (opt.ud) Object.assign(m.userData, opt.ud);
-  const C = { m, all, cols, sph, tid, n, far: opt.hideBeyond || 1e9, lead: null, vl: null, nv: 0, fm: null, fcut2: opt.farCut ? opt.farCut * opt.farCut : 0 };
+  const C = { m, all, cols, sph, tid, n, far: opt.hideBeyond || 1e9, lead: null, vl: null, nv: 0, fm: null, fcut2: opt.farCut ? opt.farCut * opt.farCut : 0, crown: !!(opt.lod && opt.lod.userData.crown) };
   { const P = HS.cull[HS.cull.length - 1], L = P && (P.lead || P); /* a twin (an ink hull, a blossom cap): same instance centres as the mesh before it, so it shares that mesh's visible list (radius: the larger of the two, so it can only draw more, never less) */
     if (L && L.n === n && L.far === C.far && !!L.m.userData.tuft === !!m.userData.tuft) { let same = true; for (let i = 0; i < n * 4 && same; i += 4) same = sph[i] === L.sph[i] && sph[i + 1] === L.sph[i + 1] && sph[i + 2] === L.sph[i + 2] && tid[i >> 2] === L.tid[i >> 2];
       if (same) { for (let i = 3; i < n * 4; i += 4) L.sph[i] = Math.max(L.sph[i], sph[i]); C.lead = L; } } }
@@ -1448,6 +1448,7 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
     f.count = 0; f.visible = false; if (opt.off) f.position.copy(opt.off); if (opt.ud) Object.assign(f.userData, opt.ud); C.fm = f; C.fpi = new Int32Array(n).fill(-1); } /* "far trees: simple": the same instances, far off, in a simpler mesh */
   HS.cull.push(C); HS.add(m); if (C.fm) HS.add(C.fm); return m;
 }
+const FAR_CROWN = 'fly'; /* Neil (11-18 18:54-18:55): "try distant tree tops off for now" / "actually only off for fly over". During a hole's fly-over, tree crowns (broadleaf, loblolly, the Ontario pines' needle pads) are drawn full at every distance; the rest of the time crowns beyond 120 yd use the simple mesh as before. Far trunks, far azaleas and their ink cut, far bushes and the ground LOD stay simple throughout. Cost during the fly-over: Augusta 8 peaks at ~440k triangles (from ~295k), the Hunt 9 ~310k (from ~255k). true = simple always (as v446), false = full always */
 const FAR_TRUNK = true; /* Augusta 8 lightening, option 2 (preview for Neil 11-18): with "far trees: simple", trunks and branches beyond 120 yd are drawn as a 4-sided open tube (8 tris, not 28) and without their ink outline. false = as v437 */
 const AZ_INK_CUT = 200; /* option 3: the far azalea domes' ink outline is dropped beyond this many yd (0 = never, as v437) */
 const GROUND_LOD = 120; /* option 4: course ground tiles whose nearest edge is beyond this many yd are drawn from a half-resolution twin (a quarter of the triangles). 0 = off, as v437 */
@@ -1470,6 +1471,7 @@ function updateCull() {
   if (_ck[16] !== camera.projectionMatrix.elements[5]) { same = false; _ck[16] = camera.projectionMatrix.elements[5]; }
   if (_cb.distanceToSquared(ball.position) > 1e-4) { same = false; _cb.copy(ball.position); }
   if (_cPT !== PLAN_TREE) { same = false; _cPT = PLAN_TREE; }
+  if (FAR_CROWN === 'fly' && updateCull.fly !== FLY.on) { same = false; updateCull.fly = FLY.on; } /* FAR_CROWN: the crowns' mesh changes as the fly-over starts and ends */
   if (same) return;
   { // a tree in the way of the ball (or wrapped round the camera) steps aside
     _blk.clear(); const cx0 = camera.position.x, cy0 = camera.position.y, cz0 = camera.position.z, bx = ball.position.x, by = ball.position.y, bz = ball.position.z, dx = bx - cx0, dz = bz - cz0, L2 = dx * dx + dz * dz || 1e-6;
@@ -1491,7 +1493,8 @@ function updateCull() {
   const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
   const lod = FARLOD.on, FD2 = FARLOD.d2;
   for (const C of CULL) {
-    if (C.fm && !lod && C.fm.visible) { C.fm.visible = false; C.fm.count = 0; }
+    const lodC = lod && !(C.crown && FAR_CROWN === 'fly' && FLY.on); /* FAR_CROWN: crowns full during the fly-over */
+    if (C.fm && !lodC && C.fm.visible) { C.fm.visible = false; C.fm.count = 0; }
     if (MENU.on && C.m.userData.tuft) { C.m.visible = false; continue; } // fly-over: skip the close-up grass tufts
     const S = C.sph; let V, nv = 0;
     if (C.lead) { V = C.lead.vl; nv = C.lead.nv; } /* a twin: its lead (just before it) has tested the same centres this frame */
@@ -1501,7 +1504,7 @@ function updateCull() {
         V[nv++] = i; }
       C.nv = nv; }
     const im = C.m.instanceMatrix.array, ic = C.cols && C.m.instanceColor.array, A = C.all, Cc = C.cols; let k = 0, ch = false; const pi = C.pi || (C.pi = new Int32Array(C.n).fill(-1));
-    const F = lod ? C.fm : null, fim = F && F.instanceMatrix.array, fic = F && Cc && F.instanceColor.array, fpi = C.fpi; let kf = 0, chf = false;
+    const F = lodC ? C.fm : null, fim = F && F.instanceMatrix.array, fic = F && Cc && F.instanceColor.array, fpi = C.fpi; let kf = 0, chf = false;
     for (let q = 0; q < nv; q++) { const i = V[q];
       if (F) { const j = i * 4, dx = S[j] - cx, dy = S[j + 1] - cy, dz = S[j + 2] - cz, d2f = dx * dx + dy * dy + dz * dz; if (d2f > FD2) { if (C.fcut2 && d2f > C.fcut2) continue; /* AZ_INK_CUT */ if (fpi[kf] !== i) { fpi[kf] = i; chf = true; const s0 = i * 16, d0 = kf * 16; for (let e = 0; e < 16; e++) fim[d0 + e] = A[s0 + e]; if (fic) { const s1 = i * 3, d1 = kf * 3; fic[d1] = Cc[s1]; fic[d1 + 1] = Cc[s1 + 1]; fic[d1 + 2] = Cc[s1 + 2]; } } kf++; continue; } }
       const gsv = FAR_GROW && C.far < 1e9 ? (C.lead || C).gs : null, gk = gsv ? gsv[i] : 1; if (gk < 1) { pi[k] = -1; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = (e < 11 && e % 4 !== 3) ? A[s0 + e] * gk : A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } k++; continue; } /* FAR_GROW: near its draw limit it's scaled down, so it grows in rather than popping */
@@ -1558,6 +1561,7 @@ function buildTrees() {
   blobGeo.computeVertexNormals();
   const blobFar = new THREE.SphereGeometry(1, 8, 6); { const p = blobFar.attributes.position; /* "far trees: simple": the same lumpy crown in fewer segments (same silhouette) */
     for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = 1 + 0.09 * Math.sin(x * 5.1 + y * 3.3) + 0.07 * Math.sin(z * 6.7 - y * 4.1); p.setXYZ(i, x * n, y * n * 0.92, z * n); } blobFar.computeVertexNormals(); }
+  const crownFar = blobFar; blobFar.userData.crown = true; /* FAR_CROWN: the far crown mesh, marked so the fly-over can draw crowns full */
   TREES.geo = { blobFar }; /* the hole's crown mesh, shared with its leafy bushes (buildBushes: Hunt 9's ravine) */
   const coneGeo = new THREE.ConeGeometry(1, 1, 8, 1); coneGeo.translate(0, .5, 0);
   const trunkGeo = new THREE.CylinderGeometry(.32, .48, 1, 7); trunkGeo.translate(0, .5, 0);
@@ -1633,14 +1637,14 @@ function buildTrees() {
   function inst(geo, mat, list, scaleFn, colorFn, off, lod) { if (!list.length) return; return cullInst(geo, mat, list.map((o, i) => { scaleFn(o, sc); return { p: o.p, m: new THREE.Matrix4().compose(o.p, o.q || q, sc), c: colorFn ? new THREE.Color(colorFn(o, i)) : null, r: Math.max(sc.x, sc.y, sc.z) * 1.25 + .5, tid: o.tid }; }), { off, lod }); }
   const BLOOM = { white: ['#fbf7ec', '#f4efe0', '#fffdf7'], yellow: ['#f3d64a', '#e9c63a', '#f7e27a'], pink: ['#f4a9c4', '#ee93b5', '#f8bfd3'], plum: ['#5e2a45', '#6e3350', '#52233c'], /* plum: 13's purple-leaf maple (AUG13_MAPLE); */ /* pink: Augusta 2's pink dogwoods (PINK_DOGWOOD), soft pink so the azaleas (hot pink, magenta) still read apart; trees in flower (Augusta's dogwoods): the crown in blossom colours */
     gold: ['#eab83a', '#e0a92e', '#f0c856'], orange: ['#ec9a4c', '#e3893f', '#f2ae66'], lime: ['#a9cf48', '#9bc23c', '#b9da5c'] }; /* the Hunt's accent trees (TREE_ACCENTS) */
-  inst(blobGeo, toon(0xffffff), blobs, (o, s) => s.setScalar(o.s), o => (o.bl && BLOOM[o.bl] ? BLOOM[o.bl] : greens)[Math.floor(o.r * (o.bl && BLOOM[o.bl] ? BLOOM[o.bl] : greens).length)], null, blobFar);
-  inst(blobGeo, inkMat, blobs, (o, s) => s.setScalar(o.s + .3), null, null, blobFar);
+  inst(blobGeo, toon(0xffffff), blobs, (o, s) => s.setScalar(o.s), o => (o.bl && BLOOM[o.bl] ? BLOOM[o.bl] : greens)[Math.floor(o.r * (o.bl && BLOOM[o.bl] ? BLOOM[o.bl] : greens).length)], null, crownFar);
+  inst(blobGeo, inkMat, blobs, (o, s) => s.setScalar(o.s + .3), null, null, crownFar);
   inst(coneGeo, toon(0xffffff), cones, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), (o, i) => o.fir ? (i % 2 ? '#2d6331' : '#25552b') : i % 2 ? '#3d7f3a' : '#346f34'); /* fir: a darker, bluer green */
   inst(coneGeo, inkMat, cones, (o, s) => s.set(o.s[0] + .3, o.s[1] + .45, o.s[2] + .3), null, new THREE.Vector3(0, -.2, 0));
   const pineGreens = ['#3e7330', '#467d35', '#356628', '#4f8a3a']; /* the loblollies' crowns: a deeper, bluer green than the broadleaf trees */
-  inst(blobGeo, toon(0xffffff), crowns, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || pineGreens[Math.floor(o.r * pineGreens.length)], null, blobFar);
-  inst(blobGeo, inkMat, crowns, (o, s) => s.set(o.s[0] + .28, o.s[1] + .26, o.s[2] + .28), null, null, blobFar);
-  if (plates && plates.length) { const pG = opinePlateGeo(14, 6), pF = opinePlateGeo(9, 4); /* OPINE_PADS: the Ontario pines' needle pads in their own scalloped mesh (near and far; two draws with the ink) */
+  inst(blobGeo, toon(0xffffff), crowns, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || pineGreens[Math.floor(o.r * pineGreens.length)], null, crownFar);
+  inst(blobGeo, inkMat, crowns, (o, s) => s.set(o.s[0] + .28, o.s[1] + .26, o.s[2] + .28), null, null, crownFar);
+  if (plates && plates.length) { const pG = opinePlateGeo(14, 6), pF = opinePlateGeo(9, 4); pF.userData.crown = true; /* OPINE_PADS: the Ontario pines' needle pads in their own scalloped mesh (near and far; two draws with the ink) */
     inst(pG, toon(0xffffff), plates, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c, null, pF); inst(pG, inkMat, plates, (o, s) => s.set(o.s[0] + .28, o.s[1] + .22, o.s[2] + .28), null, null, pF); }
   inst(trunkGeo, toon(0x8a5a35), branches, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), null, null, trunkFar);
   inst(trunkGeo, inkMat, branches, (o, s) => s.set(o.s[0] * 1.6, o.s[1], o.s[2] * 1.6), null, null, inkNone);
@@ -5724,7 +5728,8 @@ const SND = (() => {
   };
 })();
 /* the speaker buttons: home screen top-right (left of full screen) and the in-game Home dialog's corner */
-const LIE_CLIP = true; /* false = as v443 */ try { if (LIE_CLIP) document.documentElement.classList.add('lieClip'); } catch (e) {}
+const LIE_PAINT = true; /* false = as v445 */ try { if (LIE_PAINT) document.documentElement.classList.add('liePaint'); } catch (e) {}
+const LIE_CLIP = false; /* v447: off (Neil 18:47 "do we need 444 clipping?"): LIE_PAINT fixed the corner without it */ /* false = as v443 */ try { if (LIE_CLIP) document.documentElement.classList.add('lieClip'); } catch (e) {}
 const TAG_BOLD = true; /* the lie card's "Hole 1 · Par 4 · Shot 1" line in bold. false = as v442 */ try { if (TAG_BOLD) document.documentElement.classList.add('tagBold'); } catch (e) {}
 const SG_TEMPO = { carry: .6, side: .75 }; /* Neil (11-18 18:16-18:20): "still leaving chips short a lot, from good lies... up hill ones" / "reduce bad tempo affect on chips and bunker shots a bit". A mistimed tempo always costs carry (up to 15.5%), so on a chip it only ever comes up short. Around the green (chip, flop, sand, and pitches of 50 yd or less) that carry loss is x0.6 and the tempo's push/pull x0.75. Flubs (blade/chunk) unchanged. null = as v444 */
 const QUIT_SND = false; /* Neil (11-18 12:46): "We don't need the sound button toggle on the quit modal": the speaker button in the in-game Quit dialog's corner is gone; sound stays togglable from the home screen's speaker button (top right). true = as v439 */
