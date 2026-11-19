@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v461'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v463'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1082,6 +1082,9 @@ const BUILD_CHUNK2 = true;
    all at once inside its texture upload), and the mini map is shrunk in 4 bands plus the trees in batches (it was one long draw). Same draws in the same order: the same pixels.
    (The texture uploads were already one texture per step.) false = v370's steps. */
 const BUILD_CHUNK3 = true;
+const COURSE_CPU = true; /* Neil's ?prof logs (v461, 11-18 22:09-22:11): the big freezes (87-862 ms, game code 3-5 ms) followed the background build's map painting (courseSteps; greenTexG too). Safari hands canvas drawing to the same background process that draws the 3D view and does it later, so a slice of painting that took our script a few ms held up the next frames for hundreds. The hole's course map and green texture are now painted on the CPU (a canvas the browser keeps in memory: willReadFrequently), inside the build's own per-frame time budget, so it's spread out instead of piling up. Same pictures. false = as v461 */
+const BG_BUDGET = 4.5; /* Neil (11-18 22:19, v462): "a touch more loading bar": with the map now painted on the CPU inside the background build's budget, the next hole often wasn't finished by the hole-out. The background build gets 4.5 ms of a calm frame (was 2.5; the game's own frame code is ~2-3 ms of 16.7) and starts 1.5 s into a hole (AHEAD_DELAY, was 4 s). 0 = 2.5 ms, as v462 */
+const AHEAD_DELAY = { ms: 1500, at: -1e9 }; /* the same logs: the 733-894 ms freeze on a new hole's first frames came with the NEXT hole's build starting in the same moment. The background build now waits 4 s after a hole swaps in (it only ever runs on calm frames anyway). null = straight away, as v461 */
 const FLUSH1 = document.createElement('canvas'); FLUSH1.width = FLUSH1.height = 1; const FLUSH1X = FLUSH1.getContext('2d');
 /* FLUSH_DROP (hatch, with HATCH_LEAN): the 1-px canvas kept the snapshot of the last canvas flushed into it, so the next drawing on that canvas had to copy the whole canvas first
    (copy-on-write: a map-sized copy, 25 MB and ~45-115 ms on this box for Augusta's map, after every flush that is followed by more drawing). true: the 1-px canvas is reset
@@ -1141,7 +1144,7 @@ function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats witho
   return g.createPattern(c, 'repeat'); }
 function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0; /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
   let needleP = null; /* one tile per painting */
-  const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d');
+  const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined); /* COURSE_CPU */
   const R = rng(7), ppy = MAP.ppy; const X = u => (u - MAP.U0) * ppy, Y = v => (MAP.V1 - v) * ppy;
   const path = (pts, close = true) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); if (close) g.closePath(); };
   const sketch = (pts, lw = 2.6, a = .85) => {
@@ -1356,7 +1359,7 @@ function greenTex() { const it = greenTexG(false); for (;;) { const r = it.next(
 function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS sets GREENTEX before the ground's material is made). BUILD_CHUNK3 (ck): rasterized and handed back a slice at a time */
   const fp = elPts(FRINGE, 128, 1.04); let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const [u, v] of fp) { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
   const S = 1024, ppy = S / Math.max(u1 - u0, v1 - v0), cv = document.createElement('canvas'); cv.width = Math.ceil((u1 - u0) * ppy); cv.height = Math.ceil((v1 - v0) * ppy);
-  const g = cv.getContext('2d'), R = rng(21), X = u => (u - u0) * ppy, Y = v => (v1 - v) * ppy;
+  const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined), R = rng(21), X = u => (u - u0) * ppy, Y = v => (v1 - v) * ppy; /* COURSE_CPU */
   const path = pts => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); };
   const ink = (pts, lw, a, j = .25) => { for (let pass = 0; pass < 2; pass++) { g.beginPath(); const jj = (pass ? 1.6 : .5) * j * ppy; pts.forEach((p, i) => { const x = X(p[0]) + (R() - .5) * jj, y = Y(p[1]) + (R() - .5) * jj; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.lineWidth = (pass ? lw * .55 : lw) * ppy; g.strokeStyle = `rgba(29,42,26,${pass ? a * .45 : a})`; g.lineJoin = 'round'; g.stroke(); } };
   const FR = elPts(FRINGE, 160), GR = elPts(GREEN, 160), gc = GREEN.c, GRs = k => GREEN.sm ? elPts(GREEN, 0, k) : elPts(Object.assign({}, GREEN, { rx: GREEN.rx * k, ry: GREEN.ry * k }), 160);
@@ -5934,7 +5937,7 @@ function setHoleVars(o) { ({ CID, HOLES, HOLE_N, HOLE, COURSE_LOGO, COURSE_NAME,
 const FLY_SETTLE = true, FLY_SETTLE_MS = 1200; let FLY_CALM_AT = 0;
 const HOLESYS = (() => {
   const AHEAD = 1; /* holes prebuilt ahead of the one being played. 2 holds a third hole scene in GPU memory: try it on phones first */
-  const BUDGET = { calm: 2.5, wait: 14, home: 6 }; /* ms of build work per frame: in the background (calm frames only), under the pill, behind the home screen */
+  const BUDGET = { calm: BG_BUDGET || 2.5, wait: 14, home: 6 }; /* (BG_BUDGET) */ /* ms of build work per frame: in the background (calm frames only), under the pill, behind the home screen */
   const jobs = new Map(); let cur = null, want = null, est = 60, lastPtr = -1e9, down = 0, last = null, swapMs = null;
   addEventListener('pointerdown', () => { down++; lastPtr = performance.now(); }, true); addEventListener('pointerup', () => { down = Math.max(0, down - 1); lastPtr = performance.now(); }, true); addEventListener('pointercancel', () => { down = 0; }, true);
   const keyOf = (cid, i) => cid + ':' + i;
@@ -5994,7 +5997,7 @@ const HOLESYS = (() => {
   function go(cid, i, holes, then, { pill = true, hold = 0, fresh = false, card = false } = {}) { /* fresh: build it again even if it's built (or on screen): PINS.seed */
     if (!fresh && cur && cur.cid === cid && cur.i === i) { cancel(); if (then) then(); return; }
     let HD = jobs.get(keyOf(cid, i)); if (!HD || HD.err || fresh) { if (HD) drop(HD); HD = start(cid, i); }
-    const fin = () => { const t0 = performance.now(); ROUND.holes = holes; use(HD); MENU.course = CID; const t1 = performance.now(); if (then) then(); swapMs = [Math.round(t1 - t0), Math.round(performance.now() - t1)]; }; /* (timings: HOLESYS.swapMs = [swap, then]) */
+    const fin = () => { const t0 = performance.now(); ROUND.holes = holes; use(HD); if (AHEAD_DELAY) AHEAD_DELAY.at = t0; MENU.course = CID; const t1 = performance.now(); if (then) then(); swapMs = [Math.round(t1 - t0), Math.round(performance.now() - t1)]; }; /* (timings: HOLESYS.swapMs = [swap, then]) */
     if (HD.ready && !hold) { cancel(); fin(); return; }
     want = { HD, done: fin, pill, card, meta: meta(cid, i), at: performance.now() + hold }; ahead(); if (pill) { PILL.show(pill === 'home', want.meta); PILL.set(HD.n / est); } }
   function meta(cid, i) { const c = COURSE_DEF[cid]; return (c.list || (c.list = c.holes()))[i - 1]; } /* the card line of the hole being waited on (for the pill) */
@@ -6005,7 +6008,7 @@ const HOLESYS = (() => {
     return !MENU.on && !INTRO.on && !FLY.on && now >= FLY_CALM_AT && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && !G.preview && Math.abs(G.aimT - G.aimGoal) < 1e-3 && !down && now - lastPtr > 400; }
   function tick(now) {
     const W = want && want.HD, HD = W && !W.ready ? W : W ? null : [...jobs.values()].find(j => !j.ready);
-    if (HD) { if (!W && !calm(now) && !((MENU.on || INTRO.on) && !down && now - lastPtr > 400 && now > (INTRO.calm || 0))) return; const budget = !W ? (HOME_BG_WARM && MENU.on ? BUDGET.home : BUDGET.calm) : MENU.on && !want.card ? BUDGET.home : BUDGET.wait, /* (MP_LOAD_CARD: under the loader card, full speed) */ t0 = performance.now(); /* HOME_BG_WARM: the home screen's background builds (another course's first hole) at the home rate too */
+    if (HD) { if (!W && AHEAD_DELAY && !MENU.on && !INTRO.on && now - AHEAD_DELAY.at < AHEAD_DELAY.ms) return; /* AHEAD_DELAY: not in a new hole's first seconds */ if (!W && !calm(now) && !((MENU.on || INTRO.on) && !down && now - lastPtr > 400 && now > (INTRO.calm || 0))) return; const budget = !W ? (HOME_BG_WARM && MENU.on ? BUDGET.home : BUDGET.calm) : MENU.on && !want.card ? BUDGET.home : BUDGET.wait, /* (MP_LOAD_CARD: under the loader card, full speed) */ t0 = performance.now(); /* HOME_BG_WARM: the home screen's background builds (another course's first hole) at the home rate too */
       do step(HD); while (!HD.ready && !HD.idle && performance.now() - t0 < budget);
       if (W && want.pill) PILL.set(HD.n / est); }
     if (want && want.HD.ready && now >= (want.at || 0)) { const w = want; want = null; PILL.hide(); if (w.HD.err) { console.error('hole build failed', w.HD.key); drop(w.HD); return; } w.done(); } }
