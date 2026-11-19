@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v468'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v470'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2442,8 +2442,9 @@ const MODES = {
   flop:  { name: 'Flop',  rate: 1.45, tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* risk: swing flaws cost more, and a bad tempo blades or chunks it */
   sand:  SAND_EASY ? { name: 'Sand', rate: 1.5, tempo: 3.4, perf: 0.085, tight: .9, risk: 1.2 } : { name: 'Sand',  rate: 1.5,  tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* the explosion: as touchy as a flop (and a mistimed one blades or chunks it). SAND_EASY: a wider window, smaller penalties */
   putt:  { name: 'Putt',  rate: 1.25, tempo: 3.1,  perf: .6, tight: 3 } };
-const SG_TEMPO_UP = { chip: 4.05, sand: 4.25 }; /* v468 (Neil 11-18 22:48: "I still get quick too much on them. Even faster tempo. Another 9%"): 3.7 -> 4.05, 3.9 -> 4.25 (a full swing is 4.25) */ /* v467 (Neil 11-18 22:44: "tempo is also still too slow for a good one. Speed it up"): 3.4 -> 3.7 and 3.6 -> 3.9, ~9% quicker again */ /* Neil (11-18 18:23): chips and bunker splashes "expecting too slow of a tempo, just slightly". Target ratio (backswing / downswing) chip 3.2 -> 3.4, sand 3.4 -> 3.6, about 6% quicker; window widths unchanged. null = as v444 */
+const SG_TEMPO_UP = { chip: 4.3, sand: 4.5 }; /* v470 (Neil 11-18 22:52: "Speed chip and bunker tempo up even another 6%"): 4.05 -> 4.3, 4.25 -> 4.5 */ /* v468 (Neil 11-18 22:48: "I still get quick too much on them. Even faster tempo. Another 9%"): 3.7 -> 4.05, 3.9 -> 4.25 (a full swing is 4.25) */ /* v467 (Neil 11-18 22:44: "tempo is also still too slow for a good one. Speed it up"): 3.4 -> 3.7 and 3.6 -> 3.9, ~9% quicker again */ /* Neil (11-18 18:23): chips and bunker splashes "expecting too slow of a tempo, just slightly". Target ratio (backswing / downswing) chip 3.2 -> 3.4, sand 3.4 -> 3.6, about 6% quicker; window widths unchanged. null = as v444 */
 if (SG_TEMPO_UP) for (const k in SG_TEMPO_UP) MODES[k].tempo = SG_TEMPO_UP[k];
+const BLADE_EASE = { sand: .06, other: .04 }; /* Neil (11-18 22:50): "Too easy to get bladed. Just a bit": a too-quick swing blades it only once it's further off the tempo (bunker splash: .26 -> .32 past the perfect window; flop: .17 -> .21; log-ratio units, ~6% and ~4% more of a miss). Chunks (too slow) unchanged. null = as v468 */
 const SG_PERF = { chip: 1.15, sand: 1.15 }; /* Neil (11-18 22:44): chips and bunker shots "still too hard... make a touch more forgiving": their PERFECT tempo window 15% wider (the good band beyond it moves out with it). null = as v466 */
 if (SG_PERF) for (const k in SG_PERF) MODES[k].perf *= SG_PERF[k];
 const MODE_ORDER = ['power', 'full', 'punch', 'pitch', 'flop', 'sand', 'putt'];
@@ -3977,7 +3978,7 @@ function launch(sw) {
   const wob = G.lastSwing && G.lastSwing.wob ? G.lastSwing.wob.rms : 0;
   const q = clamp(1 - Math.min(1, terr / .3) * .45 - Math.min(1, Math.abs(th) / 15) * .3 - Math.min(1, wob / 3) * .12 - Math.max(0, p - 1) * 2.5, 0, 1);
   const plan = planShot(), part = clamp(D / F, .5, 1);
-  const sEz = SAND_EASY && G.mode === 'sand', flub = mrisk > 1 && terr > PERFECT + (sEz ? .26 : .17) ? (quick ? 'blade' : 'chunk') : null; // a mistimed flop: quick catches it thin (low, hot, no spin), slow digs in (fat, way short)
+  const sEz = SAND_EASY && G.mode === 'sand', flub = mrisk > 1 && terr > PERFECT + (sEz ? .26 : .17) + (BLADE_EASE && quick ? (sEz ? BLADE_EASE.sand : BLADE_EASE.other) : 0) ? (quick ? 'blade' : 'chunk') : null; /* BLADE_EASE: a quick swing has to be further off to blade it */ // a mistimed flop: quick catches it thin (low, hot, no spin), slow digs in (fat, way short)
   const spin = shotSpec(cl, G.mode, h, q, D, F).spin * (plan.spinMul || 1) * (flub === 'blade' ? (sEz ? .55 : .35) : 1);
   if (flub === 'blade') carry *= sEz ? 1.1 : 1.18; else if (flub === 'chunk') carry *= sEz ? .6 : .5;
   if (G.mode === 'chip') carry *= plan.cf || .45;                              // chip: meter = total, fly only the carry part
