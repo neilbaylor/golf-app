@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v456'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v458'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -6149,21 +6149,29 @@ if (PROF) try { (() => {
     L.push(''); L.push('view       frames   fps  p50  p95  max >25ms >50ms | js avg  p95 | render cull caddie | tris  calls');
     for (const k of ['home', 'flyover', 'swing', 'aim', 'flight', 'putt', 'other']) { const c = P.cats[k]; if (!c || !c.n) continue; const n = c.n;
       L.push(`${k.padEnd(9)} ${pad(n, 7)} ${pad(Math.round(n / (c.ms / 1000)), 5)} ${pad(f1(pct(c.dts, .5)), 4)} ${pad(f1(pct(c.dts, .95)), 4)} ${pad(Math.round(pct(c.dts, 1)), 4)} ${pad(c.dts.filter(d => d > 25).length, 5)} ${pad(c.dts.filter(d => d > 50).length, 5)} | ${pad(f1(c.js.reduce((a, b) => a + b, 0) / c.js.length), 6)} ${pad(f1(pct(c.js, .95)), 4)} | ${pad(f1(c.rd / n), 6)} ${pad(f1(c.cu / n), 4)} ${pad(f1(c.cad / n), 6)} | ${pad(Math.round(c.tris / n / 1000) + 'k', 5)} ${pad(Math.round(c.calls / n), 5)}`); }
-    L.push(''); L.push('slowest frames (ms, view, js ms): ' + P.recent.slice().sort((a, b) => b[0] - a[0]).slice(0, 8).map(r => `${Math.round(r[0])} ${r[1]} ${f1(r[2])}`).join(' · '));
+    L.push(''); L.push('slowest frames: ms view js-ms [what happened the frame before | that frame]'); P.recent.slice().sort((a, b) => b[0] - a[0]).slice(0, 10).forEach(r => L.push(`  ${pad(Math.round(r[0]), 4)} ${r[1].padEnd(8)} ${pad(f1(r[2]), 5)}  ${r[3] || '-'}`));
+    { const T = Object.entries(P.tasks).sort((a, b) => b[1][2] - a[1][2]).slice(0, 10); if (T.length) { L.push(''); L.push('work outside the frame over 4 ms (worst ms / total ms / times): what'); T.forEach(([n, v]) => L.push(`  ${pad(Math.round(v[2]), 4)} ${pad(Math.round(v[1]), 6)} ${pad(v[0], 4)}  ${n.slice(0, 90)}`)); } }
     L.push(''); L.push(`caddie set-ups (${P.cad.length}): wall ms / cpu ms / slices / mode / hole`); P.cad.slice(-16).forEach(c => L.push(`  ${pad(Math.round(c.wall), 5)} ${pad(Math.round(c.cpu), 5)} ${pad(c.n, 4)}  ${c.mode} · ${c.h}`));
     if (P.cad.length) { const w = P.cad.map(c => c.wall); L.push(`  median ${Math.round(pct(w, .5))} ms · worst ${Math.round(pct(w, 1))} ms`); }
     return L.join('\n'); }
   chip.addEventListener('click', () => { pnl.hidden = !pnl.hidden; if (!pnl.hidden) { pre.textContent = report(); msg.textContent = ''; } });
   pnl.addEventListener('click', async e => { const b = e.target.closest('button'); if (!b) return; const a = b.dataset.p, txt = report(); pre.textContent = txt;
     if (a === 'close') pnl.hidden = true;
-    else if (a === 'reset') { P.cats = {}; P.cad = []; P.recent = []; P.t0 = performance.now(); pre.textContent = report(); msg.textContent = 'reset'; }
+    else if (a === 'reset') { P.cats = {}; P.cad = []; P.recent = []; P.tasks = {}; P.t0 = performance.now(); pre.textContent = report(); msg.textContent = 'reset'; }
     else if (a === 'copy') { try { await navigator.clipboard.writeText(txt); msg.textContent = 'copied'; } catch (err) { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); msg.textContent = 'selected: copy it'; } }
     else if (a === 'send') { msg.textContent = 'sending…'; try { const r = await fetch('/prof', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: txt }); const j = await r.json(); msg.textContent = j.id ? 'sent · code ' + j.id : 'send failed'; } catch (err) { msg.textContent = 'send failed'; } } });
-  const f0 = frame; frame = function (now) { const t = performance.now(); P.s.rd = P.s.cu = P.s.cad = 0; f0(now); const js = performance.now() - t;
+  P.ts = 0; P.tTop = null; P.tasks = {}; const nmF = f => (f.name || String(f).replace(/\s+/g, ' ').slice(0, 64)); /* work outside the frame: timers and idle callbacks, timed one by one */
+  const tw = (f, kind) => typeof f !== 'function' ? f : function () { const t = performance.now(); try { return f.apply(this, arguments); } finally { const d = performance.now() - t; P.ts += d; if (d > 4) { const n = kind + ' ' + nmF(f); if (!P.tTop || d > P.tTop[0]) P.tTop = [d, n]; const T = P.tasks[n] || (P.tasks[n] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); } } };
+  { const sT = window.setTimeout, sI = window.setInterval, rI = window.requestIdleCallback; window.setTimeout = function (f, ...a) { return sT.call(window, tw(f, 'timeout'), ...a); }; window.setInterval = function (f, ...a) { return sI.call(window, tw(f, 'interval'), ...a); }; if (rI) window.requestIdleCallback = function (f, ...a) { return rI.call(window, tw(f, 'idle'), ...a); }; }
+  { const fs0 = finishShot; finishShot = function () { const t = performance.now(); try { return fs0.apply(this, arguments); } finally { const d = performance.now() - t; const T = P.tasks['frame finishShot (the result card)'] || (P.tasks['frame finishShot (the result card)'] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); } }; }
+  const st = () => { const I = renderer.info; let hb = false; try { hb = !!HOLESYS.busy; } catch (e) {} return { pg: I.programs ? I.programs.length : 0, ge: I.memory.geometries, tx: I.memory.textures, hb, hole: (() => { try { return CID + HOLE.n; } catch (e) { return ''; } })(), card: !!($('#result') && !$('#result').hidden) }; };
+  let prevT = '', lastHole = '', holeAt = 0;
+  const f0 = frame; frame = function (now) { const t = performance.now(); P.s.rd = P.s.cu = P.s.cad = 0; const a = st(); f0(now); const js = performance.now() - t; const b = st(); if (b.hole !== lastHole) { lastHole = b.hole; holeAt = now; }
+    const tg = [b.pg > a.pg ? 'shader+' + (b.pg - a.pg) : '', b.ge > a.ge ? 'geo+' + (b.ge - a.ge) : '', b.tx > a.tx ? 'tex+' + (b.tx - a.tx) : '', b.hb ? 'building' : '', now - holeAt < 3000 ? 'newHole' : '', b.card ? 'card' : '', js > 30 ? 'js' : '', P.ts > 5 ? `outside ${Math.round(P.ts)}ms` + (P.tTop ? ` (${Math.round(P.tTop[0])}: ${P.tTop[1].slice(0, 70)})` : '') : ''].filter(Boolean).join(','); P.ts = 0; P.tTop = null;
     if (P.last && !document.hidden) { const dt = now - P.last; if (dt > 0 && dt < 1000) { const k = cat(), c = C(k); c.n++; c.ms += dt; c.dts.push(dt); c.js.push(js); if (c.dts.length > 30000) { c.dts.splice(0, 10000); c.js.splice(0, 10000); }
       c.rd += P.s.rd; c.cu += P.s.cu; c.cad += P.s.cad; const i = renderer.info.render; c.tris += i.triangles; c.calls += i.calls;
-      if (dt > 20) { P.recent.push([dt, k, js]); if (P.recent.length > 400) P.recent.splice(0, 100); } } }
-    P.last = now; if (P.cur && !CJ.g) close();
+      if (dt > 20) { P.recent.push([dt, k, js, prevT + (prevT && tg ? ' | ' : '') + tg]); if (P.recent.length > 400) P.recent.splice(0, 100); } } }
+    prevT = tg; P.last = now; if (P.cur && !CJ.g) close();
     if (now - P.chipT > 500) { P.chipT = now; const c = P.cats[cat()]; if (c && c.dts.length) { const d = c.dts.slice(-30), m = d.reduce((a, b) => a + b, 0) / d.length, j = c.js.slice(-30).reduce((a, b) => a + b, 0) / Math.min(30, c.js.length); chip.textContent = `PROF ${Math.round(1000 / m)} fps · js ${f1(j)} ms`; } } };
   window.__PROF = { report };
 })(); } catch (e) { console.error('[prof]', e); }
