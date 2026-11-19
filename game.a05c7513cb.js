@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v453'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v455'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -218,6 +218,7 @@ const HOLELOAD = { /* the big loader card: only covers a page opened straight on
   hide() { const el = document.getElementById('holeLdr'); el.classList.remove('on'); document.documentElement.classList.remove('holeNext'); setTimeout(() => { el.hidden = true; }, 450); },
   go(n, holes) { HOLESYS.go(CID, n, holes, () => { if (n === NINE.first(CID)) FLY.reset(); playHole(); }); } }; /* (a new round gets its fly-over again, as the reload used to give it) */ /* the next hole loads in place (HOLESYS): only a small pill over the card if it isn't ready yet */
 if (ROUND.auto && !(RESUME_SPLASH && !document.documentElement.classList.contains('holeNext'))) HOLELOAD.show(HOLE); else if (ROUND.auto) {} /* RESUME_SPLASH: the splash stays up until the hole starts */ else if (TO_HOME) HOLELOAD.show({ title: COURSE_NAME, sub: NINE.has(CID) ? NINE.sub(CID) : OSLER_DEV && CID === 'osler' ? HOLES.length + (HOLES.length > 1 ? ' holes' : ' hole') + ' · Par ' + HOLES.reduce((t, h) => t + h.par, 0) : CID === 'augusta' ? '18 holes · Par 72' : '9 holes · Par 35' }); else document.documentElement.classList.remove('holeNext');
+const HUDPAR_LAYER = true; if (HUDPAR_LAYER) document.getElementById('app').classList.add('hpLayer'); /* Neil (11-18 21:10, iOS, hole 1): after the first shot the pink score box shifted a touch. Measured here it doesn't move at all (same spot, same size before and after); the box is tilted 4 degrees and sits over the golfer's head, which is its own moving layer, so iOS draws the box on its own layer only while the moving head overlaps it, and a tilted box snaps to slightly different pixels on and off a layer. Now it's always on its own layer, so it's drawn the same way every frame. false = as v453 */
 const HP_CLEAR = true; if (HP_CLEAR) document.getElementById('app').classList.add('hpClear'); /* undo switch (Neil 11-15): the RH/LH badge clear of the big yardage (in front of it, never behind) with its text centred in the pill (CSS: #app.hpClear); false = v353 */
 const RES_BIG = true; if (RES_BIG) document.getElementById('app').classList.add('resBig'); /* undo switch (Neil 11-15): the shot card's carry / roll / total / pin / spin / apex, its labels, the swing note and tempo all bigger, the card a little wider (CSS: #app.resBig); false = v353 sizes */
 const OSM_HUNT = true; /* undo switch (Neil 11-15): the fly-over's "© OpenStreetMap contributors" credit on every Toronto Hunt hole too (hole 1 is traced on the OSM hole); false = only on holes built from data (v353) */
@@ -6350,6 +6351,7 @@ function holeCard(L) {
   return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - HOLE.par > 0 ? '+' : ''}${strokes - HOLE.par || 'E'})</small>`, strokes <= HOLE.par)}${st('Putts', putts, putts <= 2)}${st('Drive', drive ? drive + ' yds' : '—', drive ? long : null)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', fw == null ? null : !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
 }
 // ---- opening titles: a 3×3 board of golfers and course bits that pop in, glance at each other, then roll credits (tap or Skip to jump to the menu)
+const INTRO_DECODE = true; /* Neil (11-18 21:17): "Sometimes in the initial Brady Bunch screen some squares are empty, I think because the image didn't load yet": the golfers' pictures (and the course crest) are decoded before the board starts filling in, so each square comes in with its picture; it waits 1.2 s at most, then goes anyway. false = as v454 */
 const INTRO = { on: false };
 async function runIntro() {
   const el = $('#intro'), grid = $('#introGrid'); if (!el || !grid) return;
@@ -6410,6 +6412,8 @@ async function runIntro() {
   const blink = f => { const [l, r] = eyes(f); [l, r].forEach(e => { if (!e) return; const ry = e.getAttribute('ry'); e.setAttribute('ry', .3); setTimeout(() => e.setAttribute('ry', ry), 140); }); };
   const blinkT = setInterval(() => { if (faces.length) blink(faces[Math.floor(Math.random() * faces.length)]); }, 700);
   (async () => {
+    if (INTRO_DECODE) { const urls = [...new Set([...grid.querySelectorAll('image, img')].map(e => e.getAttribute('href') || e.getAttribute('xlink:href') || e.getAttribute('src')).filter(Boolean))]; /* INTRO_DECODE: every picture on the board decoded before the first square comes in (1.2 s at most) */
+      await Promise.race([Promise.all(urls.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : new Promise(r => { im.onload = im.onerror = r; })).catch(() => {}); })), wait(1200)]); if (stop) return; }
     // 1. the board fills in, square by square, round the ring
     for (const k of ring) { if (stop) return; C[k].classList.add('in'); await wait(45); }
     grid.classList.add('sweep'); hydrate(); await wait(140);
