@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v447'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v449'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -4650,7 +4650,7 @@ function updateCamera(dt) {
     pos.lerp(P.pos, w); look.lerp(P.look, w); if (P.t >= P.r + P.h + P.f || w < .002 && (P.cancel || P.t > P.r)) G.preview = null;
     const pv = !!G.preview && !P.cancel && P.t < P.r + P.h + P.f * .35; if (pv !== G._pv) { app.classList.toggle('previewing', pv); G._pv = pv; } }
   else if (G._pv) { app.classList.remove('previewing'); G._pv = false; }
-  if (FLY.on) FLY.step(dt * (FLY_FF && G.ff ? 3 : 1), pos, look); /* the hole's opening fly-over drives the camera */
+  if (FLY.on) FLY.step(dt * (FLY_FF && (G.ff || G.ffFlyR) ? 3 : 1), pos, look); /* the hole's opening fly-over drives the camera */
   camera.position.copy(pos); camLook.copy(look);
   const fovT = 52 + 13 * Math.max(0, SP.z || 0) * (1 - e) - (SW.phase === 'back' || SW.phase === 'down' ? clamp(SW.vis, 0, 1.1) * 8.2 : 0) * (1 - e); /* backswing push-in */
   { // backswing light: edges dim and a warm glow settles on the ball as you load up (a cheap alpha overlay, no blend modes)
@@ -6084,7 +6084,7 @@ function frame(now) {
     try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
     requestAnimationFrame(frame); return; }
   if (FF_UNSTICK && G.ff && !FFP.size) G.ff = false; /* FF_UNSTICK: no finger down: no fast-forward */
-  { const ff = (G.ff || (MP_FF_SHARE && G.ffR && G.view === 'flight')) && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
+  { const ff = (G.ff || (MP_FF_SHARE && G.ffR && G.view === 'flight') || (G.ffFlyR && FLY.on)) && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
   if (G.view === 'flight') updateFlight(dt * 1.15 * (G.ff || (MP_FF_SHARE && G.ffR) ? 3 : 1)); else updateCamera(dt); // flight plays 15% quicker than real time
   if (G.shake > 0) { G.shake -= dt; const k = G.shake * .06; camera.position.x += (Math.random() - .5) * k; camera.position.y += (Math.random() - .5) * k; }
   updateTracer(); dashTex.offset.x = -(t * .9) % 1;
@@ -6240,7 +6240,7 @@ const FLY = (() => {
   function stop() { if (!S) return; S = null; after = null; app.classList.remove('droning', 'settling'); $('#flyUI').hidden = true; } /* quitting mid fly-over */
   $('#flyUI .fskip').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); end(true); });
   return { start, step, end, stop, reset() { seen.clear(); }, get on() { return !!S; }, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
-})();
+})(); window.__FLY = FLY; /* (tests: the fly-over's state) */
 /* ---- quitting back to the home screen (the end-of-hole card and the little Home button both ask first) ---- */
 const QUIT = (() => {
   const ui = $('#quitUI');
@@ -6698,6 +6698,8 @@ const MP_SIDE_UP = true; /* your turn: the WATCHING faces sit just under the top
 const MP_TRACER_NEXT = true; /* after a shot, the hitter's next-shot tracer (and target rings) shows only once the room says it's their turn next; otherwise it stays hidden until the next golfer's turn sets up theirs */
 const MP_KB_TOP = false; /* (retired: Neil found the whole panel jumping to the top jarring; MP_KB_DOCK instead) phones (coarse pointer): while the chat box is focused the panel (box, Send, reactions and the last few messages) sits at the TOP of the visible screen. Follows the visual viewport's top. Replaces MP_KB_LIFT's translate there */
 const MP_KB_DOCK = true; /* Neil (11-16 20:5x, iMessage style): phones (coarse pointer): while the chat box is focused, only its row (your face, the box, Send) docks right on top of the keyboard: position fixed at the visual viewport's bottom (vv.offsetTop + vv.height - its height), following the visualViewport, and it slides up with the keyboard and back into the panel on blur / send. The rest of the panel stays put (the keyboard may cover its lower part). A pan iOS makes on focus (standalone) is undone once the row is docked. Replaces MP_KB_LIFT's translate there. false = MP_KB_LIFT as v387 */
+const MP_KB_SLOT = true; /* Neil (11-18 20:31, screenshot, v448): still "disconnected from the wrapping box". The screenshot shows the whole page already ending at the keyboard (iOS resized it: the panel sits its usual 28 px above the keys), so docking the row 8 px above the keys put it ~20 px below its own slot, over the panel's edge; and on close the panel dropped with the page while the row slid from the old spot. Now the docked row is never lower than its place in the panel: with the page resized it simply stays put (no move at all, and on close it's straight back in the panel); where the keyboard does cover the panel it still docks on the keys as before. false = as v448 */
+const MP_KB_UNPAN = true; /* Neil (11-18 19:31, screenshot): typing in multiplayer, the box "drops down a bit" and closing the keyboard is "janky/sticky". iOS reveals a focused box by scrolling whatever holds it, and #app and the page are overflow:hidden boxes it can still scroll (window.scrollY stays 0, so MP_KB_DOCK's pan undo never saw it): the panel stayed lifted over the keys with the docked row a little below its slot, then slid back late. Now any such scroll is put back to 0 while the row is docked, and again as it undocks. false = as v447 */
 const MP_BLUR_FIX = true; /* after a send the box lets go for sure: Send no longer re-focuses it (that was the bug: its click handler focused it again right after MP_CHAT_BLUR's blur), the active element is blurred again after the re-render, and a focus that comes back without a touch on the box is dropped. iOS also gets the readonly blink that makes it close the keyboard */
 const MP_SIDE_LEFT = true; /* Neil (11-16 21:4x): with MP_SIDE_UP the WATCHING column is on the LEFT under your avatar, below the reach of your golfer's say bubble at its tallest (2 lines, measured), and a friend's chat bubble opens to its right. false = on the right under the wind card (v390) */
 const MP_AIM_TAG_LIVE = true; /* Neil (11-16 21:42): once a golfer has struck, nothing says they're AIMING: the banner shows their shot in the air ("HENRY'S DRIVE") and is gone once it lands; their strip tag is SWINGING in the air, then blank; whoever the room says is up next gets UP NEXT (from the room's next turn, which can arrive under the result card: MP_EARLY_NEXT); AIMING again only once that turn starts. false = v390 */
@@ -6720,6 +6722,7 @@ const MP_FEEL = true; /* undo switch: your swing never waits on the network (inb
 const MP_EARLY_NEXT = true; /* turn hand-off: the shooter reports where the ball ended up as soon as the result card is up (not when it goes), so the round trip happens under the card. Every phone still shows the card exactly as long as before (2.75 s or a tap; a holed card 2.6 s), then the next turn is already there. 'next' carries hold (ms of card left) so the server's idle clock starts when the turn shows. Water / OB still waits for Replay / Drop. false = 'next' after the card, as before */
 const MP_AIM_LEAD = 1; /* watching someone aim (no extra bytes): 0 = as before (ease 12/s) | 1 = ease 16/s (~20 ms less lag, no overshoot) | 2 = ease 16/s toward a 60 ms look-ahead from the last two aim samples (~55 ms less lag; can run ~0.6 deg past a stop and settle back) */
 const MP_OPT_CHAT = true; /* your own chat bubble and reaction show at once (the server's echo of them is skipped), when a local copy of the server's checks (length, rate) says it will go through; otherwise as before, on the echo. false = on the echo */
+const MP_FLY_FF_ALL = true; /* Neil (11-18 19:34): "If I fast forward fly over in multiplayer it should for everyone": holding to fast-forward the hole's fly-over tells the room (a tiny 'flyff' on / off for that hole); everyone's fly-over runs at 3x (with the 3x badge) while anyone holds. Speed only. false = each phone's own (needs the server's 'flyff' relay) */
 const MP_FLY_SKIP_ALL = true; /* Neil (11-16): in multiplayer anyone's Skip on the hole's fly-over skips it for everyone, as smoothly as their own Skip (the same glide back to the tee, tips, greet): a tiny 'flyskip' for that hole, relayed once per hole by the server; a phone whose fly-over has ended, or is on another hole, ignores it (one still loading the hole skips it as it starts). false = each phone's own fly-over */
 const MP_FLY_SHOT_GLIDE = true; /* a shot (or AUTO HIT) arriving while this phone's fly-over is still on: the Skip glide back to the tee first (0.9 s), then the shot plays from the tee view like any watched shot. false = as before: the fly-over is dropped on the spot (overlay gone in one frame, the drone's move stops dead, the view widens at once, no tips / greet) and the chase camera swoops from wherever the drone was */
 const MP_CATCHUP = true; /* Neil 17 Nov (v404): back in an MP round after more than 2 s away (app switch, lock) while the socket stayed up: jump straight to where everyone is now (the hole and turn as they stand; any shot still in the air plays), the way a reconnect does, instead of replaying every shot you missed one by one; and if it's your turn, your 30 s turn clock starts again. false = the backlog replays, as v403 */
@@ -6805,6 +6808,7 @@ if (MULTI) try { MPX = (() => {
       case 'auto': S.Q.push({ k: 'auto', pid: m.pid }); break;
       case 'auto-cancel': S.Q = S.Q.filter(e => !(e.k === 'auto' && e.pid === m.pid)); break; /* MP_KICK: someone else took over an AUTO HIT this phone hadn't played yet */
       case 'timer': timer(m); break;
+      case 'flyff': if (MP_FLY_FF_ALL && S.room && m.hole === S.room.hole) { S.flyFF = S.flyFF && S.flyFF.hole === m.hole ? S.flyFF : { hole: m.hole, by: {} }; S.flyFF.by[m.from] = !!m.on; } break; /* MP_FLY_FF_ALL: someone is (or stopped) holding fast-forward on this hole's fly-over */
       case 'flyskip': if (MP_FLY_SKIP_ALL && S.room && m.hole === S.room.hole) S.flySkip = m.hole; break; /* MP_FLY_SKIP_ALL: someone skipped this hole's fly-over (frame() ends mine) */
       case 'go': if (MP_EARLY_NEXT) { S.goSeen = m.n; if (S.resN === m.n && !$('#result').hidden) S.resHold = Math.min(S.resHold || 0, S.resAt + K.CARD_HOLD); } break; /* MP_EARLY_NEXT: the hitter tapped their card away: here the next turn may now take this card down after 1.7 s (CARD_HOLD), as before when that tap sent 'next' */
       case 'chat': if (!CHAT.echo('m', m.from, m.text)) { CHAT.msg(m.from, m.text); CHAT.log(m.from, m.text); } break; /* (MP_OPT_CHAT: my own was shown when I sent it) */
@@ -6830,7 +6834,7 @@ if (MULTI) try { MPX = (() => {
     if (!S.lobHold) LOBBY.hide();
     if (R.phase === 'play' || R.phase === 'hole' || R.phase === 'done') {
       if (!S.inRound) startRound(R);
-      if (R.hole !== S.hole) { S.Q.push({ k: 'hole', n: R.hole, course: R.course }); S.hole = R.hole; S.logs = {}; S.flySkip = 0; }
+      if (R.hole !== S.hole) { S.Q.push({ k: 'hole', n: R.hole, course: R.course }); S.hole = R.hole; S.logs = {}; S.flySkip = 0; S.flyFF = null; }
       if (R.phase === 'play' && R.turn && R.shotN !== S.turnN) { S.Q.push({ k: 'turn', n: R.shotN, R }); S.turnN = R.shotN; }
       if (R.phase !== 'play' && (!was || was.phase !== R.phase || fresh)) S.Q.push({ k: 'card', R });
     }
@@ -7122,15 +7126,16 @@ if (MULTI) try { MPX = (() => {
         if (vv) { vv.addEventListener('resize', place); vv.addEventListener('scroll', place); } window.addEventListener('scroll', place); }
       if (KBD) { const vv = window.visualViewport, row = inp.closest('.mpRow'), gap = document.createElement('div'), app0 = app; gap.className = 'mpRowGap'; row.parentNode.insertBefore(gap, row); /* MP_KB_DOCK: the gap keeps the row's place in the panel while it's docked (the panel doesn't move) */
         let docked = false, undockT = 0;
-        const target = () => { const h = row.offsetHeight, vh = vv ? vv.height : window.innerHeight, vt = vv ? vv.offsetTop : 0; return Math.round(vt + vh - h - 8); }; /* layout-viewport px (what fixed uses): just above the keys */
-        const follow = () => { if (!docked) return; row.style.top = target() + 'px';
+        const target = () => { const h = row.offsetHeight, vh = vv ? vv.height : window.innerHeight, vt = vv ? vv.offsetTop : 0, keys = Math.round(vt + vh - h - 8); if (!MP_KB_SLOT) return keys; const slot = Math.round(gap.getBoundingClientRect().top); return Math.min(keys, slot); }; /* MP_KB_SLOT: never lower than its own place in the panel */ /* layout-viewport px (what fixed uses): just above the keys */
+        const unpan = () => { if (!MP_KB_UNPAN) return; for (const e of [app0, document.body, document.documentElement]) if (e.scrollTop) e.scrollTop = 0; }; /* MP_KB_UNPAN */
+        const follow = () => { if (!docked) return; row.style.top = target() + 'px'; if (MP_KB_UNPAN && document.activeElement === inp && (app0.scrollTop || document.body.scrollTop)) unpan();
           if (vv && document.activeElement === inp && (vv.offsetTop > 0 || window.scrollY) && row.getBoundingClientRect().bottom <= window.innerHeight) { requestAnimationFrame(() => { if (docked && (window.scrollY || (vv && vv.offsetTop > 0))) window.scrollTo(0, 0); }); } }; /* iOS panned the page to reveal the box: the row is docked over the keys already, so the pan is undone (the game and panel stay where they were); the row re-follows on the scroll that brings */
         const dock = () => { clearTimeout(undockT); const r = row.getBoundingClientRect(); gap.style.height = r.height + 'px'; row.style.left = r.left + 'px'; row.style.width = r.width + 'px';
           if (!docked) { row.style.transition = 'none'; row.style.top = r.top + 'px'; app0.classList.add('kbDock'); void row.offsetWidth; row.style.transition = ''; } docked = true; follow(); }; /* from where it sits in the panel, it slides (CSS transition on top) to the keys */
-        const undock = () => { if (!docked) return; docked = false; const g = gap.getBoundingClientRect(); row.style.top = g.top + 'px'; clearTimeout(undockT);
-          undockT = setTimeout(() => { if (docked) return; app0.classList.remove('kbDock'); row.style.top = row.style.left = row.style.width = ''; gap.style.height = ''; }, 260); }; /* back into its place in the panel, then back in the flow */
+        const undock = () => { if (!docked) return; docked = false; unpan(); const g = gap.getBoundingClientRect(); clearTimeout(undockT); if (MP_KB_SLOT && Math.abs(row.getBoundingClientRect().top - g.top) < 3) { app0.classList.remove('kbDock'); row.style.top = row.style.left = row.style.width = ''; gap.style.height = ''; return; } /* MP_KB_SLOT: it never left its place: straight back in the flow, nothing to slide */ row.style.top = g.top + 'px';
+          undockT = setTimeout(() => { if (docked) return; unpan(); app0.classList.remove('kbDock'); row.style.top = row.style.left = row.style.width = ''; gap.style.height = ''; }, 260); }; /* back into its place in the panel, then back in the flow */
         inp.addEventListener('focus', dock); inp.addEventListener('blur', undock);
-        if (vv) { vv.addEventListener('resize', follow); vv.addEventListener('scroll', follow); } window.addEventListener('scroll', follow); window.addEventListener('resize', () => { if (docked) { const g = gap.getBoundingClientRect(); row.style.left = g.left + 'px'; row.style.width = g.width + 'px'; follow(); } }); }
+        if (vv) { vv.addEventListener('resize', follow); vv.addEventListener('scroll', follow); } window.addEventListener('scroll', follow); if (MP_KB_UNPAN) app0.addEventListener('scroll', follow); window.addEventListener('resize', () => { if (docked) { const g = gap.getBoundingClientRect(); row.style.left = g.left + 'px'; row.style.width = g.width + 'px'; follow(); } }); }
       inp.addEventListener('focus', () => { if (S.mine && !S.compOpen) open(); });
       el('mpSend').addEventListener('click', e => { e.preventDefault(); const sent = sendNow(); if (!S.mine && !(MP_BLUR_FIX && sent)) inp.focus({ preventScroll: true }); }); /* MP_BLUR_FIX: once sent, never focused again here (this re-focus undid MP_CHAT_BLUR's blur) */
       el('mpSend').addEventListener('pointerdown', e => e.preventDefault()); /* the keyboard stays up through a Send tap */
@@ -7150,7 +7155,7 @@ if (MULTI) try { MPX = (() => {
   function gate(e) {
     if (!S.inRound) return; const t = e.target, inMP = t.closest && t.closest(OK_ALWAYS);
     if (S.mine && S.compOpen && !inMP) { if (e.type === 'pointerdown') CHAT.close(); e.stopPropagation(); e.preventDefault(); return; } /* tapping away closes the composer (the draft stays) and isn't a swing */
-    if (!S.mine && !inMP) { e.stopPropagation(); if (e.type !== 'pointerdown') e.preventDefault(); return; }
+    if (!S.mine && !inMP) { if (MP_FLY_FF_ALL && FLY_FF && FLY.on && e.type === 'pointerdown') G.ff = true; /* MP_FLY_FF_ALL: a watcher can hold to fast-forward the fly-over too (still no touch on the course) */ e.stopPropagation(); if (e.type !== 'pointerdown') e.preventDefault(); return; }
     if (S.mine && e.type === 'pointerdown' && !inMP) { const now = performance.now(); if (now - S.actT > K.ACT_MS) { S.actT = now; if (MP_FEEL) setTimeout(() => send({ t: 'act' }), 0); else send({ t: 'act' }); } } } /* MP_FEEL: not even a socket write inside the touch handler */
   for (const ty of ['pointerdown', 'click', 'wheel']) window.addEventListener(ty, gate, { capture: true, passive: false });
   for (const id of ['mpPanel', 'mpChatBtn']) { const x = el(id); if (x) x.addEventListener('pointerdown', e => e.stopPropagation()); } /* chat taps never fast-forward a flight */
@@ -7310,11 +7315,12 @@ if (MULTI) try { MPX = (() => {
   function frame(dt, now) {
     if (MP_FEEL && S.mine && (SW.phase === 'back' || SW.phase === 'down')) return; /* mid-swing on your turn: the frame is the swing's alone (the inbox, aim stream, bubbles and cards wait ~1 s for the launch) */
     if (MP_CATCHUP && S.hidAt && now - S.hidAt > 2000) { S.catchT = now + 600; S.hidAt = 0; } /* the first frame back (it can come before 'visibilitychange'): hold the inbox's backlog for the catch-up */
-    drain(); if (!S.inRound) { G.ffR = false; return; } /* (MP_FF_SHARE: out of a round, nobody else's fast-forward) */ if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
+    drain(); if (!S.inRound) { G.ffR = false; G.ffFlyR = false; return; } /* (MP_FF_SHARE: out of a round, nobody else's fast-forward) */ if (MP_CATCHUP && S.catchT && now >= S.catchT) pump();
     if (MP_FF_SHARE) { const fl = G.view === 'flight', mineF = fl && !!S.pend && !S.replaying; if (mineF) { const on = !!G.ff; if (on !== !!S.ffSent) { S.ffSent = on; send({ t: 'ff', on }); } } else if (S.ffSent) { if (!fl) S.ffSent = false; } /* my shot in the air: my fast-forward goes to the others (on, off) */
       const R0 = S.replaying, F = S.ffR; G.ffR = !!(fl && R0 && F && F.on && F.from === R0.from && F.n === R0.n); } /* watching it: the shooter's fast-forward plays here too */
     if (S.mine && !S.pend && !S.shootAs) { if (!(MP_EARLY_NEXT && S.room && S.room.shotN !== S.curN)) aimOut(now); } else if (!S.mine) aimIn(dt); /* (MP_EARLY_NEXT: a newer turn is waiting under the card: no aim from the old one) */
     if (MP_EARLY_NEXT && S.goN != null && $('#result').hidden) S.goN = null; /* (the card went: a tap sent 'go' as it happened, below) */
+    if (MP_FLY_FF_ALL) { const fo = FLY.on && S.loaded && S.room && S.hole === S.room.hole, on = !!(fo && G.ff); if (on !== !!S.flyFFSent) { S.flyFFSent = on; send({ t: 'flyff', hole: S.hole, on }); } const F = S.flyFF; G.ffFlyR = !!(fo && F && F.hole === S.hole && Object.values(F.by).some(Boolean)); } /* MP_FLY_FF_ALL: my hold goes out; anyone else's speeds mine up */
     if (MP_FLY_SKIP_ALL && S.flySkip && S.flySkip === S.hole && S.loaded && FLY.on) FLY.end(true); /* MP_FLY_SKIP_ALL: the same path as this phone's own Skip (it does nothing once the glide back has begun) */
     if (MP_TURN_SLICE && S.preAfter && !CJ.g) { S.preAfter = false; if (S.mine && G.view !== 'flight') AV.say(preShotLine(), { pre: true }); } /* MP_TURN_SLICE: the hushed pre-shot line, now the set-up is done */
     settle(); if (S.Q.length) pump(); CHAT.tick(now); RING.tick(now); CARD.tick(now); NUDGE.tick(now); if (MP_KICK) KICK.tick(now);
