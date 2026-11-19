@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v462'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v464'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1083,13 +1083,15 @@ const BUILD_CHUNK2 = true;
    (The texture uploads were already one texture per step.) false = v370's steps. */
 const BUILD_CHUNK3 = true;
 const COURSE_CPU = true; /* Neil's ?prof logs (v461, 11-18 22:09-22:11): the big freezes (87-862 ms, game code 3-5 ms) followed the background build's map painting (courseSteps; greenTexG too). Safari hands canvas drawing to the same background process that draws the 3D view and does it later, so a slice of painting that took our script a few ms held up the next frames for hundreds. The hole's course map and green texture are now painted on the CPU (a canvas the browser keeps in memory: willReadFrequently), inside the build's own per-frame time budget, so it's spread out instead of piling up. Same pictures. false = as v461 */
-const AHEAD_DELAY = { ms: 4000, at: -1e9 }; /* the same logs: the 733-894 ms freeze on a new hole's first frames came with the NEXT hole's build starting in the same moment. The background build now waits 4 s after a hole swaps in (it only ever runs on calm frames anyway). null = straight away, as v461 */
+const FLUSH_SYNC = true; /* v463's log (Neil 22:22): the map-painting step still came with freezes our script didn't see (445 ms at a hole-out, 165 ms aiming). Safari still runs canvas drawing in its background process even on the CPU, so a slice's painting can pile up there. Each painting slice now ends by reading back one pixel of the canvas, which makes the script wait until that slice is really painted: the cost lands inside the build's time budget, spread across frames, instead of as one stall later. false = the 1-px copy as before */
+const BG_BUDGET = 4.5; /* Neil (11-18 22:19, v462): "a touch more loading bar": with the map now painted on the CPU inside the background build's budget, the next hole often wasn't finished by the hole-out. The background build gets 4.5 ms of a calm frame (was 2.5; the game's own frame code is ~2-3 ms of 16.7) and starts 1.5 s into a hole (AHEAD_DELAY, was 4 s). 0 = 2.5 ms, as v462 */
+const AHEAD_DELAY = { ms: 1500, at: -1e9 }; /* the same logs: the 733-894 ms freeze on a new hole's first frames came with the NEXT hole's build starting in the same moment. The background build now waits 4 s after a hole swaps in (it only ever runs on calm frames anyway). null = straight away, as v461 */
 const FLUSH1 = document.createElement('canvas'); FLUSH1.width = FLUSH1.height = 1; const FLUSH1X = FLUSH1.getContext('2d');
 /* FLUSH_DROP (hatch, with HATCH_LEAN): the 1-px canvas kept the snapshot of the last canvas flushed into it, so the next drawing on that canvas had to copy the whole canvas first
    (copy-on-write: a map-sized copy, 25 MB and ~45-115 ms on this box for Augusta's map, after every flush that is followed by more drawing). true: the 1-px canvas is reset
    right after the flush (the flush's work, rasterizing what was drawn so far, is already done by then), so the snapshot goes at once. Nothing drawn changes. false = v384. */
 const FLUSH_DROP = true;
-const flushCv = cv => { try { FLUSH1X.drawImage(cv, 0, 0, 1, 1, 0, 0, 1, 1); if (FLUSH_DROP) FLUSH1.width = 1; } catch (e) {} }; /* needs the canvas's pixels: rasterizes what has been drawn so far */
+const flushCv = cv => { if (FLUSH_SYNC) { try { cv.getContext('2d').getImageData(0, 0, 1, 1); } catch (e) {} return; } /* FLUSH_SYNC */ try { FLUSH1X.drawImage(cv, 0, 0, 1, 1, 0, 0, 1, 1); if (FLUSH_DROP) FLUSH1.width = 1; } catch (e) {} }; /* needs the canvas's pixels: rasterizes what has been drawn so far */
 /* HATCH_ASYNC (hatch, Neil 16 Nov 'Sure, check hatching'): the map's two pencil-hatch layers (about 35k short strokes on Augusta, two single stroke() calls) were the build's longest
    step left, ~100-300 ms on the main thread. true: in a background build the strokes are worked out here as before (same random numbers, same order), then a snapshot of the map
    goes to a small worker that draws it on an OffscreenCanvas, strokes both layers on top and hands the bitmap back; the build waits a few frames for it (yielding HATCH_WAIT, which
@@ -5936,7 +5938,7 @@ function setHoleVars(o) { ({ CID, HOLES, HOLE_N, HOLE, COURSE_LOGO, COURSE_NAME,
 const FLY_SETTLE = true, FLY_SETTLE_MS = 1200; let FLY_CALM_AT = 0;
 const HOLESYS = (() => {
   const AHEAD = 1; /* holes prebuilt ahead of the one being played. 2 holds a third hole scene in GPU memory: try it on phones first */
-  const BUDGET = { calm: 2.5, wait: 14, home: 6 }; /* ms of build work per frame: in the background (calm frames only), under the pill, behind the home screen */
+  const BUDGET = { calm: BG_BUDGET || 2.5, wait: 14, home: 6 }; /* (BG_BUDGET) */ /* ms of build work per frame: in the background (calm frames only), under the pill, behind the home screen */
   const jobs = new Map(); let cur = null, want = null, est = 60, lastPtr = -1e9, down = 0, last = null, swapMs = null;
   addEventListener('pointerdown', () => { down++; lastPtr = performance.now(); }, true); addEventListener('pointerup', () => { down = Math.max(0, down - 1); lastPtr = performance.now(); }, true); addEventListener('pointercancel', () => { down = 0; }, true);
   const keyOf = (cid, i) => cid + ':' + i;
