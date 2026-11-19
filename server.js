@@ -82,12 +82,13 @@ const MP = (() => {
     A shot in the air at the restart is lost (its turn goes back to aiming from the ball's last spot). */
   const NEXT_HOLD = true;   /* mplag (MP_EARLY_NEXT on the phones): a 'next' sent while its result card is still up says how long (hold, ms, at most HOLD_MAX); the next golfer's idle / away clock starts when the card goes, as it did when 'next' came after the card.
     ROLLBACK: false -> the clock starts at the 'next' (an early one would start it up to 2.75 s before the turn shows). An old phone sends no hold: as before */
+  const FLY_FF_ALL = true; /* the fly-over's fast-forward relayed (on / off, this hole). ROLLBACK: false -> not relayed */
   const FLY_SKIP_ALL = true; /* Neil (11-16): a Skip on the hole's fly-over on any phone skips it for everyone: its 'flyskip' (for this hole) is relayed once per hole to the others; a second press anywhere is dropped. ROLLBACK: false -> not relayed (each phone's own fly-over) */
   const MP_AIMCAP = true;   /* ROLLBACK: false -> aim messages of any size up to FRAME_MAX are relayed (before perf2) */
   for (const k in T) if (process.env['MP_' + k]) T[k] = +process.env['MP_' + k]; /* e.g. MP_IDLE=3000 for quick tests */
   const EMO = ['❤️', '😂', '🔥', '👏', '😮', '🙈'];
   const COURSES = { hunt: 'Toronto Hunt', augusta: 'Augusta National' };
-  const RATE = { aim: [20, 30], chat: [1.2, 3], react: [5, 8], typing: [2, 4], ff: [6, 10], act: [2, 4], who: [2, 4], course: [2, 4], hello: [1, 3], '*': [60, 90] }; /* per second, burst */
+  const RATE = { aim: [20, 30], chat: [1.2, 3], react: [5, 8], typing: [2, 4], ff: [6, 10], flyff: [6, 10], act: [2, 4], who: [2, 4], course: [2, 4], hello: [1, 3], '*': [60, 90] }; /* per second, burst */
   const ENDED = new Map(); let endedN = 0; /* MP_EMPTY_END: code -> the ended round's sids and ids (15 min), so its phones are told rather than seated in a ghost room */
   const rooms = new Map(), socks = new Set(); let msgsIn = 0, msgsOut = 0, bytesIn = 0, bytesOut = 0, bpSkip = 0, bpCut = 0, restoredN = 0;
   const now = () => Date.now();
@@ -295,7 +296,7 @@ const MP = (() => {
   function message(c, data) {
     msgsIn++; bytesIn += data.length; let m; try { m = JSON.parse(data.toString('utf8')); } catch (e) { return; }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
-    if (!rate(c, m.t)) { if (m.t !== 'aim' && m.t !== 'typing' && m.t !== 'react' && m.t !== 'ff') send(c, { t: 'err', code: 'rate', msg: 'Slow down a little' }); return; }
+    if (!rate(c, m.t)) { if (m.t !== 'aim' && m.t !== 'typing' && m.t !== 'react' && m.t !== 'ff' && m.t !== 'flyff') send(c, { t: 'err', code: 'rate', msg: 'Slow down a little' }); return; }
     if (m.t === 'ping') return send(c, { t: 'pong', at: m.at });
     if (m.t === 'hello') return hello(c, m);
     const R = c.room, p = R && P(R, c.pid); if (!p) return send(c, { t: 'err', code: 'noroom', msg: 'Not in a room' });
@@ -312,6 +313,7 @@ const MP = (() => {
       case 'nexthole': if (R.phase === 'hole') startHole(R, R.hole + 1); return;
       case 'aim': if (R.turn === p.id && R.tstate === 'aim' && m.d && typeof m.d === 'object' && (!MP_AIMCAP || data.length <= T.AIM_MAX)) { broadcast(R, { t: 'aim', from: p.id, n: R.shotN, d: m.d }, p); if (R.idle && !R.idle.holdAt && (!T.KICK || m.in)) { R.idle.start = now(); if (R.idle.ring) timers(R); } } return; /* aiming is input: it holds off the idle clock (MP_KICK: only the player's own aim, in:1; wind updates don't) */
       case 'act': return act(R, p, m);
+      case 'flyff': if (FLY_FF_ALL && R.phase === 'play' && m.hole === R.hole) broadcast(R, { t: 'flyff', hole: R.hole, from: p.id, on: !!m.on }, p); return; /* FLY_FF_ALL (Neil 11-18): holding fast-forward on the hole's fly-over: everyone's runs at 3x */
       case 'flyskip': if (FLY_SKIP_ALL && R.phase === 'play' && m.hole === R.hole && R.flyskip !== R.hole) { R.flyskip = R.hole; broadcast(R, { t: 'flyskip', hole: R.hole, from: p.id }, p); } return; /* FLY_SKIP_ALL: once per hole */
       case 'go': if (NEXT_HOLD && R.go && R.go.by === p.id && m.n === R.go.n) { R.go = null; broadcast(R, { t: 'go', n: m.n, from: p.id }, p); if (R.phase === 'play' && R.tstate === 'aim' && R.idle && R.idle.start > now()) { R.idle.start = now(); timers(R); } } return; /* NEXT_HOLD: the hitter tapped their result card away early (only that phone, once): the others may move on after 1.7 s, and the next golfer's clock starts now, as when that tap sent 'next' */
       case 'playfor': return playFor(R, p, m);
