@@ -3417,12 +3417,16 @@ function applyModeTempo() {
 let boilTimer = 0;
 if (!RM) { let sd = 0; boilTimer = setInterval(() => { boils[sd].setAttribute('visibility', 'hidden'); sd = (sd + 1) % 3; boils[sd].setAttribute('visibility', 'visible'); }, 160); }
 const DIALBAKE = { sets: {}, img: null, want: 'base', k: 0 };
+const DIAL_KEEP = true; /* ROLLBACK: false -> the dial frames are baked again on every visit */
+let _dialC = null; const dialCache = () => _dialC || (_dialC = (async () => { try { if (!window.caches) return null; const name = 'teeparty-dial-' + BUILD; for (const k of await caches.keys()) if (k.startsWith('teeparty-dial-') && k !== name) caches.delete(k); return await caches.open(name); } catch (e) { return null; } })());
 const dialKind = lie => DIAL_ART(lie) ? lie : 'base';
 function bakeDialSet(kind) {
   if (DIALBAKE.sets[kind]) return DIALBAKE.sets[kind];
   const defs = dial.querySelector('defs').outerHTML, px = Math.ceil(240 * Math.min(3, (window.devicePixelRatio || 1) * UIS.s)), /* TABLET_FILL: baked for the dial's size on screen */ shadow = `<circle cx="114" cy="116" r="107.75" fill="${INK}"/>`;
   const frames = [1, 2, 3].map(sd => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="${px}" height="${px}">${defs}${shadow}${boilGroup(sd, kind === 'base' ? null : kind).replace(/visibility="hidden"/, '')}</svg>`);
-  return DIALBAKE.sets[kind] = Promise.all(frames.map(svg => new Promise((ok, no) => { const im = new Image(); im.onload = () => { try { const c = document.createElement('canvas'); c.width = c.height = px; c.getContext('2d').drawImage(im, 0, 0, px, px); if (c.toBlob) c.toBlob(b => b ? ok(URL.createObjectURL(b)) : ok(c.toDataURL('image/png')), 'image/png'); else ok(c.toDataURL('image/png')); } catch (e) { no(e); } }; im.onerror = no; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); })));
+  const bake = (svg, C, key) => new Promise((ok, no) => { const im = new Image(); im.onload = () => { try { const c = document.createElement('canvas'); c.width = c.height = px; c.getContext('2d').drawImage(im, 0, 0, px, px); if (c.toBlob) c.toBlob(b => { if (b && C) C.put(key, new Response(b, { headers: { 'Content-Type': 'image/png' } })).catch(() => {}); b ? ok(URL.createObjectURL(b)) : ok(c.toDataURL('image/png')); }, 'image/png'); else ok(c.toDataURL('image/png')); } catch (e) { no(e); } }; im.onerror = no; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  return DIALBAKE.sets[kind] = (async () => { const C = DIAL_KEEP ? await dialCache() : null; /* DIAL_KEEP: the baked frames (the same pixels every visit for a build) are kept in the Cache API, so a later visit skips the feTurbulence raster */
+    return Promise.all(frames.map(async (svg, i) => { let hh = 2166136261; for (let j = 0; j < svg.length; j++) hh = Math.imul(hh ^ svg.charCodeAt(j), 16777619); const key = `/dial/${px}/${(hh >>> 0).toString(36)}`; /* keyed by the art itself: any change to it bakes afresh */ if (C) try { const r = await C.match(key); if (r) return URL.createObjectURL(await r.blob()); } catch (e) {} return bake(svg, C, key); })); })();
 }
 function setDialLie(lie) {
   const kind = dialKind(lie); DIALBAKE.want = kind;
