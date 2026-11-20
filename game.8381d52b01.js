@@ -6399,8 +6399,8 @@ const HOMEAV = (() => {
 })();
 // end of the hole: every shot, plus the numbers golfers care about
 function holeStats(L) { /* what the round card needs from a hole: score, fairway (par 4s and 5s), green in regulation, putts, the drive */
-  L = L || []; const tee = L[0], par = HOLE.par, girIdx = L.findIndex(s => s.lie === 'green' || s.holed), d1 = L.find(s => !s.putt && s.n === 1);
-  return { n: HOLE.n, par, strokes: G.stroke, fw: par > 3 && tee && !tee.putt ? (tee.lie === 'fairway' || tee.lie === 'green') : null, gir: girIdx >= 0 && girIdx + 1 <= par - 2, putts: L.filter(s => s.putt).length, drive: par > 3 && d1 ? d1.total || 0 : 0 }; }
+  L = L || []; const tee = L[0], par = HOLE.par, girIdx = L.findIndex(s => s.lie === 'green' || s.holed), d1 = L.find(s => !s.putt && s.n === 1 && !['water', 'ob', 'ravine', 'bluff'].includes(s.lie));
+  return { n: HOLE.n, par, strokes: G.stroke, fw: par > 3 && tee && !tee.putt ? (tee.lie === 'fairway' || tee.lie === 'green') : null, gir: girIdx >= 0 && L[girIdx].n <= par - 2, putts: L.filter(s => s.putt).length, drive: par > 3 && d1 ? d1.total || 0 : 0 }; }
 function showRoundCard() { /* after the last hole: a real scorecard (nine holes a row), the total big at the top, and the round's stats */
   const H = ROUND.holes, tot = H.reduce((a, h) => a + h.strokes, 0), par = H.reduce((a, h) => a + h.par, 0), d = tot - par, dt = d > 0 ? '+' + d : d || 'E';
   const course = (COURSES.find(c => c.id === MENU.course)?.name || COURSE_NAME || 'Toronto Hunt') + (NINE.name(CID) ? ' · ' + NINE.name(CID) : ''), who = (CHARS[G.who] || CHARS.neil).name;
@@ -6419,8 +6419,8 @@ function showRoundCard() { /* after the last hole: a real scorecard (nine holes 
 function holeCard(L) {
   L = L || []; const strokes = G.stroke, putts = L.filter(s => s.putt).length, pen = L.reduce((a, s) => a + (s.pen || 0), 0);
   const tee = L[0], fw = tee && !tee.putt ? (tee.lie === 'fairway' || tee.lie === 'green') : null;
-  const girIdx = L.findIndex(s => s.lie === 'green' || s.holed), gir = girIdx >= 0 && girIdx + 1 <= HOLE.par - 2;
-  const d1 = L.find(s => !s.putt && s.n === 1), drive = d1 && d1.total, long = !!d1 && d1.total >= CLUBS[0].full * att('pow') - .5; // a bomb: went at least this golfer's full driver distance
+  const girIdx = L.findIndex(s => s.lie === 'green' || s.holed), gir = girIdx >= 0 && L[girIdx].n <= HOLE.par - 2;
+  const d1 = L.find(s => !s.putt && s.n === 1 && !['water', 'ob', 'ravine', 'bluff'].includes(s.lie)), drive = d1 && d1.total, long = !!d1 && d1.total >= CLUBS[0].full * att('pow') - .5; // a bomb: went at least this golfer's full driver distance
   const LIE = { fairway: 'Fairway', rough: 'Rough', deep: 'Deep rough', fescue: 'Fescue', pine: 'Pine straw', sand: 'Bunker', green: 'Green', fringe: 'Fringe', water: 'Water', trees: 'Trees', tee: 'Tee', ob: red2() ? 'In the hazard' : 'Out of bounds', ravine: 'Ravine', bluff: 'Over the bluff' };
   const rowOf = s => { if (!s) return `<li class="gap"><span>—— too many to show ——</span></li>`; const res = s.pickup ? 'Picked up' : s.conceded ? 'Gimme' : s.holed ? 'In the hole!' : s.putt ? `${(s.pin * 3).toFixed(s.pin * 3 < 10 ? 1 : 0)} ft left` : `${LIE[s.lie] || s.lie}${s.lie === 'green' || s.pin < 60 ? ` · ${s.lie === 'green' ? Math.round(s.pin * 3) + ' ft' : Math.round(s.pin) + ' yds'}` : ''}`;
     const what = s.pickup ? 'Pick up' : s.conceded ? 'Putter' : s.putt ? 'Putter' : `${s.club}${s.mode && s.mode !== 'full' ? ' ' + MODES[s.mode].name : ''}`, dist = s.putt || s.conceded ? '' : `${s.total} yds`;
