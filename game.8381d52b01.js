@@ -1066,7 +1066,7 @@ function holeMap() { /* the painted map's frame (per hole) */
 const NEEDLES = {}; /* the needle tile is the same on every hole (its own seed): painted once per session and kind, not on every hole's build */
 function needleTile(g) { /* a 384-px square of pine needles that repeats without seams (strokes crossing an edge are drawn on the far side too) */
   const had = NEEDLES.t; if (had && !(had.x.isContextLost && had.x.isContextLost())) return g.createPattern(had.c, 'repeat');
-  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d'), Rn = rng(90), n = T * T / 4.2; x.lineCap = 'round'; NEEDLES.t = { c, x };
+  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d', { willReadFrequently: true }), Rn = rng(90), n = T * T / 4.2; x.lineCap = 'round'; NEEDLES.t = { c, x };
   const set = (m, cols, l0, l1, lw) => { const by = cols.map(() => []); for (let i = 0; i < m; i++) { const px = Rn() * T, py = Rn() * T, a = Rn() * Math.PI * 2, l = l0 + Rn() * (l1 - l0); by[Math.floor(Rn() * cols.length)].push([px, py, px + Math.cos(a) * l, py + Math.sin(a) * l]); }
     by.forEach((L, k) => { x.beginPath(); for (const [a, b, e, d] of L) for (const ox of [-T, 0, T]) for (const oy of [-T, 0, T]) { if (Math.max(a, e) + ox < -2 || Math.min(a, e) + ox > T + 2 || Math.max(b, d) + oy < -2 || Math.min(b, d) + oy > T + 2) continue; x.moveTo(a + ox, b + oy); x.lineTo(e + ox, d + oy); } x.strokeStyle = cols[k]; x.lineWidth = lw; x.stroke(); }); };
   set(n * .5, ['#7a4a24', '#6c4120'], 4, 9, 1.4);
@@ -1110,7 +1110,7 @@ const HATCH_TILES = 4, HATCH_PAD = 16; /* PAD: more than a stroke's reach (10 px
 function hatchTile(g, L, y, h) { /* HATCH_LEAN: L's strokes on g, a canvas holding the map's rows y .. y+h (only the strokes that reach them). The worker's code too (its source is sent) */
   g.translate(0, -y); for (const l of L) { const s = l.s, m = l.lw / 2 + 2; g.beginPath(); for (let i = 0; i < s.length; i += 4) { const a = s[i + 1], b = s[i + 3]; if ((a > b ? a : b) + m < y || (a < b ? a : b) - m > y + h) continue; g.moveTo(s[i], a); g.lineTo(s[i + 2], b); } g.strokeStyle = l.col; g.lineWidth = l.lw; g.stroke(); } }
 const HATCHW = (() => { let w = null, bad = !HATCH_ASYNC, seq = 0; const jobs = new Map();
-  const SRC = `const hatchTile = ${hatchTile}; onmessage = e => { const d = e.data; let bm; try { const oc = new OffscreenCanvas(d.w, d.h), g = oc.getContext('2d'); g.drawImage(d.im, 0, 0); d.im.close();
+  const SRC = `const hatchTile = ${hatchTile}; onmessage = e => { const d = e.data; let bm; try { const oc = new OffscreenCanvas(d.w, d.h), g = oc.getContext('2d', { willReadFrequently: true }); g.drawImage(d.im, 0, 0); d.im.close();
     if (d.lean) hatchTile(g, d.L, d.y, d.h); else for (const l of d.L) { const s = l.s; g.beginPath(); for (let i = 0; i < s.length; i += 4) { g.moveTo(s[i], s[i + 1]); g.lineTo(s[i + 2], s[i + 3]); } g.strokeStyle = l.col; g.lineWidth = l.lw; g.stroke(); }
     bm = oc.transferToImageBitmap(); } catch (err) { postMessage({ id: d.id, err: String(err) }); return; } postMessage({ id: d.id, bm }, [bm]); };`;
   function fail() { bad = true; for (const j of jobs.values()) j.state = 2; jobs.clear(); try { if (w) w.terminate(); } catch (e) {} w = null; } /* (never tried again: the strokes are drawn here) */
@@ -1128,7 +1128,7 @@ const HATCHW = (() => { let w = null, bad = !HATCH_ASYNC, seq = 0; const jobs = 
 const FESCUE_TILE = {}; /* FESCUE: the fescue tile is the same on every hole (its own seed): painted once per session and kind */
 function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats without seams: green showing low down, golden-straw wisps all leaning one way, pale seed heads, a few inked blades */
   const had = FESCUE_TILE.t; if (had && !(had.x.isContextLost && had.x.isContextLost())) return g.createPattern(had.c, 'repeat');
-  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d'), Rn = rng(96), LEAN = -1.2; x.lineCap = 'round'; FESCUE_TILE.t = { c, x };
+  const T = 384, c = document.createElement('canvas'); c.width = c.height = T; const x = c.getContext('2d', { willReadFrequently: true }), Rn = rng(96), LEAN = -1.2; x.lineCap = 'round'; FESCUE_TILE.t = { c, x };
   x.fillStyle = '#b2a253'; x.fillRect(0, 0, T, T);
   const wrap = (px, py, r, fn) => { for (const ox of [-T, 0, T]) for (const oy of [-T, 0, T]) { if (px + ox + r < 0 || px + ox - r > T || py + oy + r < 0 || py + oy - r > T) continue; fn(px + ox, py + oy); } };
   const blob = (n, cols, r0, r1) => { for (let i = 0; i < n; i++) { const px = Rn() * T, py = Rn() * T, r = r0 + Rn() * (r1 - r0); x.fillStyle = cols[Math.floor(Rn() * cols.length)]; wrap(px, py, r * 1.7, (a, b) => { x.beginPath(); x.ellipse(a, b, r * 1.7, r, LEAN + 1.57, 0, 7); x.fill(); }); } };
@@ -5068,7 +5068,7 @@ const MINI = (() => {
   TREES.forEach(t => { bg.beginPath(); bg.arc(px(t.u), py(t.v), Math.max(1.6, t.r * MAP.ppy * bs * .95), 0, 7); bg.fillStyle = t.pine ? '#2f6b30' : '#3f8a35'; bg.fill(); bg.lineWidth = 1; bg.strokeStyle = INK; bg.stroke(); });
   const o = { base, bs }; bs = keep; return o; }
   function* makeG(nb) { /* BUILD_CHUNK3: the same mini map in slices: the course map shrunk in nb horizontal bands (each pixel drawn once, by the same draw clipped to its band), then the trees a few hundred at a time; bs isn't touched meanwhile (the hole on screen keeps drawing its own) */
-    const B = 384 / MAP.W, base = document.createElement('canvas'); base.width = 384; base.height = Math.round(MAP.H * B); const bg = base.getContext('2d'), qx = u => (u - MAP.U0) * MAP.ppy * B, qy = v => (MAP.V1 - v) * MAP.ppy * B;
+    const B = 384 / MAP.W, base = document.createElement('canvas'); base.width = 384; base.height = Math.round(MAP.H * B); const bg = base.getContext('2d', { willReadFrequently: true }), qx = u => (u - MAP.U0) * MAP.ppy * B, qy = v => (MAP.V1 - v) * MAP.ppy * B;
     for (let k = 0; k < nb; k++) { const y0 = Math.floor(base.height * k / nb), y1 = Math.floor(base.height * (k + 1) / nb); bg.save(); bg.beginPath(); bg.rect(0, y0, base.width, y1 - y0); bg.clip(); bg.drawImage(courseTex.image, 0, 0, base.width, base.height); bg.restore(); flushCv(base); yield; }
     for (let i = 0; i < TREES.length; i++) { const t = TREES[i]; bg.beginPath(); bg.arc(qx(t.u), qy(t.v), Math.max(1.6, t.r * MAP.ppy * B * .95), 0, 7); bg.fillStyle = t.pine ? '#2f6b30' : '#3f8a35'; bg.fill(); bg.lineWidth = 1; bg.strokeStyle = INK; bg.stroke(); if (i % 300 === 299) { flushCv(base); yield; } }
     return { base, bs: B }; }
