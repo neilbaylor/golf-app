@@ -4018,7 +4018,7 @@ function launch(sw) {
   const apex = fl.apex - startP.y; /* real apex: the card's stat. The camera frames the lifted one (apex * SHOT_LIFT) */
   const dur = Tair / 1.6 + .1;
   G.prev = { u: G.ball.u, v: G.ball.v, lie: G.lie, club: G.club, mode: G.mode, dir: { ...G.dir }, D: G.D, curve: G.curve, spinX: G.spinX, height: G.height };
-  G.shot = { sinkT, P, holed: !!gnd.holed, tEnd: 1, dur, t: 0, phase: 'air', land, rd, roll: rollY, end, endLie, lieLand, hitT: hitI >= 0 ? 1 : null, apex, carry: carryY, B, tq, ratio: sw.ratio, pinHigh, pure, th, puffAcc: 0, rollT: 0, gnd, ev: 0, spin: Math.round(spin), axis: fl.axis, q, shape: shapeName(), lieLoss: Math.round(carry / (G.lieRoll || 1) - carry), air };
+  G.shot = { sinkT, P, holed: !!gnd.holed, tEnd: 1, dur, t: 0, phase: 'air', land, rd, roll: rollY, end, endLie, lieLand, hitT: hitI >= 0 ? 1 : null, apex, carry: carryY, B, tq, ratio: sw.ratio, pinHigh, pure, th, puffAcc: 0, rollT: 0, gnd, ev: 0, spin: Math.round(spin), axis: fl.axis, q, shape: shapeName(), lieLoss: G.mode === 'sand' ? 0 : Math.round(carry / (G.lieRoll || 1) - carry), air };
   G.shot.fromTop = G.aimT > .5; /* struck from the overhead view */ G.view = 'flight'; G.aimGoal = 0; G.aimT = 0; aimFrame = null; aimDrag = null; app.classList.add('flying'); peg.visible = false; tracer.visible = tracerInk.visible = trShadow.visible = false; rings.visible = false;
   const msgs = []; if (pinHigh) msgs.push(!PH_RULE || Math.hypot(B.u + d.u * D - PIN.u, B.v + d.v * D - PIN.v) <= PH_RULE.pinYd ? 'PIN HIGH' : 'ON THE NUMBER'); if (tq === 'perfect') msgs.push('PERFECT TEMPO'); if (pure) msgs.push('PURE');
   G.mood = (tq === 'perfect' && (pure || pinHigh)) ? 'perfect' : (tq === 'off' || Math.abs(th) > 10) ? 'bad' : null; G.moodT = 2.4;
