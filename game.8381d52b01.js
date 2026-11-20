@@ -977,7 +977,7 @@ const TABLET_PX_CAP = true;
 const GL_PX_MAX = 520 * 1366 * 4;
 const glMax = () => { const a = (innerWidth || 1) * (innerHeight || 1); return !TABLET_PX_CAP || a * PR * PR <= GL_PX_MAX ? PR : Math.max(Math.min(PR, 1), Math.floor(Math.sqrt(GL_PX_MAX / a) * 100) / 100); };
 let GLMAX = glMax();
-let glPR = GLMAX; renderer.setPixelRatio(glPR); renderer.info.autoReset = false;
+let glPR = GLMAX; renderer.setPixelRatio(glPR); renderer.info.autoReset = false; renderer.debug.checkShaderErrors = false; /* SHADER_ASYNC: no info-log query right after each link, so the browser compiles shaders in the background until first use (the query made every compile synchronous) */
 if (TABLET_PX_CAP) addEventListener('resize', () => { const o = GLMAX; GLMAX = glMax(); if (GLMAX === o) return; if (MENU.pr) MENU.pr = Math.min(GLMAX, MENU.pr >= o ? GLMAX : MENU.pr); if (MENU.on) { if (glPR > GLMAX) SC.pending = GLMAX; } else if (glPR > GLMAX || glPR >= o) SC.pending = GLMAX; }); /* a window resized across the line: the new ceiling at the next frame's start */
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, 1, 0.3, 2600);
