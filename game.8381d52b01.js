@@ -6415,7 +6415,7 @@ function showRoundCard() { /* after the last hole: a real scorecard (nine holes 
   $('#resWord').textContent = ''; $('#resSub').textContent = '';
   $('#resCard').innerHTML = `<div class="rc"><div class="rtop"><div class="rwho"><b>${d < 0 ? 'Under par!' : d === 0 ? 'Level par!' : 'Round done!'}</b>${course} · ${who}</div><div class="rtot"><b>${tot}</b><span>${dt}</span></div></div>${rows.map(table).join('')}<div class="rst">${stats.map(([k, v]) => `<div><i>${k}</i><b>${v}</b></div>`).join('')}</div></div>`;
   $('#resBtns').innerHTML = `<button class="btn quit" data-a="quit">Home</button><button class="btn go" data-a="newround">Play again</button>`;
-  { const k = d <= 0 ? 'roundGood' : d <= H.length ? 'roundOk' : 'roundBad'; setTimeout(() => AV.say(line(k), { mood: k === 'roundGood' ? 'happy' : k === 'roundBad' ? 'sad' : 'neutral', moodFor: 2.5 }), 700); } }
+  { const k = d < 0 ? 'roundGood' : d <= H.length ? 'roundOk' : 'roundBad'; setTimeout(() => AV.say(line(k), { mood: k === 'roundGood' ? 'happy' : k === 'roundBad' ? 'sad' : 'neutral', moodFor: 2.5 }), 700); } }
 function holeCard(L) {
   L = L || []; const strokes = G.stroke, putts = L.filter(s => s.putt).length, pen = L.reduce((a, s) => a + (s.pen || 0), 0);
   const tee = L[0], fw = tee && !tee.putt ? (tee.lie === 'fairway' || tee.lie === 'green') : null;
