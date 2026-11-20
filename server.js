@@ -211,7 +211,7 @@ const MP = (() => {
   }
   function joinHole(R, p) { p.ball = { u: 0, v: 0, lie: 'tee', stroke: 1, toPin: 1e4, done: false, holed: false }; const sc = p.scores[R.hole - 1]; if (sc && sc.pu) p.scores.length = R.hole - 1; }
   function leave(c, quiet) { const R = c.room; if (!R) return; const p = P(R, c.pid); c.room = null; c.pid = null; if (!p) return;
-    if (R.phase === 'lobby' || R.phase === 'done') R.players = R.players.filter(q => q !== p); else { p.c = null; p.discAt = now(); p.left = true; }
+    if (R.phase === 'lobby' || R.phase === 'done') R.players = R.players.filter(q => q !== p); else { p.c = null; p.discAt = now(); if (p.ball) p.ball.left = true; }
     if (!quiet) send(c, { t: 'left' }); after(R); }
   function gone(c) { socks.delete(c); if (c.closed !== true) c.closed = true; const R = c.room; if (!R) return; const p = P(R, c.pid); c.room = null; if (!p || p.c !== c) return;
     p.c = null; p.discAt = now(); if (R.phase === 'lobby' || R.phase === 'done') setT(R, 'drop:' + p.id, T.LOBBY_DROP, () => { if (!p.c) { R.players = R.players.filter(q => q !== p); after(R); } }); after(R); }
