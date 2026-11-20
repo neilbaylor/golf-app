@@ -7285,7 +7285,7 @@ if (MULTI) try { MPX = (() => {
     join(v); });
   el('mpLRoom').addEventListener('click', () => { openCode('', null, S.code); setTimeout(() => el('mpCodeIn').focus({ preventScroll: true }), 60); }); /* tap ROOM · CODE: change rooms */
   function homePick() { if (G.who !== S.homeWho && S.homeWho) { G.who = S.homeWho; AV.setChar(G.who); } G.lefty = S.homeLefty ?? G.lefty; setHand(false); } /* single player is back on the home screen's golfer */
-  function join(code, quiet) { store.set('mpCode', code); if (S.code && S.code !== code) leave(true); S.code = code; S.want = true; S.myWho = S.homeWho = G.who; S.myLefty = S.homeLefty = G.lefty;
+  function join(code, quiet) { if (BOARD_LAZYPICK) PICKQ.flush(); /* a golfer just picked on the board is applied (hand, curve) before it is sent */ store.set('mpCode', code); if (S.code && S.code !== code) leave(true); S.code = code; S.want = true; S.myWho = S.homeWho = G.who; S.myLefty = S.homeLefty = G.lefty;
     if (MP_CONNECT_FIRST) { /* connect first, on the screen you tapped from: the lobby opens on the welcome (room()) */
       if (!CAN) { S.want = false; S.code = ''; openCode(MSG_OFF, null, code); return; }
       S.joining = true; joinWait(); /* ~6 s to reach the server, then ~6 s more for its answer (joinWait again on open) */
