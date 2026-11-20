@@ -156,7 +156,7 @@ const MP = (() => {
   function nameFor(R, p, who, name) { let n = String(name || who || 'Golfer').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 14) || 'Golfer'; const same = R.players.filter(q => q !== p && q.name.replace(/ \d$/, '') === n).length; return same ? n + ' ' + (same + 1) : n; }
 
   const int = (x, lo, hi, d) => typeof x === 'number' && isFinite(x) ? Math.max(lo, Math.min(hi, Math.round(x))) : d;
-  function endRoom(R) { for (const k in R.timers) clearT(R, k); ENDED.set(R.code, { at: now(), sids: new Set(R.players.map(p => p.sid).filter(Boolean)), ids: new Set(R.players.map(p => p.id)) }); if (rooms.get(R.code) === R) rooms.delete(R.code); endedN++;
+  function endRoom(R) { for (const k in R.timers) clearT(R, k); for (const [k, e] of ENDED) if (now() - e.at > 900000) ENDED.delete(k); /* forget rounds ended over 15 min ago (wasEnded ignores them anyway) */ ENDED.set(R.code, { at: now(), sids: new Set(R.players.map(p => p.sid).filter(Boolean)), ids: new Set(R.players.map(p => p.id)) }); if (rooms.get(R.code) === R) rooms.delete(R.code); endedN++;
     for (const p of R.players) if (p.c) { const o = p.c; p.c = null; o.room = null; o.pid = null; send(o, { t: 'ended', msg: 'This round ended' }); } }
   const wasEnded = (code, m) => { const e = ENDED.get(code); if (!e) return false; if (now() - e.at > 900000) { ENDED.delete(code); return false; } return !!((m.sid && e.sids.has(String(m.sid))) || (typeof m.you === 'string' && e.ids.has(m.you))); };
   function restore(code, m) { /* MP_RESTORE: a room rebuilt from a returning phone's last copy of it, every field checked */
