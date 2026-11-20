@@ -135,7 +135,7 @@ const MP = (() => {
     try { c.sock.write(Buffer.concat([h, data])); } catch (e) {}
     if (MP_BP && c.sock.writableLength > T.BP_HARD) { bpCut++; c.closed = true; try { c.sock.destroy(); } catch (e) {} } /* MP_BP: not reading at all: cut (its 'close' event runs gone(), as for any drop) */
   }
-  function send(c, o) { if (!c || c.closed) return; if (MP_BP && o.t === 'aim' && c.sock.writableLength > T.BP_SOFT) { bpSkip++; return; } /* MP_BP: behind: skip aim frames */ const s = Buffer.from(JSON.stringify(o)); msgsOut++; bytesOut += s.length; frame(c, 0x1, s); }
+  function send(c, o, buf) { if (!c || c.closed) return; if (MP_BP && o.t === 'aim' && c.sock.writableLength > T.BP_SOFT) { bpSkip++; return; } /* MP_BP: behind: skip aim frames */ const s = buf || Buffer.from(JSON.stringify(o)); msgsOut++; bytesOut += s.length; frame(c, 0x1, s); }
   function kill(c, code = 1000) { if (c.closed) return; const d = Buffer.alloc(2); d.writeUInt16BE(code, 0); frame(c, 0x8, d); c.closed = true; try { c.sock.end(); } catch (e) {} setTimeout(() => { try { c.sock.destroy(); } catch (e) {} }, 1000); gone(c); }
   setInterval(() => { for (const c of socks) { if (!c.alive) { kill(c, 1001); continue; } c.alive = false; frame(c, 0x9, Buffer.alloc(0)); } }, 25000).unref(); /* dead sockets: no pong within 25 s */
   function rate(c, t) { /* token buckets: one per message type and one overall */
@@ -145,7 +145,7 @@ const MP = (() => {
   /* ---------- rooms ---------- */
   const pub = R => ({ code: R.code, course: R.course, phase: R.phase, hole: R.hole, nHoles: R.pars.length || 0, pars: R.pars, seed: R.seed, turn: R.turn, tstate: R.tstate, shotN: R.shotN, auto: R.autoFor || null, away: R.away || null,
     players: R.players.map(p => ({ id: p.id, seat: p.seat, name: p.name, who: p.who, conn: !!p.c, pu: !!p.pu, wait: !!p.wait, ball: p.ball, scores: p.scores, lefty: !!p.lefty, ...(p.out ? { out: true } : {}) })), cardAt: R.cardAt ? Math.max(0, R.cardAt - now()) : null });
-  const broadcast = (R, o, except) => { for (const p of R.players) if (p.c && p !== except) send(p.c, o); };
+  const broadcast = (R, o, except) => { let buf = null; for (const p of R.players) if (p.c && p !== except) send(p.c, o, buf || (buf = Buffer.from(JSON.stringify(o)))); }; /* the message is serialised once, not once per golfer */
   const sync = R => broadcast(R, { t: 'room', room: pubN(R) });
   const NINES_PICK = true, NINES = ['18', 'f9', 'b9']; /* undo switch (Neil 11-16): the room's F9 / B9 / 18 pick (R.nine; the client sends that nine's pars at TEE OFF, so R.hole / R.pars are the round's own 1..9). false = no 'nine' in the room, as before */
   const pubN = R => NINES_PICK ? { ...pub(R), nine: R.nine || '18' } : pub(R);
