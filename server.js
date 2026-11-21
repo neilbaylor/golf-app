@@ -135,7 +135,7 @@ const MP = (() => {
     try { c.sock.write(Buffer.concat([h, data])); } catch (e) {}
     if (MP_BP && c.sock.writableLength > T.BP_HARD) { bpCut++; c.closed = true; try { c.sock.destroy(); } catch (e) {} } /* MP_BP: not reading at all: cut (its 'close' event runs gone(), as for any drop) */
   }
-  function send(c, o) { if (!c || c.closed) return; if (MP_BP && o.t === 'aim' && c.sock.writableLength > T.BP_SOFT) { bpSkip++; return; } /* MP_BP: behind: skip aim frames */ const s = Buffer.from(JSON.stringify(o)); msgsOut++; bytesOut += s.length; frame(c, 0x1, s); }
+  function send(c, o, buf) { if (!c || c.closed) return; if (MP_BP && o.t === 'aim' && c.sock.writableLength > T.BP_SOFT) { bpSkip++; return; } /* MP_BP: behind: skip aim frames */ const s = buf || Buffer.from(JSON.stringify(o)); msgsOut++; bytesOut += s.length; frame(c, 0x1, s); }
   function kill(c, code = 1000) { if (c.closed) return; const d = Buffer.alloc(2); d.writeUInt16BE(code, 0); frame(c, 0x8, d); c.closed = true; try { c.sock.end(); } catch (e) {} setTimeout(() => { try { c.sock.destroy(); } catch (e) {} }, 1000); gone(c); }
   setInterval(() => { for (const c of socks) { if (!c.alive) { kill(c, 1001); continue; } c.alive = false; frame(c, 0x9, Buffer.alloc(0)); } }, 25000).unref(); /* dead sockets: no pong within 25 s */
   function rate(c, t) { /* token buckets: one per message type and one overall */
@@ -145,7 +145,7 @@ const MP = (() => {
   /* ---------- rooms ---------- */
   const pub = R => ({ code: R.code, course: R.course, phase: R.phase, hole: R.hole, nHoles: R.pars.length || 0, pars: R.pars, seed: R.seed, turn: R.turn, tstate: R.tstate, shotN: R.shotN, auto: R.autoFor || null, away: R.away || null,
     players: R.players.map(p => ({ id: p.id, seat: p.seat, name: p.name, who: p.who, conn: !!p.c, pu: !!p.pu, wait: !!p.wait, ball: p.ball, scores: p.scores, lefty: !!p.lefty, ...(p.out ? { out: true } : {}) })), cardAt: R.cardAt ? Math.max(0, R.cardAt - now()) : null });
-  const broadcast = (R, o, except) => { for (const p of R.players) if (p.c && p !== except) send(p.c, o); };
+  const broadcast = (R, o, except) => { let buf = null; for (const p of R.players) if (p.c && p !== except) send(p.c, o, buf || (buf = Buffer.from(JSON.stringify(o)))); }; /* the message is serialised once, not once per golfer */
   const sync = R => broadcast(R, { t: 'room', room: pubN(R) });
   const NINES_PICK = true, NINES = ['18', 'f9', 'b9']; /* undo switch (Neil 11-16): the room's F9 / B9 / 18 pick (R.nine; the client sends that nine's pars at TEE OFF, so R.hole / R.pars are the round's own 1..9). false = no 'nine' in the room, as before */
   const pubN = R => NINES_PICK ? { ...pub(R), nine: R.nine || '18' } : pub(R);
@@ -156,7 +156,7 @@ const MP = (() => {
   function nameFor(R, p, who, name) { let n = String(name || who || 'Golfer').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 14) || 'Golfer'; const same = R.players.filter(q => q !== p && q.name.replace(/ \d$/, '') === n).length; return same ? n + ' ' + (same + 1) : n; }
 
   const int = (x, lo, hi, d) => typeof x === 'number' && isFinite(x) ? Math.max(lo, Math.min(hi, Math.round(x))) : d;
-  function endRoom(R) { for (const k in R.timers) clearT(R, k); ENDED.set(R.code, { at: now(), sids: new Set(R.players.map(p => p.sid).filter(Boolean)), ids: new Set(R.players.map(p => p.id)) }); if (rooms.get(R.code) === R) rooms.delete(R.code); endedN++;
+  function endRoom(R) { for (const k in R.timers) clearT(R, k); for (const [k, e] of ENDED) if (now() - e.at > 900000) ENDED.delete(k); /* forget rounds ended over 15 min ago (wasEnded ignores them anyway) */ ENDED.set(R.code, { at: now(), sids: new Set(R.players.map(p => p.sid).filter(Boolean)), ids: new Set(R.players.map(p => p.id)) }); if (rooms.get(R.code) === R) rooms.delete(R.code); endedN++;
     for (const p of R.players) if (p.c) { const o = p.c; p.c = null; o.room = null; o.pid = null; send(o, { t: 'ended', msg: 'This round ended' }); } }
   const wasEnded = (code, m) => { const e = ENDED.get(code); if (!e) return false; if (now() - e.at > 900000) { ENDED.delete(code); return false; } return !!((m.sid && e.sids.has(String(m.sid))) || (typeof m.you === 'string' && e.ids.has(m.you))); };
   function restore(code, m) { /* MP_RESTORE: a room rebuilt from a returning phone's last copy of it, every field checked */
@@ -166,10 +166,10 @@ const MP = (() => {
     const R = room(code), np = s.pars.length; R.restored = now(); R.course = COURSES[s.course] ? s.course : 'hunt'; R.phase = s.phase; R.pars = s.pars.map(x => Math.round(x)); R.hole = int(s.hole, 1, np, 1); if (num(s.seed, 0, 4294967295)) R.seed = s.seed >>> 0; R.shotN = int(s.shotN, 0, 1e6, 0);
     if (NINES_PICK) R.nine = NINES.includes(s.nine) ? s.nine : '18'; /* NINES_PICK: the round's nine comes back with the room */
     const sc = A => Array.isArray(A) ? A.slice(0, np).map(x => x && typeof x === 'object' && num(x.s, 1, 99) ? { s: Math.round(x.s), par: int(x.par, 2, 7, 4), ...(x.pu ? { pu: true } : {}), ...(x.max ? { max: true } : {}) } : null) : [];
-    const ball = b => b && typeof b === 'object' ? { u: num(b.u, -2000, 2000) ? b.u : 0, v: num(b.v, -2000, 2000) ? b.v : 0, lie: String(b.lie || 'tee').slice(0, 12), stroke: int(b.stroke, 1, 40, 1), toPin: num(b.toPin, 0, 1e4) ? b.toPin : 1e4, done: !!b.done, holed: !!b.holed, ...(b.wait ? { wait: true } : {}), ...(b.puNow ? { puNow: true } : {}), ...(b.left ? { left: true } : {}) } : null;
+    const ball = b => b && typeof b === 'object' ? { u: num(b.u, -2000, 2000) ? b.u : 0, v: num(b.v, -2000, 2000) ? b.v : 0, lie: String(b.lie || 'tee').slice(0, 12), stroke: int(b.stroke, 1, 40, 1), toPin: num(b.toPin, 0, 1e4) ? b.toPin : 1e4, done: !!b.done, holed: !!b.holed, ...(b.wait ? { wait: true } : {}), ...(b.puNow ? { puNow: true } : {}), ...(b.left ? { left: true } : {}), ...(b.out ? { out: true } : {}) } : null;
     const seen = new Set(); R.players = [];
     for (const q of s.players) { if (!q || typeof q.id !== 'string' || !/^[A-Za-z0-9]{1,12}$/.test(q.id) || seen.has(q.id)) continue; seen.add(q.id);
-      R.players.push({ id: q.id, sid: null, seat: int(q.seat, 0, T.MAX - 1, R.players.length), name: String(q.name || 'Golfer').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 14) || 'Golfer', who: /^[a-z]{2,16}$/.test(q.who || '') ? q.who : 'neil', lefty: !!q.lefty, c: null, discAt: now(), scores: sc(q.scores), ball: ball(q.ball), pu: !!q.pu, wait: !!q.wait }); }
+      R.players.push({ id: q.id, sid: null, seat: int(q.seat, 0, T.MAX - 1, R.players.length), name: String(q.name || 'Golfer').replace(/[^\p{L}\p{N} .'-]/gu, '').slice(0, 14) || 'Golfer', who: /^[a-z]{2,16}$/.test(q.who || '') ? q.who : 'neil', lefty: !!q.lefty, c: null, discAt: now(), scores: sc(q.scores), ball: ball(q.ball), pu: !!q.pu, wait: !!q.wait, ...(q.out ? { out: true } : {}) }); }
     R.players.sort((a, b) => a.seat - b.seat);
     R.turn = R.phase === 'play' && R.players.some(p => p.id === s.turn) ? s.turn : null; R.tstate = R.turn ? 'aim' : null; R.shot = null; R.autoFor = null; R.idle = { start: now(), held: 0, holdAt: null };
     if (R.phase === 'play' && !R.turn) { const live = R.players.filter(p => p.ball && !p.ball.done); if (!live.length) R.phase = 'hole'; }
@@ -211,7 +211,7 @@ const MP = (() => {
   }
   function joinHole(R, p) { p.ball = { u: 0, v: 0, lie: 'tee', stroke: 1, toPin: 1e4, done: false, holed: false }; const sc = p.scores[R.hole - 1]; if (sc && sc.pu) p.scores.length = R.hole - 1; }
   function leave(c, quiet) { const R = c.room; if (!R) return; const p = P(R, c.pid); c.room = null; c.pid = null; if (!p) return;
-    if (R.phase === 'lobby' || R.phase === 'done') R.players = R.players.filter(q => q !== p); else { p.c = null; p.discAt = now(); p.left = true; }
+    if (R.phase === 'lobby' || R.phase === 'done') R.players = R.players.filter(q => q !== p); else { p.c = null; p.discAt = now(); if (p.ball) p.ball.left = true; }
     if (!quiet) send(c, { t: 'left' }); after(R); }
   function gone(c) { socks.delete(c); if (c.closed !== true) c.closed = true; const R = c.room; if (!R) return; const p = P(R, c.pid); c.room = null; if (!p || p.c !== c) return;
     p.c = null; p.discAt = now(); if (R.phase === 'lobby' || R.phase === 'done') setT(R, 'drop:' + p.id, T.LOBBY_DROP, () => { if (!p.c) { R.players = R.players.filter(q => q !== p); after(R); } }); after(R); }
@@ -234,10 +234,12 @@ const MP = (() => {
       p.ball = p.pu ? { u: 0, v: 0, lie: 'tee', stroke: 1, done: true, holed: false, puNow: true } : { u: 0, v: 0, lie: 'tee', stroke: 1, toPin: 1e4, done: false, holed: false };
       if (p.pu) p.scores[n - 1] = { s: R.pars[n - 1] + T.PU_OVER, par: R.pars[n - 1], pu: true }; }
     R.turn = null; nextTurn(R); }
+  const HONOUR = true; /* Neil (11-20): on the tee, whoever had the lowest score on the last hole goes first; a tie goes back a hole at a time; all tied (and hole 1): seat (joining) order. ROLLBACK: false -> seat order on every tee */
+  const honourCmp = (R, a, b) => { for (let h = R.hole - 1; h >= 1; h--) { const x = a.scores[h - 1], y = b.scores[h - 1], d = (x && x.s || 99) - (y && y.s || 99); if (d) return d; } return a.seat - b.seat; };
   function nextTurn(R) {
     const live = R.players.filter(p => p.ball && !p.ball.done && !p.out); R.shot = null; R.autoFor = null; R.away = null; clearT(R, 'pf'); clearT(R, 'away');
     if (!live.length) return endHole(R);
-    const tee = live.filter(p => p.ball.stroke === 1 && p.ball.lie === 'tee' && !p.ball.left);
+    const tee = live.filter(p => p.ball.stroke === 1 && p.ball.lie === 'tee' && !p.ball.left); if (HONOUR && tee.length > 1) tee.sort((a, b) => honourCmp(R, a, b));
     const pick = tee.length ? tee[0] : live.slice().sort((a, b) => (b.ball.toPin - a.ball.toPin) || (a.seat - b.seat))[0]; /* tee shots in seat order, then farthest from the hole */
     R.turn = pick.id; R.tstate = 'aim'; R.shotN++; R.idle = { start: now() + (NEXT_HOLD ? R.hold || 0 : 0), held: 0, holdAt: null }; R.hold = 0; sync(R); timers(R); }
   function timers(R) { /* the active golfer's clock: idle ring, auto-hit, or a dropped golfer's reconnect wait */
