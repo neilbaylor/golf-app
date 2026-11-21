@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v492'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v494'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -57,8 +57,10 @@ const TUT_HOLE = true; /* Neil 11-21: the tutorial gets its own hole (an invente
 const TUT_GATE = true; /* the tutorial: only what's lit can be touched (false = anything, as v488) */
 const DRIVE_TINT = true; /* Neil 11-21: the result card's Drive stat. Off the tee with less than a driver (every par 3), it's red only if the ball missed both the fairway and the green; a driver keeps the old rule (green for a full-length bomb, else red). false = as v491 */
 const TUT_READ = true; /* Neil 11-21: the tutorial's putt read comes from the real slope between the ball and the hole (false = the fixed line, as v491) */
+const TUT_AIM_KEEP = true; /* Neil 11-21: in the tutorial the tap that opens aim view never re-aims: it opens on the caddie's line at the green (false = the tap re-aims, as v492) */
+const TUT_PITCH_ONLY = true; /* Neil 11-21: at the tutorial's shot picker only Pitch can be picked, and only Pitch is spotlit (false = the whole row, as v492) */
 const TUT_FREE = true; /* Neil 11-21: no spotlight and touch anywhere once the aim view is up, and for chips and putts (the chip selector keeps its spotlight); false = spotlight on every step, as v491 */
-const TUT_FADE = false; /* Neil 11-21: no paper flash over the ball's move (true = the v488 fade) */
+const TUT_FADE = true; /* Neil 11-21: back on, as a soft dip to sky in the home screen's colour and ease (false = the ball just jumps, as v493) */
 const TUT_PLAY = true; /* Neil 11-21: the tutorial itself, played on #tutorial-hole (TUTOR). false = just the hole */
 const TUT_M = TUT_HOLE ? /^#tutorial-hole$/.exec(location.hash) : null;
 const AUG_M = /^#augusta(?:-hole-(\d+))?$/.exec(location.hash) || (!location.hash && window.__augPick ? ['#augusta', undefined] : null); /* a fresh load (no hash) picks its course at random (Neil): the intro's crest and "live from" line, the home fly-over and the picked tile all follow */
@@ -5346,7 +5348,7 @@ canvas.addEventListener('pointerdown', e => {
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (G.view === 'swing' && G.aimGoal === 0) { // any touch on the course = aim mode, but never from the control strip at the bottom
     if (e.clientY > (RECT.ctrlT || 1e9) - 16 || (RECT.ctrls || []).some(r => e.clientX > r.left - 22 && e.clientX < r.right + 22 && e.clientY > r.top - 22 && e.clientY < r.bottom + 22)) { ptrs.delete(e.pointerId); return; } // the whole control strip (and near-misses) never opens aim view
-    tap = null; audioInit(); { const g = groundAt(e.clientX, e.clientY); if (g) { const du = g.u - G.ball.u, dv = g.v - G.ball.v, L = Math.hypot(du, dv); const tu = G.ball.u + G.dir.u * G.D, tv = G.ball.v + G.dir.v * G.D, off = Math.hypot(g.u - tu, g.v - tv); if (L > 3 && (du * G.dir.u + dv * G.dir.v) / L > .35 && off > Math.max(6, G.D * .18)) dragTarget(e); } } /* the tap that opens aim view only re-aims when it lands somewhere clearly away from the current target (ahead of the ball): a tap on or near the usual spot just opens aim view (Neil) */ enterAim(); ptrs.clear(); return; }
+    tap = null; audioInit(); { const g = groundAt(e.clientX, e.clientY); if (g) { const du = g.u - G.ball.u, dv = g.v - G.ball.v, L = Math.hypot(du, dv); const tu = G.ball.u + G.dir.u * G.D, tv = G.ball.v + G.dir.v * G.D, off = Math.hypot(g.u - tu, g.v - tv); if (L > 3 && (du * G.dir.u + dv * G.dir.v) / L > .35 && off > Math.max(6, G.D * .18) && !(TUT_AIM_KEEP && TUT_M && CID === 'tut')) dragTarget(e); } } /* the tap that opens aim view only re-aims when it lands somewhere clearly away from the current target (ahead of the ball): a tap on or near the usual spot just opens aim view (Neil) */ enterAim(); ptrs.clear(); return; }
   if (G.view === 'aim' && G.aimT > .9) {
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     if (ptrs.size >= 2) { startPinch(); return; }
@@ -6436,15 +6438,15 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
   const midRect = () => { let l = 1e9, t = 1e9, r = -1e9, b = -1e9; for (const e of document.querySelectorAll('#mid *')) { const q = e.getBoundingClientRect(); if (q.width < 2 || q.height < 2) continue; const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.opacity === '0') continue; l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); } return r > l ? [l, t, r - l, b - t] : null; };
   const onScreen = (u, v, rad) => { const C = RECT.canvas, p = project(new THREE.Vector3(u, groundHeight(u, v), -v)); return [C.left + p.x - rad, C.top + p.y - rad * .8, rad * 2, rad * 1.6]; };
   const tgtRect = () => { const t = targetUV(); return onScreen(t.u, t.v, 42); };
-  const LIT = { dial: () => rectOf('#dialWrap'), club: () => rectOf('#clubBtn'), lie: () => rectOf('#lie'), slope: () => rectOf('#slopeKey'), mid: midRect, modes: () => rectOf('#modeRow'), target: tgtRect, hole: () => onScreen(PIN.u, PIN.v, 26), course: () => { const C = RECT.canvas; return [C.left + C.width / 2 - 95, C.top + C.height * .3, 190, 190]; } };
-  const WORLD = new Set(['target', 'hole', 'course']), HUDEL = { dial: '#dialWrap', club: '#clubBtn', lie: '#lie', slope: '#slopeKey', mid: '#mid', modes: '#modeRow' };
+  const LIT = { dial: () => rectOf('#dialWrap'), club: () => rectOf('#clubBtn'), lie: () => rectOf('#lie'), slope: () => rectOf('#slopeKey'), mid: midRect, modes: () => rectOf('#modeRow'), pitchBtn: () => rectOf('#modeRow .mc[data-m="pitch"]'), target: tgtRect, hole: () => onScreen(PIN.u, PIN.v, 26), course: () => { const C = RECT.canvas; return [C.left + C.width / 2 - 95, C.top + C.height * .3, 190, 190]; } };
+  const WORLD = new Set(['target', 'hole', 'course']), HUDEL = { dial: '#dialWrap', club: '#clubBtn', lie: '#lie', slope: '#slopeKey', mid: '#mid', modes: '#modeRow', pitchBtn: '#modeRow .mc[data-m="pitch"]' };
   function undim() { document.querySelectorAll('.tutDim').forEach(e => { e.style.filter = ''; e.classList.remove('tutDim'); }); if (world) { world.remove(); world = null; } }
   function dim(lit) { undim(); const keep = [$('#player'), $('#say'), ...lit.filter(k => HUDEL[k]).map(k => $(HUDEL[k]))].filter(Boolean), gl = $('#gl');
     world = document.createElementNS(NS, 'svg'); world.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none'; gl.after(world);
     const rec = el => { if (el === gl || el === world || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return; if (keep.includes(el)) return; if (keep.some(k => el.contains(k))) { for (const c of el.children) rec(c); return; } el.classList.add('tutDim'); el.style.filter = 'brightness(.42) saturate(.85)'; };
     for (const c of app.children) rec(c); }
   const shape = (r, round, circle, extra) => circle ? `<circle cx="${r[0] + r[2] / 2}" cy="${r[1] + r[3] / 2}" r="${Math.max(r[2], r[3]) / 2}" ${extra}/>` : `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="${round}" ${extra}/>`;
-  const PAD = { dial: 6, club: 6, lie: 6, slope: 6, mid: 6, modes: 6, target: 0, hole: 0, course: 0 }, ROUND = { club: 22, lie: 18, slope: 16, mid: 26, modes: 16, target: 42, hole: 22 }, CIRC = { dial: 1, course: 1 };
+  const PAD = { dial: 6, club: 6, lie: 6, slope: 6, mid: 6, modes: 6, pitchBtn: 6, target: 0, hole: 0, course: 0 }, ROUND = { club: 22, lie: 18, slope: 16, mid: 26, modes: 16, pitchBtn: 16, target: 42, hole: 22 }, CIRC = { dial: 1, course: 1 };
   const box = k => { const r = LIT[k](); if (!r) return null; const p = PAD[k]; return [r[0] - p, r[1] - p, r[2] + 2 * p, r[3] + 2 * p]; };
   function draw() { if (!st) return; const W = innerWidth, H = innerHeight; const f = free();
     if (f !== !!st.free) { st.free = f; if (f) undim(); else if (st.dimOK) dim(st.lit); }
@@ -6452,9 +6454,14 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
     let s = ''; if (!f) for (const k of st.lit) { const r = box(k); if (r) s += shape(r, ROUND[k] || 18, CIRC[k], 'class="ring" fill="none" stroke="#ffd23f" stroke-width="3.5" stroke-dasharray="11 8" stroke-linecap="round"'); } top.innerHTML = s;
     const sr = $('#say').hidden ? null : $('#say').getBoundingClientRect(); if (st.tg) st.tg.style.top = ((st.tgY && st.tgY()) || (sr ? sr.bottom + 12 : 140)) + 'px';
     for (const n of st.notes || []) { const p = n.at(); if (p) { n.el.style.left = p[0] + 'px'; n.el.style.top = p[1] + 'px'; n.el.style.display = ''; } else n.el.style.display = 'none'; } }
-  let fading = false; function fade(fn) { if (!TUT_FADE) { fn(); return; } /* TUT_FADE (Neil 11-21: the ball jumping to its spot was jarring): a quick paper fade over the move */
-    fading = true; const f = document.createElement('div'); f.style.cssText = 'position:fixed;inset:0;z-index:59;background:#fffaf0;opacity:0;transition:opacity .28s ease;pointer-events:none'; document.body.appendChild(f);
-    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; })); setTimeout(() => { fn(); setTimeout(() => { f.style.opacity = '0'; setTimeout(() => { f.remove(); fading = false; calmAt = 0; }, 320); }, 650); }, 300); }
+  let fading = false; function fade(fn) { if (!TUT_FADE) { fn(); return; } /* TUT_FADE (Neil 11-21): the move to the set spot happens under a soft dip to sky, the same colour and ease as the home screen's loop seam; it also hides the camera's zoom onto the old lie */
+    fading = true; const n = G.stroke, cap = n === 2 ? 'Shot 2 · from the rough' : n === 3 ? 'Shot 3 · a pitch to the green' : 'Shot 4 · the putt';
+    const f = document.createElement('div'); f.style.cssText = 'position:fixed;inset:0;z-index:59;background:#d6f0ff;opacity:0;transition:opacity .5s cubic-bezier(.45,0,.55,1);pointer-events:none;display:flex;align-items:center;justify-content:center';
+    f.innerHTML = `<b style="font:26px/1 var(--font-display);letter-spacing:.03em;color:var(--ink);opacity:0;transform:translateY(6px);transition:opacity .35s .2s,transform .45s .2s cubic-bezier(.3,1.4,.5,1)">${cap}</b>`; document.body.appendChild(f); const b = f.firstChild;
+    const until = (ok, max, then) => { const t0 = performance.now(); (function w() { if (ok() || performance.now() - t0 > max) then(); else setTimeout(w, 50); })(); };
+    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; b.style.opacity = '1'; b.style.transform = 'none'; }));
+    setTimeout(() => until(() => !G.camTween && SW.phase === 'idle', 1500, () => { fn(); /* under cover: the camera's zoom onto the old lie is done; move the ball */
+      setTimeout(() => until(() => !G.camTween, 1500, () => { b.style.transition = 'opacity .25s'; b.style.opacity = '0'; f.style.opacity = '0'; setTimeout(() => { f.remove(); fading = false; calmAt = 0; }, 560); }), 380); }), 560); }
   function bub(t) { AV.say(t, { force: true, hold: true }); }
   function clear() { st = null; undim(); top.innerHTML = ''; ui.innerHTML = ''; }
   function show(id, o) { clear(); st = Object.assign({ id, lit: [], stroke: G.stroke }, o); done.add(id); if (o.say) bub(o.say); st.dimOK = o.dim !== false; st.free = free(); if (st.dimOK && !st.free) dim(st.lit);
@@ -6470,7 +6477,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
   function leave() { try { localStorage.setItem('tp_tut_done', '1'); } catch (e) {} location.replace(location.pathname + location.search); } /* back to the main screen (a normal load: Hunt and Augusta, no tutorial) */
   function askSkip() { const keep = st; card(`<h3 style="font-size:26px">Skip the tutorial?</h3><p>You'll go back to the main screen to pick a course.</p><div class="row"><button class="btnT p" data-a="skip">Skip it</button><button class="btnT" data-a="stay">Keep going</button></div>`, w => w.addEventListener('click', e => { const a = e.target.closest('button'); if (!a) return; e.stopPropagation(); if (a.dataset.a === 'skip') leave(); else w.remove(); })); void keep; }
   function finish() { fin = true; clear(); $('#result').hidden = true; app.classList.remove('resulting'); bub("You've got it. Let's play.");
-    card(`<h3>On to the first tee</h3><button class="btnT w" data-a="go">Pick a course</button>`, w => w.addEventListener('click', e => { if (e.target.closest('button')) { e.stopPropagation(); leave(); } })); ui.firstChild && (ui.firstChild.style.background = 'rgba(24,36,22,.62)'); }
+    card(`<h3>Nice!<br>On to the first tee</h3><button class="btnT w" data-a="go">Pick a course</button>`, w => w.addEventListener('click', e => { if (e.target.closest('button')) { e.stopPropagation(); leave(); } })); ui.firstChild && (ui.firstChild.style.background = 'rgba(24,36,22,.62)'); }
   const sheet = () => !$('#scrim').hidden, cls = c => app.classList.contains(c); let calmAt = 0;
   function read() { /* TUT_READ: the putt's real read, from the ground between the ball and the hole (the putt is wherever the ball stopped, not always the set spot) */
     const b = G.ball, du = PIN.u - b.u, dv = PIN.v - b.v, L = Math.hypot(du, dv) || 1, ru = dv / L, rv = -du / L; let side = 0;
@@ -6490,13 +6497,15 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
       if (shot && id !== 'pick2') end(); /* any step: a swing takes it down (Neil 11-21: the spotlight stayed up on his 2nd shot) */
       else if (id === 'tap' && G.aimGoal === 1) { end(); aimFrom = null; }
       else if (id === 'aim') { const t = targetUV(); if (!aimFrom) aimFrom = { u: t.u, v: t.v, c: G.curve }; else if (Math.hypot(t.u - aimFrom.u, t.v - aimFrom.v) > 1 || G.curve !== aimFrom.c || SW.phase === 'down' || G.view === 'flight') end(); else if (G.aimGoal !== 1) end(); }
-      else if (id === 'pick1' && sheet()) { show('pick2', { say: 'Pitch flies high and lands soft. Punch stays low under trees. Pick Pitch.', lit: ['modes'] }); }
+      else if (id === 'pick1' && sheet()) { show('pick2', { say: 'Pitch flies high and lands soft. Punch stays low under trees. Pick Pitch.', lit: [TUT_PITCH_ONLY ? 'pitchBtn' : 'modes'] }); }
       else if (id === 'pick2' && !sheet()) { clear(); }
       if (st) draw(); return; }
-    if (fading || !ready(now)) return;
+    if (fading) return;
+    if (!(TUT_FADE && G.ball && !FLY.on && G.view !== 'flight' && !cls('flying') && !cls('settling') && !cls('droning') && !cls('resulting') && SW.phase === 'idle' && $('#result').hidden && !sheet()) && !ready(now)) return; /* TUT_FADE: a move starts as soon as the shot is over, so the dip covers the camera's zoom; everything else waits for calm */
     { const S = TUT_SPOTS[Math.min(G.stroke, 4)], d = Math.hypot(PIN.u - G.ball.u, PIN.v - G.ball.v), keep = G.stroke === 2 ? G.lie === 'rough' : G.stroke === 3 ? G.lie !== 'green' && !/sand|bunker|water/.test(G.lie) && d >= 10 && d <= 60 : G.stroke === 4 ? G.lie === 'green' && d * 3 > 10 : false; /* Neil 11-21: a drive already in the rough, a 2nd already in chipping range, a putt already over 10 ft: play it from there */
-      if (S && G.stroke <= 4 && !placed.has(G.stroke) && keep) { placed.add(G.stroke); if (G.aimGoal) { try { exitAim(); } catch (e) {} calmAt = 0; return; } } /* (a new shot starts in the swing view) */
-      if (S && G.stroke <= 4 && !placed.has(G.stroke)) { placed.add(G.stroke); calmAt = 0; fade(() => { try { G.view = 'swing'; G.aimGoal = 0; setupShot(S[0], S[1], S[2]); updateHUD(); } catch (e) { console.error(e); } calmAt = 0; }); return; } } /* TUT_SPOTS: the same shots every time, wherever the last one went */
+      if (S && G.stroke <= 4 && !placed.has(G.stroke) && keep && ready(now)) { placed.add(G.stroke); if (G.aimGoal) { try { exitAim(); } catch (e) {} calmAt = 0; return; } } /* (a new shot starts in the swing view) */
+      if (S && G.stroke <= 4 && !placed.has(G.stroke) && !keep) { placed.add(G.stroke); calmAt = 0; fade(() => { try { G.view = 'swing'; G.aimGoal = 0; setupShot(S[0], S[1], S[2]); updateHUD(); } catch (e) { console.error(e); } calmAt = 0; }); return; }
+      if (!ready(now)) return; } /* TUT_SPOTS: the same shots every time, wherever the last one went */
     const toPin = Math.hypot(PIN.u - G.ball.u, PIN.v - G.ball.v), green = G.lie === 'green', sand = /sand|bunker/.test(G.lie);
     if (G.stroke === 1 && !done.has('swing')) { lit1.add(1); return show('swing', { say: 'Pull the club down, then flick it up. Smooth beats hard.', lit: ['dial'], goal: 'Hit the fairway', notes: [{ t: 'pull ↓<br>then flick ↑', at: () => { const r = rectOf('#dialWrap'); return r && [Math.max(8, r[0] - 70), r[1] - 92]; } }] }); }
     if (G.stroke >= 2 && !green && !done.has('lie')) { const f = LIES[G.lie] && LIES[G.lie].f || 1, nm = (LIES[G.lie] && LIES[G.lie].name || G.lie).toLowerCase();
@@ -6515,6 +6524,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
     const inBox = (r, x, y) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
     const allowed = e => { const t = e.target; if (t && t.closest && (t.closest('#tutO .tg') || t.closest('#tutO .cardW') || t.closest('#quitUI'))) return true;
       const p = e.touches && e.touches[0] || e.changedTouches && e.changedTouches[0] || e, x = p.clientX, y = p.clientY;
+      if (TUT_PITCH_ONLY && st && st.id === 'pick2') { const b = t && t.closest && t.closest('#modeRow .mc'); return !!b && b.dataset.m === 'pitch'; } /* the picker: Pitch only */
       if (free() || (TUT_FREE && st && st.id === 'tap')) return true; /* Neil 11-21: "tap anywhere to aim" means anywhere (the spotlight stays) */
       if (st) return st.lit.some(k => { const r = box(k); if (!r) return false; if (!CIRC[k]) return inBox(r, x, y); const R = Math.max(r[2], r[3]) / 2; return Math.hypot(x - r[0] - r[2] / 2, y - r[1] - r[3] / 2) <= R; }); /* a round spotlight is hit-tested as the circle it draws, not its box */
       return !(G.view !== 'flight' && $('#result').hidden && !FLY.on && !MENU.on && !INTRO.on); }; /* no step up: only between shots (the flight, the result card) */
