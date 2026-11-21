@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v480'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v482'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -54,6 +54,7 @@ const HUD_PAR = true; /* undo switch: the pink score-to-par box by the name unde
 /* which course and hole the page opens on: no hash (or #hole-N) is the Toronto Hunt; #augusta (or #augusta-hole-11 to -18) is the Augusta National preview: holes 10 to 18, starting at 10 (AUG_FRONT: the front-nine holes built so far first, from #augusta = hole 1; #augusta-hole-2 ...) */
 const OSL_M = OSLER_DEV ? /^#ob-004b22b2(?:-hole-(\d+))?$/.exec(location.hash) : null;
 const TUT_HOLE = true; /* Neil 11-21: the tutorial gets its own hole (an invented par 4, not Hunt 1), at #tutorial-hole while we design it. Nothing of it is built without that link. false = no tutorial course */
+const TUT_PLAY = false; /* Neil 11-21: the tutorial itself, played on #tutorial-hole (TUTOR). false = just the hole */
 const TUT_M = TUT_HOLE ? /^#tutorial-hole$/.exec(location.hash) : null;
 const AUG_M = /^#augusta(?:-hole-(\d+))?$/.exec(location.hash) || (!location.hash && window.__augPick ? ['#augusta', undefined] : null); /* a fresh load (no hash) picks its course at random (Neil): the intro's crest and "live from" line, the home fly-over and the picked tile all follow */
 const HUNT_CARD = {"1":{"par":4,"hcp":7},"2":{"par":4,"hcp":5},"3":{"par":3,"hcp":2},"4":{"hcp":4},"5":{"par":5,"hcp":1},"6":{"hcp":6},"7":{"hcp":9},"8":{"hcp":8},"9":{"hcp":3}}; /* the Hunt's scorecard (Neil): par and stroke index by hole number */
@@ -1105,7 +1106,7 @@ const COURSE_CPU = true; /* Neil's ?prof logs (v461, 11-18 22:09-22:11): the big
 const FLUSH_SYNC = true; /* v463's log (Neil 22:22): the map-painting step still came with freezes our script didn't see (445 ms at a hole-out, 165 ms aiming). Safari still runs canvas drawing in its background process even on the CPU, so a slice's painting can pile up there. Each painting slice now ends by reading back one pixel of the canvas, which makes the script wait until that slice is really painted: the cost lands inside the build's time budget, spread across frames, instead of as one stall later. false = the 1-px copy as before */
 const BG_BUDGET = 4.5; /* Neil (11-18 22:19, v462): "a touch more loading bar": with the map now painted on the CPU inside the background build's budget, the next hole often wasn't finished by the hole-out. The background build gets 4.5 ms of a calm frame (was 2.5; the game's own frame code is ~2-3 ms of 16.7) and starts 1.5 s into a hole (AHEAD_DELAY, was 4 s). 0 = 2.5 ms, as v462 */
 const AHEAD_DELAY = { ms: 1500, at: -1e9 }; /* the same logs: the 733-894 ms freeze on a new hole's first frames came with the NEXT hole's build starting in the same moment. The background build now waits 4 s after a hole swaps in (it only ever runs on calm frames anyway). null = straight away, as v461 */
-let WARM_N = 0; /* (?prof: warm-up draws so far) */ const WARM_SPLIT = 1.5e6; /* Neil's ?prof logs (11-18 21:4x, iPhone): the big freezes (100-700 ms) came while the result card was up or a new hole was coming, with the game's own frame code at 2-18 ms: Safari / the GPU busy, not our script. That's when the next hole is built in the background, and its last step drew the whole hole once (a hidden 1-pixel draw) so every mesh and texture is on the GPU before it's shown: all of it in one frame. Now that warm-up draw goes in pieces of about 1.5 MB of mesh data, one piece a frame (the same uploads, spread out). 0 = in one go, as v459 */
+let WARM_N = 0; /* (?prof: warm-up draws so far) */ let SWAPP = null; /* PROF_SWAP (Neil 11-21): ?prof's hook into hole swaps (null without ?prof) */ const WARM_SPLIT = 1.5e6; /* Neil's ?prof logs (11-18 21:4x, iPhone): the big freezes (100-700 ms) came while the result card was up or a new hole was coming, with the game's own frame code at 2-18 ms: Safari / the GPU busy, not our script. That's when the next hole is built in the background, and its last step drew the whole hole once (a hidden 1-pixel draw) so every mesh and texture is on the GPU before it's shown: all of it in one frame. Now that warm-up draw goes in pieces of about 1.5 MB of mesh data, one piece a frame (the same uploads, spread out). 0 = in one go, as v459 */
 const FLUSH1 = document.createElement('canvas'); FLUSH1.width = FLUSH1.height = 1; const FLUSH1X = FLUSH1.getContext('2d');
 /* FLUSH_DROP (hatch, with HATCH_LEAN): the 1-px canvas kept the snapshot of the last canvas flushed into it, so the next drawing on that canvas had to copy the whole canvas first
    (copy-on-write: a map-sized copy, 25 MB and ~45-115 ms on this box for Augusta's map, after every flush that is followed by more drawing). true: the 1-px canvas is reset
@@ -1784,7 +1785,12 @@ function buildBridges() { if (AUGD && AUGD.BRIDGE) for (const B of AUGD.BRIDGE) 
     let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const q of st) { u0 = Math.min(u0, q.u); u1 = Math.max(u1, q.u); v0 = Math.min(v0, q.v); v1 = Math.max(v1, q.v); } u0 -= 8; u1 += 8; v0 -= 8; v1 += 8;
     const MW = Math.ceil(u1 - u0) * 2, MH = Math.ceil(v1 - v0) * 2, md = new Uint8Array(MW * MH * 4); for (let j = 0; j < MH; j++) for (let i = 0; i < MW; i++) { const k = (j * MW + i) * 4, w = AUGD.wAt(u0 + (i + .5) / 2, v1 - (j + .5) / 2) > 0 ? 255 : 0; md[k] = md[k + 1] = md[k + 2] = w; md[k + 3] = 255; }
     const mask = new THREE.DataTexture(md, MW, MH, THREE.RGBAFormat); mask.magFilter = mask.minFilter = THREE.LinearFilter; mask.needsUpdate = true; /* x = u, y = world z (-v): row 0 at the far end */
-    const rm = new THREE.ShaderMaterial({ uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: tex }, mask: { value: mask }, box: { value: new THREE.Vector4(u0, -v1, u1 - u0, v1 - v0) }, yw: { value: yw }, axis: { value: new THREE.Vector4(A[0], -A[1], fu, -fv) } }]),
+    const rm = bridgeReflMat(tex, mask, new THREE.Vector4(u0, -v1, u1 - u0, v1 - v0), yw, new THREE.Vector4(A[0], -A[1], fu, -fv)); /* (SHADER_WARM: its shader is set up at launch) */
+    const refl = new THREE.Mesh(rg, rm); refl.renderOrder = -1; refl.userData.ink = false; HS.add(refl); /* -1: after the ground (-2 on Augusta), before everything that stands on it */
+  }
+} }
+function bridgeReflMat(tex, mask, box, yw, axis) { /* a bridge's reflection in the creek (Augusta 12, 13 and 15). One function, so SHADER_WARM's copy is the very same shader */
+  return new THREE.ShaderMaterial({ uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: tex }, mask: { value: mask }, box: { value: box }, yw: { value: yw }, axis: { value: axis } }]),
       vertexShader: `varying vec2 vUv; varying vec3 vW;
         #include <fog_pars_vertex>
         void main(){ vUv = uv; vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
@@ -1799,10 +1805,15 @@ function buildBridges() { if (AUGD && AUGD.BRIDGE) for (const B of AUGD.BRIDGE) 
           vec3 water = vec3(0.247, 0.698, 0.878), c = texture2D(map, vUv).rgb * vec3(0.62, 0.74, 0.86);
           float k = 0.62 * smoothstep(0.0, 0.1, s) * (1.0 - smoothstep(0.82, 0.9, s) * 0.55) * smoothstep(yw - 3.2, yw - 0.15, vW.y + 0.0 * along); gl_FragColor = vec4(mix(water, c, k), 1.0);
         #include <fog_fragment>
-        }`, fog: true, side: THREE.BackSide, depthTest: false, depthWrite: false });
-    const refl = new THREE.Mesh(rg, rm); refl.renderOrder = -1; refl.userData.ink = false; HS.add(refl); /* -1: after the ground (-2 on Augusta), before everything that stands on it */
-  }
-} }
+        }`, fog: true, side: THREE.BackSide, depthTest: false, depthWrite: false }); }
+const SHADER_WARM = true; /* Neil 11-21: the one shader a round meets late (the bridge reflection, Augusta 12) took ~210 ms to set up on an iPhone, mid-round. Set it up once behind the opening titles instead (same shader, so nothing looks different). false = set up when hole 12 is built, as before */
+const SHADER_KEEP = []; /* its warm-up material stays alive: dropping it would drop the shader too */
+function shaderWarm() { if (!SHADER_WARM || shaderWarm.done) return; shaderWarm.done = true;
+  try { const t1 = new THREE.DataTexture(new Uint8Array(4), 1, 1, THREE.RGBAFormat); t1.needsUpdate = true; const m = bridgeReflMat(t1, t1, new THREE.Vector4(0, 0, 1, 1), 0, new THREE.Vector4(0, 0, 1, 0));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
+    const o = new THREE.Mesh(g, m), sc = new THREE.Scene(); o.frustumCulled = false; sc.fog = scene.fog; sc.add(o); const t0 = performance.now();
+    renderer.compile(sc, camera); renderer.setScissorTest(true); renderer.setScissor(0, 0, 1, 1); renderer.render(sc, camera); renderer.setScissorTest(false); SHADER_KEEP.push(m); shaderWarm.ms = performance.now() - t0; /* (?prof shows it) */
+  } catch (e) { console.error(e); } }
 /* ---- Lake Ontario off the bluff down the right (the Hunt only) ---- */
 const FOUNT_T = { value: 0 }; /* the pond fountain's clock: frame() sets it, its shaders do the rest */
 let fountTex = null; /* its sticker art, drawn once and shared by every hole that has the pond */
@@ -5865,8 +5876,9 @@ const AV = (() => {
   function setTalking(on) { if (on !== app.classList.contains('talking')) app.classList.toggle('talking', on); }
   function say(text, opts = {}) {
     if (CHAT_OVER && CHAT_BUSY && CHAT_BUSY()) { if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } /* CHAT_OVER: a chat line or typing on the big golfer: no canned line */
+    if (st.hold && !opts.hold && !bubble.hidden) { if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } /* TUT_PLAY: no canned line over a tutorial line */
     if (st.text && st.shown < st.text.length && !opts.force) { if (st.queue.length < 1) st.queue.push([text, opts]); return; }
-    st.text = text; st.pre = !!opts.pre; st.shown = 0; st.typeAcc = 0; st.hideT = 0; bubble.hidden = false; sayA.textContent = ''; sayB.textContent = text; st.drawn = 0; if (BUB_FIT) { bubble.classList.remove('short'); bubble.classList.toggle('short', bubble.offsetWidth < 78); } /* BUB_FIT: a one-word line gets a wider, centred bubble so the tail isn't in its corner */ app.style.setProperty('--sayH', (bubble.offsetHeight + 12) + 'px'); setTalking(true);
+    st.hold = !!opts.hold; /* TUT_PLAY: a tutorial line stays up until the step is done */ st.text = text; st.pre = !!opts.pre; st.shown = 0; st.typeAcc = 0; st.hideT = 0; bubble.hidden = false; sayA.textContent = ''; sayB.textContent = text; st.drawn = 0; if (BUB_FIT) { bubble.classList.remove('short'); bubble.classList.toggle('short', bubble.offsetWidth < 78); } /* BUB_FIT: a one-word line gets a wider, centred bubble so the tail isn't in its corner */ app.style.setProperty('--sayH', (bubble.offsetHeight + 12) + 'px'); setTalking(true);
     if (SAY_DODGE) { st.rect = null; const c = RECT.canvas; if (c) { const r = bubble.getBoundingClientRect(), m = 16; st.rect = { l: r.left - c.left - m, r: r.right - c.left + m, t: r.top - c.top - m, b: r.bottom - c.top + m }; } if (holeUnder()) { hush(); if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } } /* SAY_DODGE: putting with the hole under where the bubble would be: no line (the mood still shows on the face) */
     bubble.style.animation = 'none'; restyle(bubble); bubble.style.animation = '';
     if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5);
@@ -5880,7 +5892,7 @@ const AV = (() => {
   function holeUnder() { /* SAY_DODGE: putting, and the hole is under the bubble's box (read once per line, in say) */
     if (!st.rect || G.mode !== 'putt' || typeof PIN !== 'object' || !PIN) return false; _sd.set(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v); const q = project(_sd), r = st.rect;
     return q.z < 1 && q.x > r.l && q.x < r.r && q.y > r.t && q.y < r.b; }
-  function hush() { bubble.hidden = true; st.text = ''; st.pre = false; st.queue.length = 0; setTalking(false); } /* (lines queued behind it go too: they'd cover the hole just the same) */
+  function hush() { st.hold = false; bubble.hidden = true; st.text = ''; st.pre = false; st.queue.length = 0; setTalking(false); } /* (lines queued behind it go too: they'd cover the hole just the same) */
   function dodge() { if (st.text && !bubble.hidden && holeUnder()) hush(); } /* the putting view settled with the hole under a line already up: the golfer stops talking */
   function update(dt, t) {
     // talking
@@ -5892,7 +5904,7 @@ const AV = (() => {
         if (st.shown !== st.drawn) { st.drawn = st.shown; sayA.textContent = st.text.slice(0, st.shown); sayB.textContent = st.text.slice(st.shown); } /* rewrite (and re-lay-out) the bubble only when a letter appears */
         st.visT -= dt; if (st.visT <= 0) { st.viseme = vowelMap(st.text[Math.max(0, st.shown - 1)] || ' '); st.visT = .06 + Math.random() * .05; }
       } else {
-        st.hideT += dt;
+        if (!st.hold) st.hideT += dt; /* TUT_PLAY */
         if (st.hideT > 1.9 + st.text.length * .02) { if (st.queue.length) { const [tx, o] = st.queue.shift(); st.text = ''; say(tx, o); } else { bubble.hidden = true; st.text = ''; setTalking(false); } }
       }
     }
@@ -6032,7 +6044,7 @@ const HOLESYS = (() => {
     cur = HD; jobs.delete(HD.key); setHoleVars(HD.v); scene.add(HS.group); CULL = HS.cull; _ck.fill(NaN);
     scene.userData.outer = HS.ud.outer; scene.userData.lowClouds = HS.ud.lowClouds;
     READ.use(HS.read); MINI.use(HS.mini); flag.setHole(); CRITTERS.hole(); holeUI();
-    if (old && old !== HD) { let home = false; try { home = MENU.on; } catch (e) {} if (home && old.i === NINE.first(old.cid) && old.cid !== HD.cid && old.v) { jobs.set(old.key, old); old.ready = true; } else drop(old); TURF.wipe(); } /* a first hole switched away from on the home screen stays built, for switching back */
+    if (old && old !== HD) { let home = false; try { home = MENU.on; } catch (e) {} if (home && old.i === NINE.first(old.cid) && old.cid !== HD.cid && old.v) { jobs.set(old.key, old); old.ready = true; } else { const td = performance.now(); drop(old); if (SWAPP) SWAPP.drop = performance.now() - td; } TURF.wipe(); } /* a first hole switched away from on the home screen stays built, for switching back */
     try { const hh = CID === 'hunt' && HOLE_N === 1 ? '' : '#' + holeHash(HOLE_N); if (HOLE_URL) history.replaceState(null, '', location.pathname + location.search + hh); else sessionStorage.setItem('tp_at', hh); } catch (e) {} /* a reload lands back on this hole (HOLE_URL false: kept in the tab, not the address) */
     ahead(); }
   function ahead() { /* prebuild the next AHEAD holes of this course; on the home screen instead every other course's first hole, so picking a course swaps at once (Neil); anything else prebuilt goes */
@@ -6047,7 +6059,8 @@ const HOLESYS = (() => {
   function go(cid, i, holes, then, { pill = true, hold = 0, fresh = false, card = false } = {}) { /* fresh: build it again even if it's built (or on screen): PINS.seed */
     if (!fresh && cur && cur.cid === cid && cur.i === i) { cancel(); if (then) then(); return; }
     let HD = jobs.get(keyOf(cid, i)); if (!HD || HD.err || fresh) { if (HD) drop(HD); HD = start(cid, i); }
-    const fin = () => { const t0 = performance.now(); ROUND.holes = holes; try { sessionStorage.setItem('tp_round', JSON.stringify({ holes })); } catch (e) {} use(HD); if (AHEAD_DELAY) AHEAD_DELAY.at = t0; MENU.course = CID; const t1 = performance.now(); if (then) then(); swapMs = [Math.round(t1 - t0), Math.round(performance.now() - t1)]; }; /* (timings: HOLESYS.swapMs = [swap, then]) */
+    if (SWAPP) SWAPP.go(keyOf(cid, i), !!HD.ready, HD.n); /* PROF_SWAP */
+    const fin = () => { const t0 = performance.now(); ROUND.holes = holes; try { sessionStorage.setItem('tp_round', JSON.stringify({ holes })); } catch (e) {} use(HD); if (AHEAD_DELAY) AHEAD_DELAY.at = t0; MENU.course = CID; const t1 = performance.now(); if (then) then(); swapMs = [Math.round(t1 - t0), Math.round(performance.now() - t1)]; if (SWAPP) SWAPP.done(HD.key, t1 - t0, performance.now() - t1); }; /* (timings: HOLESYS.swapMs = [swap, then]) */
     if (HD.ready && !hold) { cancel(); fin(); return; }
     want = { HD, done: fin, pill, card, meta: meta(cid, i), at: performance.now() + hold }; ahead(); if (pill) { PILL.show(pill === 'home', want.meta); PILL.set(HD.n / est); } }
   function meta(cid, i) { const c = COURSE_DEF[cid]; return (c.list || (c.list = c.holes()))[i - 1]; } /* the card line of the hole being waited on (for the pill) */
@@ -6134,7 +6147,7 @@ function skyHidden() { /* every view ray lands on the outer ground plane before 
   return true; }
 function frame(now) {
   if (MPX && MP_BUBBLE_RECT) MPX.pre(); /* MP_BUBBLE_RECT: the chat bubbles' anchors read first, while the layout is clean */
-  const rawDt = Math.max(0, (now - last) / 1000), dt = clamp(rawDt, 0, .05) || 0; last = now; HOLESYS.tick(now); if (CJ.g) caddieStep(CADDIE_BG_SLICE && FLY.on ? 2.5 : 6); /* CADDIE_SLICE (CADDIE_BG_SLICE: 2.5 ms a frame under the hole's fly-over) */ renderer.info.reset(); applyPendingPR(); /* a slice of any hole being built, first (before this frame's draw) */
+  const rawDt = Math.max(0, (now - last) / 1000), dt = clamp(rawDt, 0, .05) || 0; last = now; HOLESYS.tick(now); if (TUT_M && window.__TUTOR) __TUTOR.tick(now); /* TUT_PLAY */ if (CJ.g) caddieStep(CADDIE_BG_SLICE && FLY.on ? 2.5 : 6); /* CADDIE_SLICE (CADDIE_BG_SLICE: 2.5 ms a frame under the hole's fly-over) */ renderer.info.reset(); applyPendingPR(); /* a slice of any hole being built, first (before this frame's draw) */
   if (INTRO.on) { requestAnimationFrame(frame); return; } // the titles cover the screen: draw nothing behind them
   if (!isFinite(SW.vis) || !isFinite(SW.visV)) { SW.vis = 0; SW.visV = 0; } if (!isFinite(camera.fov)) camera.fov = 52; if (!isFinite(G.aimT)) G.aimT = G.aimGoal; const t = now / 1000; FOUNT_T.value = t; /* the pond fountain's spray (one uniform) */ if (FESCUE && G.wind) { if (FESCUE_THICK && G.ball) FESCUE_U.b.value.set(G.ball.u, -G.ball.v, camera.position.x, camera.position.z); FESCUE_U.t.value = RM ? 0 : t; const fk = .06 + .012 * Math.min(25, G.wind.mph || 0); FESCUE_U.w.value.set(Math.cos(G.wind.ang || 0) * fk, -Math.sin(G.wind.ang || 0) * fk); } /* FESCUE: the tufts lean and sway downwind */
   if (MENU.on) { // menu up: just the fly-over (no swing UI, tracer, dial or avatar work)
@@ -6212,19 +6225,21 @@ if (PROF) try { (() => {
     L.push(''); L.push('slowest frames: gap-ms view js-ms-of-the-frame-before-the-gap [what happened the frame before | the next]'); P.recent.slice().sort((a, b) => b[0] - a[0]).slice(0, 10).forEach(r => L.push(`  ${pad(Math.round(r[0]), 4)} ${r[1].padEnd(8)} ${pad(f1(r[2]), 5)}  ${r[3] || '-'}`));
     { const T = Object.entries(P.steps || {}).sort((a, b) => b[1][2] - a[1][2]).slice(0, 10); if (T.length) { L.push(''); L.push('hole-build steps, slowest slice (worst ms / total ms / slices): step'); T.forEach(([n, v]) => L.push(`  ${pad(Math.round(v[2]), 4)} ${pad(Math.round(v[1]), 6)} ${pad(v[0], 5)}  ${n}`)); } }
     { const T = Object.entries(P.tasks).sort((a, b) => b[1][2] - a[1][2]).slice(0, 10); if (T.length) { L.push(''); L.push('work outside the frame over 4 ms (worst ms / total ms / times): what'); T.forEach(([n, v]) => L.push(`  ${pad(Math.round(v[2]), 4)} ${pad(Math.round(v[1]), 6)} ${pad(v[0], 4)}  ${n.slice(0, 90)}`)); } }
+    if (P.swaps.length) { L.push(''); L.push('hole swaps: hole / built before asked? / waited ms / swap ms (old hole freed ms) / after-swap ms / next 3 frame gaps ms'); P.swaps.forEach(w => L.push(`  ${w.key.padEnd(11)} ${w.ready == null ? '?' : w.ready ? 'built' : 'NOT built'.padEnd(5)} ${pad(Math.round(w.wait), 6)} ${pad(Math.round(w.use), 5)} (${Math.round(w.drop)}) ${pad(Math.round(w.then), 5)}  ${w.f.map(x => Math.round(x)).join(' ')}`)); } /* PROF_SWAP */
     L.push(''); L.push(`caddie set-ups (${P.cad.length}): wall ms / cpu ms / slices / mode / hole`); P.cad.slice(-16).forEach(c => L.push(`  ${pad(Math.round(c.wall), 5)} ${pad(Math.round(c.cpu), 5)} ${pad(c.n, 4)}  ${c.mode} · ${c.h}`));
     if (P.cad.length) { const w = P.cad.map(c => c.wall); L.push(`  median ${Math.round(pct(w, .5))} ms · worst ${Math.round(pct(w, 1))} ms`); }
     return L.join('\n'); }
   chip.addEventListener('click', () => { pnl.hidden = !pnl.hidden; if (!pnl.hidden) { pre.textContent = report(); msg.textContent = ''; } });
   pnl.addEventListener('click', async e => { const b = e.target.closest('button'); if (!b) return; const a = b.dataset.p, txt = report(); pre.textContent = txt;
     if (a === 'close') pnl.hidden = true;
-    else if (a === 'reset') { P.cats = {}; P.cad = []; P.recent = []; P.tasks = {}; P.steps = {}; P.t0 = performance.now(); pre.textContent = report(); msg.textContent = 'reset'; }
+    else if (a === 'reset') { P.cats = {}; P.cad = []; P.recent = []; P.tasks = {}; P.swaps = []; P.steps = {}; P.t0 = performance.now(); pre.textContent = report(); msg.textContent = 'reset'; }
     else if (a === 'copy') { try { await navigator.clipboard.writeText(txt); msg.textContent = 'copied'; } catch (err) { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); msg.textContent = 'selected: copy it'; } }
     else if (a === 'send') { msg.textContent = 'sending…'; try { const r = await fetch('/prof', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: txt }); const j = await r.json(); msg.textContent = j.id ? 'sent · code ' + j.id : 'send failed'; } catch (err) { msg.textContent = 'send failed'; } } });
   P.ts = 0; P.tTop = null; P.tasks = {}; const nmF = f => (f.name || String(f).replace(/\s+/g, ' ').slice(0, 64)); /* work outside the frame: timers and idle callbacks, timed one by one */
   const tw = (f, kind) => typeof f !== 'function' ? f : function () { const t = performance.now(); try { return f.apply(this, arguments); } finally { const d = performance.now() - t; P.ts += d; if (d > 4) { const n = kind + ' ' + nmF(f); if (!P.tTop || d > P.tTop[0]) P.tTop = [d, n]; const T = P.tasks[n] || (P.tasks[n] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); } } };
   { const sT = window.setTimeout, sI = window.setInterval, rI = window.requestIdleCallback; window.setTimeout = function (f, ...a) { return sT.call(window, tw(f, 'timeout'), ...a); }; window.setInterval = function (f, ...a) { return sI.call(window, tw(f, 'interval'), ...a); }; if (rI) window.requestIdleCallback = function (f, ...a) { return rI.call(window, tw(f, 'idle'), ...a); }; }
   { const fs0 = finishShot; finishShot = function () { const t = performance.now(); try { return fs0.apply(this, arguments); } finally { const d = performance.now() - t; const T = P.tasks['frame finishShot (the result card)'] || (P.tasks['frame finishShot (the result card)'] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); } }; }
+  P.swaps = []; P.sw = null; SWAPP = { req: null, drop: 0, go(key, ready, n) { this.req = { key, ready, n, at: performance.now() }; this.drop = 0; }, done(key, use, then) { const r = this.req && this.req.key === key ? this.req : { key, ready: null, at: performance.now() }; P.sw = { key, ready: r.ready, wait: performance.now() - r.at - use - then, use, then, drop: this.drop, f: [] }; this.req = null; } }; /* PROF_SWAP: each hole swap, then the gaps of the 3 frames after it */
   P.bs = new Set(); { const mark = n => P.bs.add(n); /* which hole-build steps ran this frame (background or waited-for) */
     const stp = (n, d) => { const T = P.steps[n] || (P.steps[n] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); }; P.steps = {};
     const wf = (n, f) => function () { mark(n); const t0 = performance.now(), r = f.apply(this, arguments); stp(n, performance.now() - t0); if (r && typeof r.next === 'function' && typeof r[Symbol.iterator] === 'function') { const nx = r.next.bind(r); let k = 0; r.next = v => { mark(n); const t = performance.now(); try { return nx(v); } finally { const d = performance.now() - t; stp(n, d); if (k++ === 0) stp(n + ' (1st slice)', d); } }; } return r; }; /* PROF_UPLOAD: the first slice on its own too (courseSteps': the new map canvas's first paint) */ /* each build step timed (a generator: each slice; nested steps count in their caller too) */
@@ -6237,7 +6252,7 @@ if (PROF) try { (() => {
   let prevT = '', lastHole = '', holeAt = 0, cardAt = 0, endT = 0, postMs = 0, postPrev = 0; const mc = new MessageChannel(); mc.port1.onmessage = () => { postMs = performance.now() - endT; }; /* after the frame's script: the browser's own update (style, layout, paint, commit) until the next task */
   const f0 = frame; frame = function (now) { const t = performance.now(); P.s.rd = P.s.cu = P.s.cad = 0; const a = st(); f0(now); const js = performance.now() - t; const b = st(); if (b.hole !== lastHole) { lastHole = b.hole; holeAt = now; } if (b.card && !cardAt) cardAt = now; else if (!b.card) cardAt = 0; const pm = postMs; postMs = 0;
     const bs = P.bs.size ? 'build:' + [...P.bs].join('+') : ''; P.bs.clear(); const tg = [bs, b.wn > a.wn ? (b.wn - a.wn >= 100 ? 'warmAll' : 'warm') : '', b.pg > a.pg ? 'shader+' + (b.pg - a.pg) : '', b.ge > a.ge ? 'geo+' + (b.ge - a.ge) : '', b.tx > a.tx ? 'tex+' + (b.tx - a.tx) : '', b.hb ? 'building' : '', now - holeAt < 3000 ? 'newHole' : '', b.card ? `card ${Math.round(now - cardAt)}ms in` : '', js > 30 ? 'js' : '', pm > 8 ? `browser ${Math.round(pm)}ms` : '', P.ts > 5 ? `outside ${Math.round(P.ts)}ms` + (P.tTop ? ` (${Math.round(P.tTop[0])}: ${P.tTop[1].slice(0, 70)})` : '') : ''].filter(Boolean).join(','); P.ts = 0; P.tTop = null;
-    if (P.last && !document.hidden) { const dt = now - P.last; if (dt > 0 && dt < 1000) { const k = cat(), c = C(k); c.n++; c.ms += dt; c.dts.push(dt); c.js.push(js); if (c.dts.length > 30000) { c.dts.splice(0, 10000); c.js.splice(0, 10000); }
+    if (P.last && !document.hidden) { const dt = now - P.last; if (P.sw) { P.sw.f.push(dt); if (P.sw.f.length >= 3) { P.swaps.push(P.sw); if (P.swaps.length > 30) P.swaps.shift(); P.sw = null; } } /* PROF_SWAP */ if (dt > 0 && dt < 1000) { const k = cat(), c = C(k); c.n++; c.ms += dt; c.dts.push(dt); c.js.push(js); if (c.dts.length > 30000) { c.dts.splice(0, 10000); c.js.splice(0, 10000); }
       c.rd += P.s.rd; c.cu += P.s.cu; c.cad += P.s.cad; const i = renderer.info.render; c.tris += i.triangles; c.calls += i.calls;
       if (dt > 20) { P.recent.push([dt, k, P.pjs, prevT + (prevT && tg ? ' | ' : '') + tg]); if (P.recent.length > 400) P.recent.splice(0, 100); } } }
     prevT = tg; P.pjs = js; P.last = now; if (P.cur && !CJ.g) close(); endT = performance.now(); mc.port2.postMessage(0);
@@ -6386,6 +6401,93 @@ const QUIT = (() => {
   $('#homeBtn').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); ask(); });
   return { ask, home };
 })();
+/* ---- TUT_PLAY: the tutorial, played on the tutorial's own hole (#tutorial-hole). Each step lights only what to touch, the golfer's bubble coaches, and the step lifts as soon as you do it ---- */
+const TUTOR = TUT_PLAY && TUT_M ? (() => {
+  const NS = 'http://www.w3.org/2000/svg', done = new Set(); let st = null, aimFrom = null, lastStroke = 0, fin = false;
+  const root = document.createElement('div'); root.id = 'tutO'; root.style.cssText = 'position:fixed;inset:0;z-index:60;pointer-events:none;font-family:var(--font-hand);color:var(--ink)'; document.body.appendChild(root);
+  const css = document.createElement('style'); css.textContent = `#tutO .tg{position:absolute;display:flex;gap:8px;align-items:center;pointer-events:auto}
+#tutO .goal{font:12px/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;background:var(--pink);color:var(--paper);border:2px solid var(--ink);border-radius:10px;padding:5px 9px 3px;box-shadow:2px 2px 0 var(--ink)}
+#tutO .skip,#tutO .ok{font:12px/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;background:var(--paper);color:var(--ink);border:2px solid var(--ink);border-radius:10px;padding:5px 9px 3px;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+#tutO .ok{background:var(--sun);font-size:14px;padding:7px 12px 5px}
+#tutO .note{position:absolute;font:700 29px/.95 Caveat,var(--font-hand);color:#fffaf0;text-shadow:2px 2px 0 #1d2a1a;white-space:nowrap;transform:rotate(-5deg)}
+#tutO .cardW{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 22px;pointer-events:auto;background:rgba(24,36,22,.55)}
+#tutO .cardW .card{width:100%;max-width:330px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:12px}
+#tutO .cardW h3{margin:0;font:30px/1 var(--font-display)}
+#tutO .cardW p{margin:0;font-size:19px;line-height:1.25}
+#tutO .row{display:flex;gap:10px;justify-content:flex-end;align-items:center}
+#tutO .btnT{font:19px/1 var(--font-display);letter-spacing:.03em;background:var(--sun);color:var(--ink);border:3px solid var(--ink);border-radius:14px;padding:11px 18px 7px;box-shadow:2px 3px 0 var(--ink);cursor:pointer}
+#tutO .btnT.p{background:var(--paper)}
+#tutO .btnT.w{width:100%}
+@keyframes tutPulse{0%,100%{stroke-opacity:1}50%{stroke-opacity:.35}}
+#tutO .ring{animation:tutPulse 1.4s ease-in-out infinite}`; document.head.appendChild(css);
+  const top = document.createElementNS(NS, 'svg'); top.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:visible'; root.appendChild(top);
+  const ui = document.createElement('div'); ui.style.cssText = 'position:absolute;inset:0'; root.appendChild(ui);
+  let world = null; /* the dim over the 3D course, under the HUD (its holes are the lit spots out on the course) */
+  const rectOf = sel => { const e = typeof sel === 'string' ? $(sel) : sel; if (!e) return null; const r = e.getBoundingClientRect(); return r.width ? [r.left, r.top, r.width, r.height] : null; };
+  const midRect = () => { let l = 1e9, t = 1e9, r = -1e9, b = -1e9; for (const e of document.querySelectorAll('#mid *')) { const q = e.getBoundingClientRect(); if (q.width < 2 || q.height < 2) continue; const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.opacity === '0') continue; l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); } return r > l ? [l, t, r - l, b - t] : null; };
+  const onScreen = (u, v, rad) => { const C = RECT.canvas, p = project(new THREE.Vector3(u, groundHeight(u, v), -v)); return [C.left + p.x - rad, C.top + p.y - rad * .8, rad * 2, rad * 1.6]; };
+  const tgtRect = () => { const t = targetUV(); return onScreen(t.u, t.v, 42); };
+  const LIT = { dial: () => rectOf('#dialWrap'), club: () => rectOf('#clubBtn'), lie: () => rectOf('#lie'), slope: () => rectOf('#slopeKey'), mid: midRect, modes: () => rectOf('#modeRow'), target: tgtRect, hole: () => onScreen(PIN.u, PIN.v, 26), course: () => { const C = RECT.canvas; return [C.left + C.width / 2 - 95, C.top + C.height * .3, 190, 190]; } };
+  const WORLD = new Set(['target', 'hole', 'course']), HUDEL = { dial: '#dialWrap', club: '#clubBtn', lie: '#lie', slope: '#slopeKey', mid: '#mid', modes: '#modeRow' };
+  function undim() { document.querySelectorAll('.tutDim').forEach(e => { e.style.filter = ''; e.classList.remove('tutDim'); }); if (world) { world.remove(); world = null; } }
+  function dim(lit) { undim(); const keep = [$('#player'), $('#say'), ...lit.filter(k => HUDEL[k]).map(k => $(HUDEL[k]))].filter(Boolean), gl = $('#gl');
+    world = document.createElementNS(NS, 'svg'); world.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none'; gl.after(world);
+    const rec = el => { if (el === gl || el === world || el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return; if (keep.includes(el)) return; if (keep.some(k => el.contains(k))) { for (const c of el.children) rec(c); return; } el.classList.add('tutDim'); el.style.filter = 'brightness(.42) saturate(.85)'; };
+    for (const c of app.children) rec(c); }
+  const shape = (r, round, circle, extra) => circle ? `<circle cx="${r[0] + r[2] / 2}" cy="${r[1] + r[3] / 2}" r="${Math.max(r[2], r[3]) / 2}" ${extra}/>` : `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="${round}" ${extra}/>`;
+  const PAD = { dial: 6, club: 6, lie: 6, slope: 6, mid: 6, modes: 6, target: 0, hole: 0, course: 0 }, ROUND = { club: 22, lie: 18, slope: 16, mid: 26, modes: 16, target: 42, hole: 22 }, CIRC = { dial: 1, course: 1 };
+  const box = k => { const r = LIT[k](); if (!r) return null; const p = PAD[k]; return [r[0] - p, r[1] - p, r[2] + 2 * p, r[3] + 2 * p]; };
+  function draw() { if (!st) return; const W = innerWidth, H = innerHeight;
+    if (world) { let m = `<defs><mask id="tutM"><rect width="${W}" height="${H}" fill="#fff"/>`; for (const k of st.lit) if (WORLD.has(k)) { const r = box(k); if (r) m += shape(r, ROUND[k] || 18, CIRC[k], 'fill="#000"'); } world.innerHTML = m + `</mask></defs><rect width="${W}" height="${H}" fill="rgba(24,36,22,.62)" mask="url(#tutM)"/>`; }
+    let s = ''; for (const k of st.lit) { const r = box(k); if (r) s += shape(r, ROUND[k] || 18, CIRC[k], 'class="ring" fill="none" stroke="#ffd23f" stroke-width="3.5" stroke-dasharray="11 8" stroke-linecap="round"'); } top.innerHTML = s;
+    const sr = $('#say').hidden ? null : $('#say').getBoundingClientRect(); if (st.tg) st.tg.style.top = ((st.tgY && st.tgY()) || (sr ? sr.bottom + 12 : 140)) + 'px';
+    for (const n of st.notes || []) { const p = n.at(); if (p) { n.el.style.left = p[0] + 'px'; n.el.style.top = p[1] + 'px'; n.el.style.display = ''; } else n.el.style.display = 'none'; } }
+  function bub(t) { AV.say(t, { force: true, hold: true }); }
+  function clear() { st = null; undim(); top.innerHTML = ''; ui.innerHTML = ''; }
+  function show(id, o) { clear(); st = Object.assign({ id, lit: [] }, o); done.add(id); if (o.say) bub(o.say); if (o.dim !== false) dim(st.lit);
+    const tg = document.createElement('div'); tg.className = 'tg'; tg.style.left = '14px';
+    if (o.ok) { const b = document.createElement('span'); b.className = 'ok'; b.textContent = o.ok; b.onclick = e => { e.stopPropagation(); end(); }; tg.appendChild(b); }
+    if (o.goal) { const g = document.createElement('span'); g.className = 'goal'; g.textContent = 'Goal · ' + o.goal; tg.appendChild(g); }
+    const sk = document.createElement('span'); sk.className = 'skip'; sk.textContent = 'Skip tutorial ›'; sk.onclick = e => { e.stopPropagation(); askSkip(); }; tg.appendChild(sk);
+    ui.appendChild(tg); st.tg = tg;
+    st.notes = (o.notes || []).map(n => { const el = document.createElement('div'); el.className = 'note'; el.innerHTML = n.t; ui.appendChild(el); return { el, at: n.at }; });
+    draw(); }
+  function end() { if (!st) return; const id = st.id; clear(); AV.hush(); if (id === 'aim') AV.say('Now swing it!', { force: true }); }
+  function card(html, wire) { const w = document.createElement('div'); w.className = 'cardW'; w.innerHTML = `<div class="card">${html}</div>`; ui.appendChild(w); wire(w); return w; }
+  function leave() { try { localStorage.setItem('tp_tut_done', '1'); } catch (e) {} location.replace(location.pathname + location.search); } /* back to the main screen (a normal load: Hunt and Augusta, no tutorial) */
+  function askSkip() { const keep = st; card(`<h3 style="font-size:26px">Skip the tutorial?</h3><p>You'll go back to the main screen to pick a course.</p><div class="row"><button class="btnT p" data-a="skip">Skip it</button><button class="btnT" data-a="stay">Keep going</button></div>`, w => w.addEventListener('click', e => { const a = e.target.closest('button'); if (!a) return; e.stopPropagation(); if (a.dataset.a === 'skip') leave(); else w.remove(); })); void keep; }
+  function finish() { fin = true; clear(); $('#result').hidden = true; app.classList.remove('resulting'); bub("You've got it. Let's play.");
+    card(`<h3>On to the first tee</h3><button class="btnT w" data-a="go">Pick a course</button>`, w => w.addEventListener('click', e => { if (e.target.closest('button')) { e.stopPropagation(); leave(); } })); ui.firstChild && (ui.firstChild.style.background = 'rgba(24,36,22,.62)'); }
+  const sheet = () => !$('#scrim').hidden, cls = c => app.classList.contains(c); let calmAt = 0;
+  const ready = now => { const ok = !FLY.on && !MENU.on && !INTRO.on && !cls('droning') && !cls('settling') && !cls('resulting') && !cls('flying') && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && $('#result').hidden && !sheet() && G.ball; if (!ok) { calmAt = 0; return false; } if (!calmAt) calmAt = now; return now - calmAt > 500; }; /* settled for half a second */
+  function tick(now) {
+    if (fin) return; const coach = $('#coach'); if (coach) coach.style.visibility = 'hidden';
+    const L = G.log && G.log[G.log.length - 1]; if (L && L.holed && !$('#result').hidden) { finish(); return; }
+    if (st) { /* is this step done? */
+      const id = st.id;
+      if ((id === 'swing' || id === 'pitch' || id === 'putt') && SW.phase === 'down') end();
+      else if (id === 'tap' && G.aimGoal === 1) { end(); aimFrom = null; }
+      else if (id === 'aim') { const t = targetUV(); if (!aimFrom) aimFrom = { u: t.u, v: t.v, c: G.curve }; else if (Math.hypot(t.u - aimFrom.u, t.v - aimFrom.v) > 1 || G.curve !== aimFrom.c || SW.phase === 'down') end(); else if (G.aimGoal !== 1) end(); }
+      else if (id === 'pick1' && sheet()) { show('pick2', { say: 'Pitch flies high and lands soft. Punch stays low under trees. Pick Pitch.', lit: ['modes'] }); }
+      else if (id === 'pick2' && !sheet()) { clear(); }
+      if (st) draw(); return; }
+    if (!ready(now)) return;
+    const toPin = Math.hypot(PIN.u - G.ball.u, PIN.v - G.ball.v), green = G.lie === 'green', sand = /sand|bunker/.test(G.lie);
+    if (G.stroke === 1 && !done.has('swing')) return show('swing', { say: 'Pull the club down, then flick it up. Smooth beats hard.', lit: ['dial'], goal: 'Hit the fairway', notes: [{ t: 'pull ↓<br>then flick ↑', at: () => { const r = rectOf('#dialWrap'); return r && [Math.max(8, r[0] - 70), r[1] - 92]; } }] });
+    if (G.stroke >= 2 && !green && !done.has('lie')) { const f = LIES[G.lie] && LIES[G.lie].f || 1, nm = (LIES[G.lie] && LIES[G.lie].name || G.lie).toLowerCase();
+      return show('lie', { say: f >= 1 ? "Nice, the fairway! This card shows 100%: the ball comes out full distance." : `You're in the ${nm}. The ball comes out a little shorter, and this card shows how much.`, lit: ['lie'], ok: 'Got it',
+        notes: [{ t: f >= 1 ? 'rough or sand<br>= shorter' : `${Math.round(f * 100)}% = a bit<br>shorter shot`, at: () => { const r = rectOf('#lie'); return r && [Math.min(innerWidth - 150, r[0] - 10), r[1] + r[3] + 64]; } }] }); }
+    if (G.stroke >= 2 && !green && !done.has('tap') && G.aimGoal === 0) return show('tap', { say: 'Tap anywhere on the course to aim.', lit: ['course'], notes: [{ t: 'tap', at: () => { const r = LIT.course(); return [r[0] + r[2] / 2 - 18, r[1] + r[3] / 2 - 16]; } }] });
+    if (done.has('tap') && !done.has('aim') && G.aimGoal === 1 && G.aimT > .98) return show('aim', { say: 'Drag the ring to aim. Drag CURVE to bend the shot left or right.', lit: ['target', 'mid'], goal: 'Land on the green', tgY: () => { const r = midRect(); return r ? r[1] + r[3] + 56 : null; },
+      notes: [{ t: 'drag to aim ↗', at: () => { const r = tgtRect(); return [Math.max(12, r[0] - 190), r[1] + r[3] + 30]; } }, { t: 'drag to curve', at: () => { const r = midRect(); return r && [r[0] + 4, r[1] + r[3] + 14]; } }] });
+    if (!green && !sand && toPin < 70 && G.aimGoal === 0 && !done.has('pick1') && done.has('lie')) return show('pick1', { say: 'Close to the green? Tap your club to select Pitch.', lit: ['club'], goal: 'Select Pitch', notes: [{ t: 'tap here', at: () => { const r = rectOf('#clubBtn'); return r && [r[0] - 112, r[1] - 76]; } }] });
+    if (done.has('pick2') && !done.has('pitch') && !green && G.aimGoal === 0) return show('pitch', { say: "Same swing, just softer. The arc shows how high it'll fly.", lit: ['target', 'dial'], goal: 'Finish on the green', tgY: () => { const r = tgtRect(); return r[1] + r[3] + 24; }, notes: [{ t: 'softer<br>swing', at: () => { const r = rectOf('#dialWrap'); return r && [Math.max(8, r[0] - 70), r[1] - 92]; } }] });
+    if (green && G.mode === 'putt' && !done.has('putt')) return show('putt', { say: 'Aim a touch uphill of the hole and pull back gently.', lit: ['hole', 'slope'], goal: 'Hole it', tgY: () => { const r = rectOf('#slopeKey'); return r ? r[1] - 60 : null; }, notes: [{ t: 'steeper =<br>more break', at: () => { const r = rectOf('#slopeKey'); return r && [r[0] + r[2] + 14, r[1] + r[3] - 40]; } }] });
+  }
+  addEventListener('resize', () => draw()); window.__TUTDBG = () => ({ fly: FLY.on, menu: MENU.on, intro: INTRO.on, view: G.view, sw: SW.phase, cam: !!G.camTween, res: $('#result').hidden, sheet: $('#clubSheet').hidden, ball: !!G.ball, aimGoal: G.aimGoal, mode: G.mode, done: [...done] });
+  return { tick, get step() { return st && st.id; }, done };
+})() : null;
+window.__TUTOR = TUTOR;
 function setHome(on) {
   if (!on && BOARD_LAZYPICK) PICKQ.flush(); /* BOARD_LAZYPICK: a golfer picked on the home board is set up for play as the round starts (Play, MP tee-off) */
   MENU.on = on; app.classList.toggle('atHome', on); try { HOLESYS.ahead(); } catch (e) {} /* home: other courses' first holes; playing: the next hole */
@@ -6497,7 +6599,7 @@ async function runIntro() {
     : c.face ? `<div class="c face" data-k="${k}" data-who="${c.face}" style="--bd:${(1.45 + Math.random() * .6).toFixed(2)}s;--bl:-${(Math.random() * 1.5).toFixed(2)}s">${AV.homeArt(c.face).replace(/\bid="av/g, `id="i${k}av`).replace(/url\(#av/g, `url(#i${k}av`).replace(/ style="[^"]*"/g, '')}<span class="nametag">${CHARS[c.face].name}</span></div>`
     : `<div class="c prop p-${c.prop}" data-k="${k}">${PROPS[c.prop]}</div>`).join('');
   const C = [...grid.children], mid = $('#introMid'), faces = C.filter(c => c.classList.contains('face'));
-  el.hidden = false; INTRO.on = true; try { HOLESYS.ahead(); } catch (e) {} /* start building the other course's first hole behind the intro */
+  el.hidden = false; INTRO.on = true; try { HOLESYS.ahead(); } catch (e) {} setTimeout(shaderWarm, 400); /* SHADER_WARM: behind the titles */ /* start building the other course's first hole behind the intro */
   let stop = false, done; const fin = new Promise(r => done = r);
   let hyd = false; const hydrate = () => { if (hyd) return false; hyd = true; if (INTRO.onExit) INTRO.onExit(); return true; }; // the home screen comes up under the board (painted, animating) before anything moves
   const end = async () => { if (stop) return; stop = true; INTRO.on = false; clearInterval(blinkT);
@@ -6790,10 +6892,10 @@ const BOARD = (() => {
     { const t0 = performance.now(); let n = 0; while (n < 4 || performance.now() - t0 < 300) { n++; await frames(1); if (performance.now() - t0 > 900) break; } } // let the camera settle back
   } catch (e) { SW.phase = 'idle'; app.classList.remove('swinging'); }
   clearTimeout(slowT); el.classList.remove('slow');
-  if (ROUND.auto) { INTRO.on = false; const ie = $('#intro'); if (ie) ie.remove(); INTRO.onExit = () => {}; } /* a new hole of a round in progress: no titles, no home screen */
+  if (ROUND.auto) { INTRO.on = false; const ie = $('#intro'); if (ie) ie.remove(); INTRO.onExit = () => {}; setTimeout(shaderWarm, 0); } /* SHADER_WARM: no titles to hide behind */ /* a new hole of a round in progress: no titles, no home screen */
   else if (!MENU.on) setHome(true); // switch the 3D to the home fly-over (and its render scale) now, hidden behind the cover, so the intro's exit only has the tiles to move
   INTRO.onExit = () => { if (!MENU.on) setHome(true); el.classList.add('home'); };
-  if (!ROUND.auto && TO_HOME) { INTRO.on = false; const ie = $('#intro'); if (ie) ie.remove(); INTRO.onExit(); HOLELOAD.hide(); BOARD.home(); } /* switched course on the home screen: no titles again, straight back to it */
+  if (!ROUND.auto && TO_HOME) { setTimeout(shaderWarm, 0); INTRO.on = false; const ie = $('#intro'); if (ie) ie.remove(); INTRO.onExit(); HOLELOAD.hide(); BOARD.home(); } /* switched course on the home screen: no titles again, straight back to it */
   else if (!ROUND.auto) { try { await runIntro(); } catch (e) { INTRO.on = false; const ie = $('#intro'); if (ie) ie.remove(); } INTRO.onExit(); BOARD.home(); } /* the tiles land on the board as it already sits: the picked golfer in the middle */ // warmed up: hydrate into the home screen over the live fly-over
   const startHole = () => { if (!BOOT.on) return; PICKQ.flush(); if (HOLESYS.busy) { HOLESYS.then(startHole); return; } if (NINE_BG_STAY && NINES_PICK && NINEUI.home && HOLESYS.cur && HOLESYS.cur.i !== NINE.first(MENU.course)) { NINEUI.home(MENU.course); if (HOLESYS.busy) { HOLESYS.then(startHole); return; } } /* NINE_BG_STAY: the background stayed put; the nine's first hole is built now */ /* a hole still building (another course, or hole 1 after quitting): play once it's in */ BOOT.on = false; setHome(false); if (!FLY.start(MENU.course + ':' + HOLE.n, BOOT.greet)) { startCamTween(1.6); settleTips(1700); if (BOOT.greet) setTimeout(BOOT.greet, 900); } el.classList.add('done'); setTimeout(() => { if (!BOOT.on) el.hidden = true; }, 600); }; /* first time on the hole: the drone fly-over, then the tee */
   $('#playBtn').addEventListener('click', startHole);
