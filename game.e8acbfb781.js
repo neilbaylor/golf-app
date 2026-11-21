@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v484'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v486'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5876,6 +5876,7 @@ const AV = (() => {
   function setTalking(on) { if (on !== app.classList.contains('talking')) app.classList.toggle('talking', on); }
   function say(text, opts = {}) {
     if (CHAT_OVER && CHAT_BUSY && CHAT_BUSY()) { if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } /* CHAT_OVER: a chat line or typing on the big golfer: no canned line */
+    if (TUT_PLAY && TUT_M && CID === 'tut' && !opts.hold && !opts.tut) { if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } /* TUT_PLAY (Neil 11-21): in the tutorial the golfer only says the tutorial's lines */
     if (st.hold && !opts.hold && !bubble.hidden) { if (opts.mood) setMood(opts.mood, opts.moodFor || 2.5); return; } /* TUT_PLAY: no canned line over a tutorial line */
     if (st.text && st.shown < st.text.length && !opts.force) { if (st.queue.length < 1) st.queue.push([text, opts]); return; }
     st.hold = !!opts.hold; /* TUT_PLAY: a tutorial line stays up until the step is done */ st.text = text; st.pre = !!opts.pre; st.shown = 0; st.typeAcc = 0; st.hideT = 0; bubble.hidden = false; sayA.textContent = ''; sayB.textContent = text; st.drawn = 0; if (BUB_FIT) { bubble.classList.remove('short'); bubble.classList.toggle('short', bubble.offsetWidth < 78); } /* BUB_FIT: a one-word line gets a wider, centred bubble so the tail isn't in its corner */ app.style.setProperty('--sayH', (bubble.offsetHeight + 12) + 'px'); setTalking(true);
@@ -6338,6 +6339,7 @@ const FLY = (() => {
   const seen = new Set(), tRun = () => AUGCAM ? 8.6 * clamp(Math.sqrt(AUGCAM.L / 297), .8, 1.25) : 8.6, /* Augusta: a little quicker down 12, a little longer down 13 */ T_PAUSE = 0, T_ORB = 5.2, T_BACK = 1.2; let S = null, after = null, T_RUN = 8.6; /* (per hole: set as each fly-over starts) */
   const _p = new THREE.Vector3(), _l = new THREE.Vector3(), _o = new THREE.Vector3(), gp = (u, v, h) => new THREE.Vector3(u, groundHeight(u, v) + h, -v);
   function start(key, done) {
+    if (TUT_PLAY && CID === 'tut') return false; /* TUT_PLAY (Neil 11-21): no fly-over before the tutorial: straight to the tee */
     if (seen.has(key)) return false; seen.add(key); after = done; T_RUN = tRun();
     const cu = v => centerU(clamp(v, 0, 300)), C = { u: GREEN.c[0], v: GREEN.c[1] }, cv = K => new THREE.CatmullRomCurve3(K.map(([u, v, h]) => gp(u, v, h)), false, 'centripetal');
     let P, L; if (AUGCAM) { /* Augusta: the same flight down the hole's own line (13 doglegs), scaled to its length, kept clear of the pines */
@@ -6403,7 +6405,8 @@ const QUIT = (() => {
 })();
 /* ---- TUT_PLAY: the tutorial, played on the tutorial's own hole (#tutorial-hole). Each step lights only what to touch, the golfer's bubble coaches, and the step lifts as soon as you do it ---- */
 const TUTOR = TUT_PLAY && TUT_M ? (() => {
-  const NS = 'http://www.w3.org/2000/svg', done = new Set(); let st = null, aimFrom = null, lastStroke = 0, fin = false;
+  const NS = 'http://www.w3.org/2000/svg', done = new Set(), placed = new Set();
+  const TUT_SPOTS = { 2: [-24, 245, 'rough'], 3: [-6.4, 350, 'fairway'], 4: [-4, 379, 'green'] }; /* Neil 11-21: the 2nd shot from the left rough (~140 yd), the 3rd a ~35-yd pitch over the front bunker, the 4th a putt of ~25 ft, wherever the last shot finished */ let st = null, aimFrom = null, lastStroke = 0, fin = false;
   const root = document.createElement('div'); root.id = 'tutO'; root.style.cssText = 'position:fixed;inset:0;z-index:60;pointer-events:none;font-family:var(--font-hand);color:var(--ink)'; document.body.appendChild(root);
   const css = document.createElement('style'); css.textContent = `#tutO .tg{position:absolute;display:flex;gap:8px;align-items:center;pointer-events:auto}
 #tutO .goal{font:12px/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;background:var(--pink);color:var(--paper);border:2px solid var(--ink);border-radius:10px;padding:5px 9px 3px;box-shadow:2px 2px 0 var(--ink)}
@@ -6452,7 +6455,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
     ui.appendChild(tg); st.tg = tg;
     st.notes = (o.notes || []).map(n => { const el = document.createElement('div'); el.className = 'note'; el.innerHTML = n.t; ui.appendChild(el); return { el, at: n.at }; });
     draw(); }
-  function end() { if (!st) return; const id = st.id; clear(); AV.hush(); if (id === 'aim') AV.say('Now swing it!', { force: true }); }
+  function end() { if (!st) return; const id = st.id; clear(); AV.hush(); if (id === 'aim') AV.say('Now swing it!', { force: true, tut: true }); }
   function card(html, wire) { const w = document.createElement('div'); w.className = 'cardW'; w.innerHTML = `<div class="card">${html}</div>`; ui.appendChild(w); wire(w); return w; }
   function leave() { try { localStorage.setItem('tp_tut_done', '1'); } catch (e) {} location.replace(location.pathname + location.search); } /* back to the main screen (a normal load: Hunt and Augusta, no tutorial) */
   function askSkip() { const keep = st; card(`<h3 style="font-size:26px">Skip the tutorial?</h3><p>You'll go back to the main screen to pick a course.</p><div class="row"><button class="btnT p" data-a="skip">Skip it</button><button class="btnT" data-a="stay">Keep going</button></div>`, w => w.addEventListener('click', e => { const a = e.target.closest('button'); if (!a) return; e.stopPropagation(); if (a.dataset.a === 'skip') leave(); else w.remove(); })); void keep; }
@@ -6473,6 +6476,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
       else if (id === 'pick2' && !sheet()) { clear(); }
       if (st) draw(); return; }
     if (!ready(now)) return;
+    { const S = TUT_SPOTS[Math.min(G.stroke, 4)]; if (S && G.stroke <= 4 && !placed.has(G.stroke)) { placed.add(G.stroke); calmAt = 0; try { G.view = 'swing'; G.aimGoal = 0; setupShot(S[0], S[1], S[2]); updateHUD(); } catch (e) { console.error(e); } return; } } /* TUT_SPOTS: the same shots every time, wherever the last one went */
     const toPin = Math.hypot(PIN.u - G.ball.u, PIN.v - G.ball.v), green = G.lie === 'green', sand = /sand|bunker/.test(G.lie);
     if (G.stroke === 1 && !done.has('swing')) return show('swing', { say: 'Pull the club down, then flick it up. Smooth beats hard.', lit: ['dial'], goal: 'Hit the fairway', notes: [{ t: 'pull ↓<br>then flick ↑', at: () => { const r = rectOf('#dialWrap'); return r && [Math.max(8, r[0] - 70), r[1] - 92]; } }] });
     if (G.stroke >= 2 && !green && !done.has('lie')) { const f = LIES[G.lie] && LIES[G.lie].f || 1, nm = (LIES[G.lie] && LIES[G.lie].name || G.lie).toLowerCase();
