@@ -1,4 +1,4 @@
-# Decisions needed for the bug/perf PRs (#1–#17)
+# Decisions needed for the bug/perf PRs (#1–#18)
 
 Also tracked in https://github.com/neilbaylor/golf-app/issues/14 (rounds 1–5) and in a comment on PR #1 (rounds 6–8). The token couldn't edit the issue any more.
 
@@ -7,7 +7,7 @@ Also tracked in https://github.com/neilbaylor/golf-app/issues/14 (rounds 1–5) 
 - [ ] **#6 (round card voice).** Even par: should it get the good-round lines (drop #6 and reword the "Under par" lines), or the OK-round lines (merge #6)?
 - [ ] **#4 (MP tee honour).** Should a golfer who leaves also lose their turn after the tee, not just the honour order on the tee?
 - [ ] **#12 (async shader compile).** OK to turn off three.js shader error reporting in production? There's no `?debug` flag today; a `?shaders` switch could be added.
-- [ ] **#15 (MP replay drift).** It fixes one proven cause (2.57 yd → 0). A second cause remains open (full shots onto the green, 0.8–1.8 yd, about 2 in 15 replays). Merge #15 now and track the rest, or hold? (The second cause is narrowed down to the speed-table rows; see `HANDOFF.md`.)
+- [x] **#15 / #18 (MP replay drift):** resolved. #18 fixes the remaining drift (0 of 30 replays off). Merge #18 after #5 and #15. Optional: keep #15 (it's still correct) or drop it.
 
 - [ ] **#17 (free uploaded canvases):** fine as long as no WebGL context-restore path is planned. If one is, it must repaint these canvases (or set `TEX_FREE = false`).
 
@@ -15,6 +15,6 @@ Also tracked in https://github.com/neilbaylor/golf-app/issues/14 (rounds 1–5) 
 - [ ] Phone check for the perf PRs measured only in headless Chromium + SwiftShader: #8, #11, #12 (`?prof` before and after).
 
 ## Porting
-- **Need redoing in `sketchy-golf.html` plus a rebuild (new file name; don't edit the hashed file in place):** #1, #2, #5, #6, #8, #9, #11, #12, #13, #15, #17.
+- **Need redoing in `sketchy-golf.html` plus a rebuild (new file name; don't edit the hashed file in place):** #1, #2, #5, #6, #8, #9, #11, #12, #13, #15, #17, #18.
 - **Server-only, mergeable as they are:** #3, #4, #7, #10.
-- Every PR applies to `main` on its own; the stack is only for review order.
+- Every PR applies to `main` on its own except #18, which needs #5 and #15 first. Otherwise the stack is only for review order.
