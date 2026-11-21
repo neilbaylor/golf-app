@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v475'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v477'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2458,6 +2458,7 @@ const MODES = {
 const SG_TEMPO_UP = { chip: 4.3, pitch: 4.3, sand: 4.5, punch: 4.25, flop: 4.3, putt: 3.3 }; /* v472 (Neil 23:06): "Make punch 4.25, pitch and flop should be 4.3. Putt 3.3" (were 4.0, 3.4, 3.4, 3.1) */ /* v471 (Neil 23:05, "What is chip? We have pitch and bunker"): there is no chip mode to pick any more (modeAllowed: chip is off), so tonight's chip changes never reached a shot: the short shot is the PITCH. It now gets the same 4.3 (was 3.4) */ /* v470 (Neil 11-18 22:52: "Speed chip and bunker tempo up even another 6%"): 4.05 -> 4.3, 4.25 -> 4.5 */ /* v468 (Neil 11-18 22:48: "I still get quick too much on them. Even faster tempo. Another 9%"): 3.7 -> 4.05, 3.9 -> 4.25 (a full swing is 4.25) */ /* v467 (Neil 11-18 22:44: "tempo is also still too slow for a good one. Speed it up"): 3.4 -> 3.7 and 3.6 -> 3.9, ~9% quicker again */ /* Neil (11-18 18:23): chips and bunker splashes "expecting too slow of a tempo, just slightly". Target ratio (backswing / downswing) chip 3.2 -> 3.4, sand 3.4 -> 3.6, about 6% quicker; window widths unchanged. null = as v444 */
 if (SG_TEMPO_UP) for (const k in SG_TEMPO_UP) MODES[k].tempo = SG_TEMPO_UP[k];
 const BLADE_EASE = { sand: .06, other: .04 }; /* Neil (11-18 22:50): "Too easy to get bladed. Just a bit": a too-quick swing blades it only once it's further off the tempo (bunker splash: .26 -> .32 past the perfect window; flop: .17 -> .21; log-ratio units, ~6% and ~4% more of a miss). Chunks (too slow) unchanged. null = as v468 */
+const PUTT_TAB_OFF = true; /* Neil 11-20 21:38: only say PUTT when putting from off the green. false = PUTT tab on every putt */
 const MODE_ON_DIAL = true; /* Neil (11-20 21:19, picked option C on the design canvas): the PITCH / POWER / BUNKER / FLOP / PUNCH chip sits as a tab on top of the swing dial instead of under the yardage, so the speech bubble never drops to make room. false = under the yardage, as v473 */
 try { if (MODE_ON_DIAL) { const m = document.getElementById('distMode'), w = document.getElementById('dialWrap'); if (m && w) { w.appendChild(m); m.classList.add('onDial'); } } } catch (e) {}
 const SG_PERF = { chip: 1.15, pitch: 1.15, sand: 1.15 }; /* (v471: the pitch too) */ /* Neil (11-18 22:44): chips and bunker shots "still too hard... make a touch more forgiving": their PERFECT tempo window 15% wider (the good band beyond it moves out with it). null = as v466 */
@@ -3176,7 +3177,7 @@ function setupShotSliced(u, v, lie, first = 6) { if (!(CADDIE_FAST2 && CADDIE_SL
 function updateHUD() { if (!HUD_FAST2 || (CADDIE_FAST2 && HUD_HOLD)) return updateHUD0(); try { HUDW = 1; return updateHUD0(); } finally { HUDW = null; } } /* HUD_FAST2: HUDW holds the cards' widths only inside a refresh */
 function updateHUD0() { if (CADDIE_FAST2 && HUD_HOLD) return;
   if (HUD_PAR) hudPar(); /* HUD_PAR hook */ if (HUDW === 1) { const d = $('#dist'), l = $('#lie'); HUDW = d && l ? { d, dw: d.clientWidth, l, lw: l.clientWidth } : null; } /* HUD_FAST2: both widths now, before this refresh writes anything (after the score box, which sits in the face) */
-  if (G.view !== 'flight') { setDist(hudDist(), _bic); $('#distNum').classList.remove('live'); setDistLbl(G.mode === 'putt' ? 'Feet · Putter' : `Yards · ${club().name}`, HUD_LATER); const dm = $('#distMode'), mt = G.mode === 'full' || (G.mode === 'putt' && !MODE_ON_DIAL) ? '' : MODES[G.mode].name; /* (MODE_ON_DIAL: the putter gets its PUTT tab too) */ dm.hidden = !mt; app.classList.toggle('hasMode', !!mt && !MODE_ON_DIAL); /* (MODE_ON_DIAL: the bubble never moves for it) */ if (dm.textContent !== mt) dm.textContent = mt; }
+  if (G.view !== 'flight') { setDist(hudDist(), _bic); $('#distNum').classList.remove('live'); setDistLbl(G.mode === 'putt' ? 'Feet · Putter' : `Yards · ${club().name}`, HUD_LATER); const dm = $('#distMode'), mt = G.mode === 'full' || (G.mode === 'putt' && (!MODE_ON_DIAL || (PUTT_TAB_OFF && G.lie === 'green'))) ? '' : MODES[G.mode].name; /* PUTT_TAB_OFF: PUTT only shows when putting from off the green */ /* (MODE_ON_DIAL: the putter gets its PUTT tab too) */ dm.hidden = !mt; app.classList.toggle('hasMode', !!mt && !MODE_ON_DIAL); /* (MODE_ON_DIAL: the bubble never moves for it) */ if (dm.textContent !== mt) dm.textContent = mt; }
   setIH($('#lieIcon'), lieIcons[G.lie] || lieIcons.rough); try { setDialLie(G.lie); } catch (e) {}
   setTx($('#lieName'), LIES[G.lie].name);
   const pct = Math.round((LIES[G.lie].f || 1) * 100), lo = Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100), lp = $('#liePct'); setTx(lp, lo < pct ? `${lo}–${pct}%` : pct + '%'); lp.classList.toggle('warn', pct < 100); if (!HUD_FAST || lp.hidden !== (G.lie === 'green')) lp.hidden = G.lie === 'green';
@@ -4587,12 +4588,14 @@ let aimFrame = null;
 // inside 30 yds of the green (and putting) you play from one raised view that frames ball and pin — no separate aim view
 const shortGame = () => G.mode !== 'putt' && G.lie !== 'green' && greenGap() <= 30;
 function puttView() { if ((G.mode === 'putt' || shortGame()) && G.view === 'swing') { measure(); aimFrame = null; G.view = 'aim'; G.aimGoal = 1; } }
-const _fc2 = new THREE.PerspectiveCamera(52, 1, .3, 4000), _fv2 = new THREE.Vector3();
+const _fc2 = new THREE.PerspectiveCamera(52, 1, .3, 4000), _fv2 = new THREE.Vector3(), _fv3 = new THREE.Vector3();
+const AIM_TILT = { near: 56, far: 42, yaw: 24 }; /* Neil (11-20, design option 3B): the pitch / bunker / flop aim view looked nearly straight down (80 degrees beside the green, 52 from 30 yd out), so the ball's arc was flat on screen. The camera now sits further back and lower behind the line, 56 degrees beside the green easing to 40 from 30 yd out, and 24 degrees off to the side of the line (from straight behind, a rising arc lies along its own ground line on screen), so how high it goes reads in 3D (its shadow on the grass under it). null = as v475 */
 function frameShort() { // tilted down the line: steeper the closer you are to the green; ball just above the controls, far end just under the HUD
-  const f = new THREE.Vector3(G.dir.u, 0, -G.dir.v).normalize(), far = Math.max(G.D, pinDist()) + 1.2, k = clamp(greenGap() / 30, 0, 1), phi = lerp(80, 52, k) * Math.PI / 180;
+  const f = new THREE.Vector3(G.dir.u, 0, -G.dir.v).normalize(), far = Math.max(G.D, pinDist()) + 1.2, k = clamp(greenGap() / 30, 0, 1), phi = (AIM_TILT ? lerp(AIM_TILT.near, AIM_TILT.far, k) : lerp(80, 52, k)) * Math.PI / 180; /* AIM_TILT */
   const B = new THREE.Vector3(G.ball.u, groundHeight(G.ball.u, G.ball.v), -G.ball.v), Tf = new THREE.Vector3(G.ball.u + G.dir.u * far, 0, -(G.ball.v + G.dir.v * far)); Tf.y = groundHeight(Tf.x, -Tf.z);
   measure(); const ar = RECT.app, Hs = ar.height, yb = 1 - 2 * clamp((RECT.ctrlT || Hs * .65) - ar.top - 54, Hs * .3, Hs * .92) / Hs, yt = 1 - 2 * clamp((RECT.hudB || 140) - ar.top + 40, Hs * .1, Hs * .45) / Hs;
-  const d = new THREE.Vector3(f.x * Math.cos(phi), -Math.sin(phi), f.z * Math.cos(phi));
+  const yw = AIM_TILT ? AIM_TILT.yaw * Math.PI / 180 : 0, fx = f.x * Math.cos(yw) - f.z * Math.sin(yw), fz = f.x * Math.sin(yw) + f.z * Math.cos(yw); /* AIM_TILT: from a little off to the side, so the arc's height shows */
+  const d = new THREE.Vector3(fx * Math.cos(phi), -Math.sin(phi), fz * Math.cos(phi));
   _fc2.fov = 52; _fc2.aspect = camera.aspect; _fc2.updateProjectionMatrix();
   const P0 = B.clone().lerp(Tf, .5); let dist = far * 1.4;
   for (let i = 0; i < 14; i++) {
@@ -4600,6 +4603,7 @@ function frameShort() { // tilted down the line: steeper the closer you are to t
     const pb = _fv2.copy(B).project(_fc2).y, pt = _fv2.copy(Tf).project(_fc2).y, sep = pt - pb;
     if (sep > 1e-3) dist *= clamp(sep / (yt - yb), .6, 1.6);
     const e = (pt + pb) / 2 - (yt + yb) / 2; P0.addScaledVector(f, e * dist * Math.tan(26 * Math.PI / 180) / Math.sin(phi)); dist = clamp(dist, 6, 300);
+    if (yw) { const ex = (_fv2.copy(B).project(_fc2).x + _fv2.copy(Tf).project(_fc2).x) / 2; _fv3.setFromMatrixColumn(_fc2.matrixWorld, 0).setY(0).normalize(); P0.addScaledVector(_fv3, ex * dist * Math.tan(26 * Math.PI / 180) * _fc2.aspect * .9); } /* AIM_TILT: keep the ball-to-target line centred left-right */
   }
   _fc2.position.copy(P0).addScaledVector(d, -dist);
   return { bpos: _fc2.position.clone(), blook: P0.clone(), pos: new THREE.Vector3(), look: new THREE.Vector3(), zoom: 1, pan: new THREE.Vector3(), F: far };
