@@ -4001,9 +4001,9 @@ function launch(sw) {
   // table guess + one secant correction (≈0.4 ms) instead of a full bisection at the moment of impact
   let speedA = PHYS.speedFromTable(tableCache.tbl, carry);
   let calmF = null; { const o = { p: startP, yaw: plan.yaw + plan.yawc, launch: plan.launch, spin: plan.spin, tilt: plan.tilt, speed: speedA }, f0 = calmF = PHYS.fly(o, plan.gP || groundHW, 1 / 120), L0 = f0.pts[f0.pts.length - 1], c0 = Math.hypot(L0.x - startP.x, L0.z - startP.z); if (c0 > 1) speedA *= Math.pow(carry / c0, .85); } /* ELEV_PLAYER: measured on the level plane, like the plan */
-  speedA *= plan.speedMul || 1;
-  const ws = windScale(calmF, startP), wv = { x: Math.cos(G.wind.ang) * G.wind.mph * .447 * ws, z: -Math.sin(G.wind.ang) * G.wind.mph * .447 * ws }; /* WIND_SHAPE */
-  const fl = PHYS.fly({ p: startP, yaw: plan.yaw + plan.yawc + startDeg * Math.PI / 180, launch: launchA, spin, tilt, speed: speedA, wind: wv }, groundHW); liftPts(fl.pts); // shown (and tree-tested) higher than the physics flight
+  speedA *= plan.speedMul || 1; if (REPLAY_FL) speedA = REPLAY_FL.sp; /* MP replay: the shooter's own launch speed (this phone's speed table can differ in its last digits; that moved replays by a yard or two) */
+  const ws = REPLAY_FL ? REPLAY_FL.ws : windScale(calmF, startP), wv = { x: Math.cos(G.wind.ang) * G.wind.mph * .447 * ws, z: -Math.sin(G.wind.ang) * G.wind.mph * .447 * ws }; /* WIND_SHAPE */
+  const yawc = REPLAY_FL ? REPLAY_FL.yc : plan.yawc, fl = PHYS.fly({ p: startP, yaw: plan.yaw + yawc + startDeg * Math.PI / 180, launch: launchA, spin, tilt, speed: speedA, wind: wv }, groundHW); liftPts(fl.pts); // shown (and tree-tested) higher than the physics flight
   // trees: first sample that passes through a trunk or canopy ends the flight (a tree right in front WILL be hit)
   const tHit = firstTreeHit(fl.pts), hitI = tHit ? tHit.i : -1; PLAN_TREE = tHit ? tHit.tree : null;
   const air = tHit ? fl.pts.slice(0, tHit.i).concat([{ t: tHit.t, x: tHit.x, y: tHit.y, z: tHit.z }]) : fl.pts, A = air[air.length - 1];
@@ -4024,7 +4024,7 @@ function launch(sw) {
   const apex = fl.apex - startP.y; /* real apex: the card's stat. The camera frames the lifted one (apex * SHOT_LIFT) */
   const dur = Tair / 1.6 + .1;
   G.prev = { u: G.ball.u, v: G.ball.v, lie: G.lie, club: G.club, mode: G.mode, dir: { ...G.dir }, D: G.D, curve: G.curve, spinX: G.spinX, height: G.height };
-  G.shot = { sinkT, P, holed: !!gnd.holed, tEnd: 1, dur, t: 0, phase: 'air', land, rd, roll: rollY, end, endLie, lieLand, hitT: hitI >= 0 ? 1 : null, apex, carry: carryY, B, tq, ratio: sw.ratio, pinHigh, pure, th, puffAcc: 0, rollT: 0, gnd, ev: 0, spin: Math.round(spin), axis: fl.axis, q, shape: shapeName(), lieLoss: G.mode === 'sand' ? 0 : Math.round(carry / (G.lieRoll || 1) - carry), air };
+  G.shot = { fl: { sp: speedA, yc: yawc, ws }, sinkT, P, holed: !!gnd.holed, tEnd: 1, dur, t: 0, phase: 'air', land, rd, roll: rollY, end, endLie, lieLand, hitT: hitI >= 0 ? 1 : null, apex, carry: carryY, B, tq, ratio: sw.ratio, pinHigh, pure, th, puffAcc: 0, rollT: 0, gnd, ev: 0, spin: Math.round(spin), axis: fl.axis, q, shape: shapeName(), lieLoss: G.mode === 'sand' ? 0 : Math.round(carry / (G.lieRoll || 1) - carry), air };
   G.shot.fromTop = G.aimT > .5; /* struck from the overhead view */ G.view = 'flight'; G.aimGoal = 0; G.aimT = 0; aimFrame = null; aimDrag = null; app.classList.add('flying'); peg.visible = false; tracer.visible = tracerInk.visible = trShadow.visible = false; rings.visible = false;
   const msgs = []; if (pinHigh) msgs.push(!PH_RULE || Math.hypot(B.u + d.u * D - PIN.u, B.v + d.v * D - PIN.v) <= PH_RULE.pinYd ? 'PIN HIGH' : 'ON THE NUMBER'); if (tq === 'perfect') msgs.push('PERFECT TEMPO'); if (pure) msgs.push('PURE');
   G.mood = (tq === 'perfect' && (pure || pinHigh)) ? 'perfect' : (tq === 'off' || Math.abs(th) > 10) ? 'bad' : null; G.moodT = 2.4;
@@ -4772,7 +4772,7 @@ function liftPts(pts) {
     for (const p of pts) { if (!(p.y > top)) { const g = groundHW(p.x, p.z); if (!(p.y > g)) continue; } const k = L2 > 1e-6 ? clamp(((p.x - a.x) * dx + (p.z - a.z) * dz) / L2, 0, 1) : 0, r = Math.min(ga + (gb - ga) * k, p.y); p.y = r + (p.y - r) * SHOT_LIFT; }
     return pts; }
   for (const p of pts) { const g = groundHW(p.x, p.z); if (p.y > g) p.y = g + (p.y - g) * SHOT_LIFT; } return pts; }
-let PLAN_TREE = null; /* the tree the aimed shot will hit: it must stay drawn, even if it stands between the camera and the ball */
+let PLAN_TREE = null, REPLAY_FL = null; /* the tree the aimed shot will hit: it must stay drawn, even if it stands between the camera and the ball */
 function perfectFlight(pl, wind = null) { /* TRACER_TREE: the flight launch() fires for a perfect, calm strike of this plan (pin-high power, perfect tempo, no curve, no wind, a clean lie), lifted like the shown one */
   const cl = club(); let carry = G.D; if (G.mode === 'chip') carry *= pl.cf || .45; if (G.mode === 'sand' && SAND_TOTAL) carry *= pl.cf || 1;
   let sp = pl.pfSp && pl.pfC === carry ? pl.pfSp : PHYS.speedFromTable(tableCache.tbl, carry); if (sp !== pl.pfSp) { const f0 = PHYS.fly({ p: pl.p, yaw: pl.yaw + pl.yawc, launch: pl.launch, spin: pl.spin, tilt: pl.tilt, speed: sp }, pl.gP || groundHW, 1 / 120), L0 = f0.pts[f0.pts.length - 1], c0 = Math.hypot(L0.x - pl.p.x, L0.z - pl.p.z); if (c0 > 1) sp *= Math.pow(carry / c0, .85); pl.pfSp = sp; pl.pfC = carry; pl.pfWs = windScale(f0, pl.p); pl.pfTb = tableCache.tbl; } /* pfWs (WIND_SHAPE): the same calm flight launch() scales its wind by */ /* (the secant once per plan) */
@@ -7023,7 +7023,7 @@ if (MULTI) try { MPX = (() => {
       lsw: { curveDeg: ls.curveDeg, q: ls.q, wob: ls.wob, pts: packPts(ls.pts || []) }, tb: tableCache && tableCache.mp ? tableCache.mp : null, stroke: G.stroke };
     seeded(seed, () => _launch(sw));
     const R = G.shot; if (!R) return; const ob = R.endLie === 'ob' && R.lieLand !== 'water', water = R.endLie === 'water' || R.lieLand === 'water' || ob;
-    d.chk = { u: R.end.u, v: R.end.v, lu: R.land.u, lv: R.land.v };
+    d.chk = { u: R.end.u, v: R.end.v, lu: R.land.u, lv: R.land.v }; if (R.fl) d.fl = R.fl;
     sendR({ t: 'shot', as: as !== S.you ? as : undefined, auto: !!S.autoNow, d, res: { u: R.end.u, v: R.end.v, lie: R.endLie, holed: !!R.holed, water, toPin: Math.hypot(PIN.u - R.end.u, PIN.v - R.end.v) } });
     S.ends.push({ n: S.curN, u: R.end.u, v: R.end.v, lie: R.endLie, holed: !!R.holed, by: 'me' }); if (S.ends.length > 200) S.ends.shift();
     if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* this turn's shot is struck */
@@ -7046,7 +7046,7 @@ if (MULTI) try { MPX = (() => {
     if (d.tb && d.mode !== 'putt' && !(MP_REPLAY_FAST && tbHeld(d.tb))) { const k = { dir: G.dir, D: G.D, Feff: G.Feff, h: G.height, c: G.curve, s: G.spinX }; G.dir = { ...d.tb.dir }; G.D = d.tb.D; G.Feff = d.tb.Feff; G.height = d.tb.h; if (d.tb.c != null) { G.curve = d.tb.c; G.spinX = d.tb.s; } planCache = { key: '' }; tableCache = { key: '' }; planShot(); G.dir = k.dir; G.D = k.D; G.Feff = k.Feff; G.height = k.h; G.curve = k.c; G.spinX = k.s; } /* (an old phone's table has no c, s: as before) */ /* (MP_REPLAY_FAST: unless this phone holds that very table) */
     planCache = { key: '' }; G.aimT = d.aimT || 0; G.aimGoal = 0; G.view = 'swing';
     S.replaying = { n: m.n, auto: !!m.auto, from: m.from }; if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* (MP_AIM_TAG_LIVE: struck) */
-    seeded(d.seed, () => _launch(d.sw)); S.stats.replays++;
+    REPLAY_FL = d.fl && Number.isFinite(d.fl.sp) ? d.fl : null; try { seeded(d.seed, () => _launch(d.sw)); } finally { REPLAY_FL = null; } /* (an older phone's shot has no fl: replayed as before) */ S.stats.replays++;
     const R = G.shot, c = d.chk; if (R) { S.ends.push({ n: m.n, u: R.end.u, v: R.end.v, lie: R.endLie, holed: !!R.holed, by: 'replay' }); if (S.ends.length > 200) S.ends.shift(); }
     if (R && c) { const e = Math.hypot(R.end.u - c.u, R.end.v - c.v); S.lastMiss = e; if (e > 1e-6) { S.stats.mismatch++; log('replay mismatch', e); } else log('replay ok', m.n, R.end.u.toFixed(3), R.end.v.toFixed(3)); }
     BANNER.set(); STRIP.draw();
