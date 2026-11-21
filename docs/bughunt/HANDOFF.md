@@ -42,6 +42,21 @@ You're picking up the results of a bug and perf hunt on neilbaylor/golf-app (Tee
 - **No leaks:** home↔play cycles and hole loads keep GPU object counts and the JS heap steady.
 - **Per-shot `launch`:** about 19 ms of one frame in software rendering. It's the physics; not changed, because changing the timestep would break MP replays between versions.
 
+
+## Rounds after the merge (v491, `main` @ 988472b)
+
+Two fresh-eyes rounds of bugs and perf on the merged build. **No new PRs:** nothing demonstrable was found, and I didn't open speculative ones.
+- **Ports verified:** all 18 merged fixes are present in the live bundle `game.d0d03720d0.js` (#12 with the `?shaders` switch).
+- **New code reviewed (v473–v491):** tutorial (`TUTOR`), ghost-line, `SHADER_WARM`, AIM_TILT, MODE_ON_DIAL / PUTT_TAB_OFF, MP_AUTO_VARY, and server tee honours by score. No bugs found:
+  - The tutorial's input gate doesn't allow the drop screen, but the tutorial hole has no water or OB, so that path can't happen.
+  - MP_AUTO_VARY's randomness is outside the seeded replay, but it's sent with the shot, so replays still match.
+  - `honourCmp` handles missing scores (late joiners go last) and falls back to seat order.
+- **Random-play invariant test** (`tests/randplay.js`): about 36 holes on Hunt 1–9, Augusta 1+ and Augusta 12 (3 holes with water penalties). No page errors, no stuck states, and strokes = shots + penalties on every hole.
+- **Notes (not bugs):**
+  - Ghost-line's ghost mesh holds at most 64 crown pieces (ghosted crowns past 64 would simply not draw). The measured peak across Hunt 1–9 and Augusta 1–9 is 30 (Hunt 9), so it isn't reached in practice. If bigger trees are added, size it to the ghost count.
+  - Ghost-line costs about 0.44 ms per frame during a continuous aim drag on Hunt 9. Fine.
+  - Cold boot (first visit) is still dominated by the swing-dial bake (all lie kinds, `feTurbulence`; cached from the second visit by #11) and by shader compiles forced by the build's `renderer.compile`. Deferring either moves the cost into play as jank. That's a product choice, so it's left alone.
+
 **If you find more:** add the PR to the stack and to this list, and post any decision on its PR and in `DECISIONS.md` here.
 
 **Security:** the GitHub token used here was pasted in chat. Revoke it.
