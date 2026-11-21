@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.c60d610635.js", "osler": "osler.f5ef422a43.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.d754df01be.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.73dddd34b6.js", "osler": "osler.f5ef422a43.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); if (/^#ob-004b22b2(?:-hole-\d+)?$/.test(h || at)) pre(N.osler); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -226,6 +226,7 @@ html.tagBold #holeTag{font-weight:700;letter-spacing:0} /* (v445: the browser's 
 #intro .ig{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:7px;width:min(100%,430px);aspect-ratio:1;padding:7px;box-sizing:border-box;background:#0d1226;border:4px solid var(--ink);border-radius:14px;box-shadow:0 0 0 3px #ffd23f,0 14px 40px rgba(0,0,0,.5)}
 #intro .c{position:relative;border-radius:6px;overflow:hidden;background:#8fd3ff;opacity:0;transform:scale(.55) rotate(-6deg);transition:opacity .3s,transform .5s cubic-bezier(.3,1.6,.5,1)}
 #intro .c.in{opacity:1;transform:none}
+#intro.pre .c:not(.in){opacity:.01} /* INTRO_PRE (Neil 11-21: the last few pictures still stutter in): every square is painted, all but invisibly, before the board fills, so the first frame each one shows has nothing left to decode or draw */
 #intro .c svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 #intro .c .icl{position:absolute;left:12%;top:8%;width:76%}
 #intro .c .icl img{display:block;width:100%;height:auto;filter:drop-shadow(2px 3px 0 rgba(29,42,26,.8))}
@@ -1187,5 +1188,5 @@ if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror
 if (/^#ob-004b22b2(?:-hole-\d+)?$/.test(location.hash)) document.write('<script src="' + __splitN.osler + '" onerror="__splitFail()"><\/script>'); /* OslerBrook: only on its own boot */</script>
 <script src="hunt.d754df01be.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.c60d610635.js" onerror="__splitFail()"></script>
+<script src="game.73dddd34b6.js" onerror="__splitFail()"></script>
 
