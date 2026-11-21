@@ -188,6 +188,8 @@ const COURSE_DEF = { /* every course: its name, crest, what its flag carries (th
     holes: () => [...(AUG_FRONT ? AUG_FRONT_CARD : []), { n: 10, par: 4, yds: 450, hcp: 6, name: 'Camellia' }, { n: 11, par: 4, yds: 400, hcp: 8, name: 'White Dogwood' }, { n: 12, par: 3, yds: 145, hcp: 16, name: 'Golden Bell' }, { n: 13, par: 5, yds: 455, hcp: 4, name: 'Azalea' }, { n: 14, par: 4, yds: 380, hcp: 12, name: 'Chinese Fir' }, { n: 15, par: 5, yds: 475, hcp: 2, name: 'Firethorn' }, { n: 16, par: 3, yds: 145, hcp: 18, name: 'Redbud' }, { n: 17, par: 4, yds: 370, hcp: 14, name: 'Nandina' }, { n: 18, par: 4, yds: 385, hcp: 10, name: 'Holly' }] } }; /* optional name: shown on the fly-over card */
 if (OSLER_DEV && /^#ob-004b22b2(?:-hole-\d+)?$/.test(location.hash)) COURSE_DEF.osler = { id: 'osler', name: 'OslerBrook', dev: true, logo: OSLER_LOGO, flag: () => { const im = new Image(); im.src = OSLER_LOGO; return { img: im, w: 150, oval: false }; }, holes: () => Object.keys(OSLER_HOLES).map(k => holeMeta(normHole(OSLER_HOLES[k], 'osler'))) };
 let CID, HOLES, HOLE_N, HOLE, COURSE_LOGO, COURSE_NAME; /* the hole on screen (HOLESYS swaps them; a hole being prebuilt sees its own for the length of each build step) */
+const TEX_FREE = true; /* ROLLBACK: false -> the course and green canvases stay in memory after the GPU has its copy */
+const texFree = t => { t.onUpdate = null; const c = t.image; if (c && c.getContext) c.width = c.height = 0; }; /* once uploaded, the canvas's pixels are only the GPU's (nothing reads them again; the minimap is drawn from it before the upload) */
 let MAP = null, GREENTEX = null, courseTex = null, CUPMESH = null, HS = null, AUGCAM = null, homePath = null; /* the hole's scene side: painted-map frame, green art, map texture, cup, scene group (HS: { group, cull, ud }), drone and home-camera paths */
 const HOME_BG_WARM = true; /* Neil (11-16 22:55): after a round (MP or not) the home screen was slow to show the other course: its first hole, dropped for the round, rebuilt at the background rate and only then could the tap swap to it. On: (1) on the home screen that rebuild runs at the home rate (BUDGET.home, as a course switch there already does); (2) on a round's last hole its first hole is prebuilt in the next hole's place (no extra memory: the round holds two holes everywhere else), so Home / Play again / the MP lobby land on it at once and the other course starts building straight away; (3) HOMESNAP: a ~25 KB still of each course's home view, shown under the sky dip of a course switch (or a quit home) while its hole still builds, the live fly-over fading in over it. Undo switch: false = v393 */
 const NINE_BG_STAY = true; /* Neil (11-16 15:57): switching F9 / B9 on the home screen doesn't change the fly-over behind it; Play builds the nine's first hole if it isn't the one showing (Play's short load). false = the background follows the pick (v368) */
@@ -1391,7 +1393,7 @@ function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS s
   return { tex, box: new THREE.Vector4(u0, -v1, u1 - u0, v1 - v0) };
 }
 function* courseSteps() { /* the hole's painted map, then the ground it's draped on */
-courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(BUILD_CHUNK2)); courseTex.anisotropy = maxAniso;
+courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(BUILD_CHUNK2)); courseTex.anisotropy = maxAniso; if (TEX_FREE) courseTex.onUpdate = texFree;
 const course = new THREE.Mesh(new THREE.PlaneGeometry(MAP.U1 - MAP.U0, MAP.V1 - MAP.V0), groundMat(courseTex, 1));
 course.rotation.x = -Math.PI / 2; course.position.set((MAP.U0 + MAP.U1) / 2, 0, -(MAP.V0 + MAP.V1) / 2); HS.add(course);
 yield* terrainSteps(course); }
@@ -5960,7 +5962,7 @@ const HOLESYS = (() => {
   const PREBUILD_OWN_HS = true; /* a fresh prebuild holds no scene group of its own until its HS = newHS() step: until then it holds none (null), not the hole on screen's, so dropping it early (home screen mid-round) can't remove and dispose the hole on screen. Undo switch: false keeps the on-screen hole's HS in those first steps, as before */
   function* steps(HD, fresh) {
     if (fresh && PREBUILD_OWN_HS) HS = null; if (fresh) { setCourse(HD.cid); HOLE_N = HD.i; HOLE = HOLES[HD.i - 1]; AUGD = BDH_CHUNK ? yield* holeAUGDg(CID, HOLE.n) : holeAUGD(CID, HOLE.n); yield; courseGeom(); yield; }
-    HS = newHS(); holeMap(); GREENTEX = BUILD_CHUNK3 ? yield* greenTexG(true) : greenTex(); yield;
+    HS = newHS(); holeMap(); GREENTEX = BUILD_CHUNK3 ? yield* greenTexG(true) : greenTex(); if (TEX_FREE && GREENTEX) GREENTEX.tex.onUpdate = texFree; yield;
     yield* courseSteps(); yield;
     buildOuter(); yield; buildTrees(); yield; buildBushes(); yield; buildBridges(); buildLake(); buildFountain(); yield; if (BUILD_CHUNK2) yield* buildSceneryG(); else buildScenery(); yield; CUPMESH = buildCup(); yield;
     HS.read = yield* READ.make(); yield; HS.mini = BUILD_CHUNK3 ? yield* MINI.makeG(4) : MINI.make(); AUGCAM = makeAugCam(); homePath = makeHomePath(); if (F3.warm) { yield; yield* caddieWarmG(); } /* CADDIE_FAST3: the caddie's tables for this hole */
