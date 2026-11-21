@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v490'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v492'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -55,6 +55,9 @@ const HUD_PAR = true; /* undo switch: the pink score-to-par box by the name unde
 const OSL_M = OSLER_DEV ? /^#ob-004b22b2(?:-hole-(\d+))?$/.exec(location.hash) : null;
 const TUT_HOLE = true; /* Neil 11-21: the tutorial gets its own hole (an invented par 4, not Hunt 1), at #tutorial-hole while we design it. Nothing of it is built without that link. false = no tutorial course */
 const TUT_GATE = true; /* the tutorial: only what's lit can be touched (false = anything, as v488) */
+const DRIVE_TINT = true; /* Neil 11-21: the result card's Drive stat. Off the tee with less than a driver (every par 3), it's red only if the ball missed both the fairway and the green; a driver keeps the old rule (green for a full-length bomb, else red). false = as v491 */
+const TUT_READ = true; /* Neil 11-21: the tutorial's putt read comes from the real slope between the ball and the hole (false = the fixed line, as v491) */
+const TUT_FREE = true; /* Neil 11-21: no spotlight and touch anywhere once the aim view is up, and for chips and putts (the chip selector keeps its spotlight); false = spotlight on every step, as v491 */
 const TUT_FADE = false; /* Neil 11-21: no paper flash over the ball's move (true = the v488 fade) */
 const TUT_PLAY = true; /* Neil 11-21: the tutorial itself, played on #tutorial-hole (TUTOR). false = just the hole */
 const TUT_M = TUT_HOLE ? /^#tutorial-hole$/.exec(location.hash) : null;
@@ -6443,9 +6446,10 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
   const shape = (r, round, circle, extra) => circle ? `<circle cx="${r[0] + r[2] / 2}" cy="${r[1] + r[3] / 2}" r="${Math.max(r[2], r[3]) / 2}" ${extra}/>` : `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="${round}" ${extra}/>`;
   const PAD = { dial: 6, club: 6, lie: 6, slope: 6, mid: 6, modes: 6, target: 0, hole: 0, course: 0 }, ROUND = { club: 22, lie: 18, slope: 16, mid: 26, modes: 16, target: 42, hole: 22 }, CIRC = { dial: 1, course: 1 };
   const box = k => { const r = LIT[k](); if (!r) return null; const p = PAD[k]; return [r[0] - p, r[1] - p, r[2] + 2 * p, r[3] + 2 * p]; };
-  function draw() { if (!st) return; const W = innerWidth, H = innerHeight;
-    if (world) { let m = `<defs><mask id="tutM"><rect width="${W}" height="${H}" fill="#fff"/>`; for (const k of st.lit) if (WORLD.has(k)) { const r = box(k); if (r) m += shape(r, ROUND[k] || 18, CIRC[k], 'fill="#000"'); } world.innerHTML = m + `</mask></defs><rect width="${W}" height="${H}" fill="rgba(24,36,22,.62)" mask="url(#tutM)"/>`; }
-    let s = ''; for (const k of st.lit) { const r = box(k); if (r) s += shape(r, ROUND[k] || 18, CIRC[k], 'class="ring" fill="none" stroke="#ffd23f" stroke-width="3.5" stroke-dasharray="11 8" stroke-linecap="round"'); } top.innerHTML = s;
+  function draw() { if (!st) return; const W = innerWidth, H = innerHeight; const f = free();
+    if (f !== !!st.free) { st.free = f; if (f) undim(); else if (st.dimOK) dim(st.lit); }
+    if (world && !f) { let m = `<defs><mask id="tutM"><rect width="${W}" height="${H}" fill="#fff"/>`; for (const k of st.lit) if (WORLD.has(k)) { const r = box(k); if (r) m += shape(r, ROUND[k] || 18, CIRC[k], 'fill="#000"'); } world.innerHTML = m + `</mask></defs><rect width="${W}" height="${H}" fill="rgba(24,36,22,.62)" mask="url(#tutM)"/>`; }
+    let s = ''; if (!f) for (const k of st.lit) { const r = box(k); if (r) s += shape(r, ROUND[k] || 18, CIRC[k], 'class="ring" fill="none" stroke="#ffd23f" stroke-width="3.5" stroke-dasharray="11 8" stroke-linecap="round"'); } top.innerHTML = s;
     const sr = $('#say').hidden ? null : $('#say').getBoundingClientRect(); if (st.tg) st.tg.style.top = ((st.tgY && st.tgY()) || (sr ? sr.bottom + 12 : 140)) + 'px';
     for (const n of st.notes || []) { const p = n.at(); if (p) { n.el.style.left = p[0] + 'px'; n.el.style.top = p[1] + 'px'; n.el.style.display = ''; } else n.el.style.display = 'none'; } }
   let fading = false; function fade(fn) { if (!TUT_FADE) { fn(); return; } /* TUT_FADE (Neil 11-21: the ball jumping to its spot was jarring): a quick paper fade over the move */
@@ -6453,7 +6457,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
     requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; })); setTimeout(() => { fn(); setTimeout(() => { f.style.opacity = '0'; setTimeout(() => { f.remove(); fading = false; calmAt = 0; }, 320); }, 650); }, 300); }
   function bub(t) { AV.say(t, { force: true, hold: true }); }
   function clear() { st = null; undim(); top.innerHTML = ''; ui.innerHTML = ''; }
-  function show(id, o) { clear(); st = Object.assign({ id, lit: [], stroke: G.stroke }, o); done.add(id); if (o.say) bub(o.say); if (o.dim !== false) dim(st.lit);
+  function show(id, o) { clear(); st = Object.assign({ id, lit: [], stroke: G.stroke }, o); done.add(id); if (o.say) bub(o.say); st.dimOK = o.dim !== false; st.free = free(); if (st.dimOK && !st.free) dim(st.lit);
     const tg = document.createElement('div'); tg.className = 'tg'; tg.style.left = '14px';
     if (o.ok) { const b = document.createElement('span'); b.className = 'ok'; b.textContent = o.ok; b.onclick = e => { e.stopPropagation(); end(); }; tg.appendChild(b); }
     if (o.goal) { const g = document.createElement('span'); g.className = 'goal'; g.textContent = 'Goal · ' + o.goal; tg.appendChild(g); }
@@ -6468,6 +6472,14 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
   function finish() { fin = true; clear(); $('#result').hidden = true; app.classList.remove('resulting'); bub("You've got it. Let's play.");
     card(`<h3>On to the first tee</h3><button class="btnT w" data-a="go">Pick a course</button>`, w => w.addEventListener('click', e => { if (e.target.closest('button')) { e.stopPropagation(); leave(); } })); ui.firstChild && (ui.firstChild.style.background = 'rgba(24,36,22,.62)'); }
   const sheet = () => !$('#scrim').hidden, cls = c => app.classList.contains(c); let calmAt = 0;
+  function read() { /* TUT_READ: the putt's real read, from the ground between the ball and the hole (the putt is wherever the ball stopped, not always the set spot) */
+    const b = G.ball, du = PIN.u - b.u, dv = PIN.v - b.v, L = Math.hypot(du, dv) || 1, ru = dv / L, rv = -du / L; let side = 0;
+    for (const t of [.25, .4, .55, .7, .85]) { const u = b.u + du * t, v = b.v + dv * t; side += groundHeight(u + ru * 1.5, v + rv * 1.5) - groundHeight(u - ru * 1.5, v - rv * 1.5); }
+    const g = side / 5 / 3, up = (groundHeight(PIN.u, PIN.v) - groundHeight(b.u, b.v)) * 36; /* g: rise to the right per yard; up: inches */
+    const brk = Math.abs(g) < .006 ? "It's nearly straight, so aim right at the hole" : g > 0 ? 'It breaks left, so aim a touch right of the hole' : 'It breaks right, so aim a touch left of the hole';
+    const pace = up > 2 ? ' and give it a firmer pull: it\'s uphill.' : up < -2 ? ' and pull back gently: it\'s downhill.' : ' and pull back smoothly.';
+    return brk + pace; }
+  const free = () => TUT_FREE && !(st && (st.id === 'pick1' || st.id === 'pick2')) && !sheet() && (G.aimGoal === 1 || G.lie === 'green' || G.mode === 'putt' || done.has('pick2')); /* TUT_FREE: the aim view up, or a chip or putt: no spotlight, anything can be touched */
   const ready = now => { const ok = !FLY.on && !MENU.on && !INTRO.on && !cls('droning') && !cls('settling') && !cls('resulting') && !cls('flying') && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && $('#result').hidden && !sheet() && G.ball; if (!ok) { calmAt = 0; return false; } if (!calmAt) calmAt = now; return now - calmAt > 500; }; /* settled for half a second */
   function tick(now) {
     if (fin) return; const coach = $('#coach'); if (coach) coach.style.visibility = 'hidden';
@@ -6495,7 +6507,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
       notes: [{ t: 'drag to aim ↗', at: () => { const r = tgtRect(); return [Math.max(12, r[0] - 190), r[1] + r[3] + 30]; } }, { t: 'drag to curve', at: () => { const r = midRect(); return r && [r[0] + 4, r[1] + r[3] + 14]; } }] });
     if (!green && !sand && toPin < 70 && !done.has('pick1') && done.has('lie')) return show('pick1', { say: 'Close to the green? Tap your club to select Pitch.', lit: ['club'], goal: 'Select Pitch', notes: [{ t: 'tap here', at: () => { const r = rectOf('#clubBtn'); return r && [r[0] - 112, r[1] - 76]; } }] });
     if (done.has('pick2') && !done.has('pitch') && !green) { lit1.add(G.stroke); /* (a pitch opens the short-game aim view itself) */ return show('pitch', { say: "Same swing, just softer. The arc shows how high it'll fly.", lit: ['target', 'dial'], goal: 'Finish on the green', tgY: () => { const r = tgtRect(); return r[1] + r[3] + 24; }, notes: [{ t: 'softer<br>swing', at: () => { const r = rectOf('#dialWrap'); return r && [Math.max(8, r[0] - 70), r[1] - 92]; } }] }); }
-    if (green && G.mode === 'putt' && !done.has('putt')) { lit1.add(G.stroke); return show('putt', { say: 'Aim a touch uphill of the hole and pull back gently.', lit: ['hole', 'slope', 'dial'], goal: 'Hole it', tgY: () => { const r = rectOf('#slopeKey'); return r ? r[1] - 60 : null; }, notes: [{ t: 'steeper =<br>more break', at: () => { const r = rectOf('#slopeKey'); return r && [r[0] + r[2] + 14, r[1] + r[3] - 40]; } }] }); }
+    if (green && G.mode === 'putt' && !done.has('putt')) { lit1.add(G.stroke); return show('putt', { say: TUT_READ ? read() : 'Aim a touch uphill of the hole and pull back gently.', lit: ['hole', 'slope', 'dial'], goal: 'Hole it', tgY: () => { const r = rectOf('#slopeKey'); return r ? r[1] - 60 : null; }, notes: [{ t: 'steeper =<br>more break', at: () => { const r = rectOf('#slopeKey'); return r && [r[0] + r[2] + 14, r[1] + r[3] - 40]; } }] }); }
     if (!lit1.has(G.stroke) && !(done.has('tap') && !done.has('aim') && G.aimGoal === 1)) { lit1.add(G.stroke); return show('go', { say: G.stroke === 2 ? 'Now swing it!' : 'Your shot: pull down, then flick up.', lit: ['dial'], goal: green ? 'Hole it' : 'Land on the green' }); } /* the shot control lit whenever it's your shot (Neil 11-21) */
   }
   $('#modeRow').addEventListener('click', e => { if (!st || st.id !== 'pick2') return; const b = e.target.closest('.mc'); if (b && b.dataset.m === 'pitch') setTimeout(closeSheets, 180); }); /* picking Pitch closes the sheet (it stays open otherwise, for the club) */
@@ -6503,11 +6515,12 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
     const inBox = (r, x, y) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
     const allowed = e => { const t = e.target; if (t && t.closest && (t.closest('#tutO .tg') || t.closest('#tutO .cardW') || t.closest('#quitUI'))) return true;
       const p = e.touches && e.touches[0] || e.changedTouches && e.changedTouches[0] || e, x = p.clientX, y = p.clientY;
+      if (free() || (TUT_FREE && st && st.id === 'tap')) return true; /* Neil 11-21: "tap anywhere to aim" means anywhere (the spotlight stays) */
       if (st) return st.lit.some(k => { const r = box(k); if (!r) return false; if (!CIRC[k]) return inBox(r, x, y); const R = Math.max(r[2], r[3]) / 2; return Math.hypot(x - r[0] - r[2] / 2, y - r[1] - r[3] / 2) <= R; }); /* a round spotlight is hit-tested as the circle it draws, not its box */
       return !(G.view !== 'flight' && $('#result').hidden && !FLY.on && !MENU.on && !INTRO.on); }; /* no step up: only between shots (the flight, the result card) */
     for (const ev of ['pointerdown', 'touchstart', 'mousedown', 'click', 'wheel']) addEventListener(ev, e => { if (!TUT_GATE || fin || MENU.on || INTRO.on) return; if (!allowed(e)) { e.stopPropagation(); if (ev !== 'touchstart' && ev !== 'wheel' && e.cancelable) e.preventDefault(); } }, { capture: true, passive: false }); }
   addEventListener('resize', () => draw()); window.__TUTDBG = () => ({ fly: FLY.on, menu: MENU.on, intro: INTRO.on, view: G.view, sw: SW.phase, cam: !!G.camTween, res: $('#result').hidden, sheet: $('#clubSheet').hidden, ball: !!G.ball, aimGoal: G.aimGoal, mode: G.mode, done: [...done] });
-  return { tick, get step() { return st && st.id; }, get aimOK() { return !!st && (st.id === 'tap' || st.id === 'aim'); }, done };
+  return { tick, get step() { return st && st.id; }, get aimOK() { return free() || (!!st && (st.id === 'tap' || st.id === 'aim')); }, done };
 })() : null;
 window.__TUTOR = TUTOR;
 function setHome(on) {
@@ -6594,7 +6607,7 @@ function holeCard(L) {
     return `<li class="${s.holed && !s.conceded ? 'in' : ''}${s.pen ? ' pen' : ''}"><i>${s.n}</i><span>${what}</span><em>${dist}</em><b>${res}${s.pen ? ' +1' : ''}</b></li>`; };
   const rows = (L.length > 6 ? [...L.slice(0, 3), null, ...L.slice(-3)] : L).map(rowOf).join(''); /* a long hole: first three, a gap, last three */
   const st = (k, v, good) => `<div class="st${good ? ' good' : good === false ? ' bad' : ''}"><small>${k}</small>${v === '✓' || v === '✗' ? `<b class="mk" aria-label="${v === '✓' ? 'yes' : 'no'}"><svg viewBox="0 0 24 24"><path d="${v === '✓' ? 'M4.5 12.8l5 5L19.8 6.6' : 'M6.5 6.5l11 11M17.5 6.5l-11 11'}"/></svg></b>` : `<b>${v}</b>`}</div>`; /* tick / cross drawn big and bold */ /* true green · false red · null plain */
-  return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - HOLE.par > 0 ? '+' : ''}${strokes - HOLE.par || 'E'})</small>`, strokes <= HOLE.par)}${st('Putts', putts, putts <= 2)}${st('Drive', drive ? drive + ' yds' : '—', drive ? long : null)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', fw == null ? null : !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
+  return `<ol class="sc">${rows}</ol><div class="scs${pen ? '' : ' five'}">${st('Score', `${strokes} <small>(${strokes - HOLE.par > 0 ? '+' : ''}${strokes - HOLE.par || 'E'})</small>`, strokes <= HOLE.par)}${st('Putts', putts, putts <= 2)}${st('Drive', drive ? drive + ' yds' : '—', drive ? (DRIVE_TINT && d1.club !== CLUBS[0].name ? (d1.lie === 'fairway' || d1.lie === 'green' || !!d1.holed) : long) : null)}${st('Fairway', fw == null ? '—' : fw ? '✓' : '✗', fw == null ? null : !!fw)}${st('Green in reg', gir ? '✓' : '✗', gir)}${pen ? st('Penalties', pen, false) : ''}</div>`; /* penalties only show when you had one */
 }
 // ---- opening titles: a 3×3 board of golfers and course bits that pop in, glance at each other, then roll credits (tap or Skip to jump to the menu)
 const INTRO_DECODE = true; /* Neil (11-18 21:17): "Sometimes in the initial Brady Bunch screen some squares are empty, I think because the image didn't load yet": the golfers' pictures (and the course crest) are decoded before the board starts filling in, so each square comes in with its picture; it waits 1.2 s at most, then goes anyway. false = as v454 */
