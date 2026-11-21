@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v488'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v490'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -54,6 +54,8 @@ const HUD_PAR = true; /* undo switch: the pink score-to-par box by the name unde
 /* which course and hole the page opens on: no hash (or #hole-N) is the Toronto Hunt; #augusta (or #augusta-hole-11 to -18) is the Augusta National preview: holes 10 to 18, starting at 10 (AUG_FRONT: the front-nine holes built so far first, from #augusta = hole 1; #augusta-hole-2 ...) */
 const OSL_M = OSLER_DEV ? /^#ob-004b22b2(?:-hole-(\d+))?$/.exec(location.hash) : null;
 const TUT_HOLE = true; /* Neil 11-21: the tutorial gets its own hole (an invented par 4, not Hunt 1), at #tutorial-hole while we design it. Nothing of it is built without that link. false = no tutorial course */
+const TUT_GATE = true; /* the tutorial: only what's lit can be touched (false = anything, as v488) */
+const TUT_FADE = false; /* Neil 11-21: no paper flash over the ball's move (true = the v488 fade) */
 const TUT_PLAY = true; /* Neil 11-21: the tutorial itself, played on #tutorial-hole (TUTOR). false = just the hole */
 const TUT_M = TUT_HOLE ? /^#tutorial-hole$/.exec(location.hash) : null;
 const AUG_M = /^#augusta(?:-hole-(\d+))?$/.exec(location.hash) || (!location.hash && window.__augPick ? ['#augusta', undefined] : null); /* a fresh load (no hash) picks its course at random (Neil): the intro's crest and "live from" line, the home fly-over and the picked tile all follow */
@@ -6071,6 +6073,7 @@ const HOLESYS = (() => {
   function calm(now) { /* nothing on screen is moving because of the player: no swing, flight, drone, camera move or finger down */
     return !MENU.on && !INTRO.on && !FLY.on && now >= FLY_CALM_AT && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && !G.preview && Math.abs(G.aimT - G.aimGoal) < 1e-3 && !down && now - lastPtr > 400; }
   function tick(now) {
+    if (INTRO_PRE && INTRO.fill) return; /* (the intro board filling in: nothing built under it) */
     const W = want && want.HD, HD = W && !W.ready ? W : W ? null : [...jobs.values()].find(j => !j.ready);
     if (HD) { if (!W && AHEAD_DELAY && !MENU.on && !INTRO.on && now - AHEAD_DELAY.at < AHEAD_DELAY.ms) return; /* AHEAD_DELAY: not in a new hole's first seconds */ if (!W && !calm(now) && !((MENU.on || INTRO.on) && !down && now - lastPtr > 400 && now > (INTRO.calm || 0))) return; const budget = !W ? (HOME_BG_WARM && MENU.on ? BUDGET.home : BUDGET.calm) : MENU.on && !want.card ? BUDGET.home : BUDGET.wait, /* (MP_LOAD_CARD: under the loader card, full speed) */ t0 = performance.now(); /* HOME_BG_WARM: the home screen's background builds (another course's first hole) at the home rate too */
       do step(HD); while (!HD.ready && !HD.idle && performance.now() - t0 < budget);
@@ -6445,7 +6448,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
     let s = ''; for (const k of st.lit) { const r = box(k); if (r) s += shape(r, ROUND[k] || 18, CIRC[k], 'class="ring" fill="none" stroke="#ffd23f" stroke-width="3.5" stroke-dasharray="11 8" stroke-linecap="round"'); } top.innerHTML = s;
     const sr = $('#say').hidden ? null : $('#say').getBoundingClientRect(); if (st.tg) st.tg.style.top = ((st.tgY && st.tgY()) || (sr ? sr.bottom + 12 : 140)) + 'px';
     for (const n of st.notes || []) { const p = n.at(); if (p) { n.el.style.left = p[0] + 'px'; n.el.style.top = p[1] + 'px'; n.el.style.display = ''; } else n.el.style.display = 'none'; } }
-  let fading = false; function fade(fn) { /* TUT_FADE (Neil 11-21: the ball jumping to its spot was jarring): a quick paper fade over the move */
+  let fading = false; function fade(fn) { if (!TUT_FADE) { fn(); return; } /* TUT_FADE (Neil 11-21: the ball jumping to its spot was jarring): a quick paper fade over the move */
     fading = true; const f = document.createElement('div'); f.style.cssText = 'position:fixed;inset:0;z-index:59;background:#fffaf0;opacity:0;transition:opacity .28s ease;pointer-events:none'; document.body.appendChild(f);
     requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; })); setTimeout(() => { fn(); setTimeout(() => { f.style.opacity = '0'; setTimeout(() => { f.remove(); fading = false; calmAt = 0; }, 320); }, 650); }, 300); }
   function bub(t) { AV.say(t, { force: true, hold: true }); }
@@ -6490,12 +6493,19 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
     if (G.stroke >= 2 && !green && !done.has('tap') && G.aimGoal === 0) return show('tap', { say: 'Tap anywhere on the course to aim.', lit: ['course'], notes: [{ t: 'tap', at: () => { const r = LIT.course(); return [r[0] + r[2] / 2 - 18, r[1] + r[3] / 2 - 16]; } }] });
     if (done.has('tap') && !done.has('aim') && G.aimGoal === 1 && G.aimT > .98) return show('aim', { say: 'Drag the ring to aim. Drag CURVE to bend the shot left or right.', lit: ['target', 'mid'], goal: 'Land on the green', tgY: () => { const r = midRect(); return r ? r[1] + r[3] + 56 : null; },
       notes: [{ t: 'drag to aim ↗', at: () => { const r = tgtRect(); return [Math.max(12, r[0] - 190), r[1] + r[3] + 30]; } }, { t: 'drag to curve', at: () => { const r = midRect(); return r && [r[0] + 4, r[1] + r[3] + 14]; } }] });
-    if (!green && !sand && toPin < 70 && G.aimGoal === 0 && !done.has('pick1') && done.has('lie')) return show('pick1', { say: 'Close to the green? Tap your club to select Pitch.', lit: ['club'], goal: 'Select Pitch', notes: [{ t: 'tap here', at: () => { const r = rectOf('#clubBtn'); return r && [r[0] - 112, r[1] - 76]; } }] });
+    if (!green && !sand && toPin < 70 && !done.has('pick1') && done.has('lie')) return show('pick1', { say: 'Close to the green? Tap your club to select Pitch.', lit: ['club'], goal: 'Select Pitch', notes: [{ t: 'tap here', at: () => { const r = rectOf('#clubBtn'); return r && [r[0] - 112, r[1] - 76]; } }] });
     if (done.has('pick2') && !done.has('pitch') && !green) { lit1.add(G.stroke); /* (a pitch opens the short-game aim view itself) */ return show('pitch', { say: "Same swing, just softer. The arc shows how high it'll fly.", lit: ['target', 'dial'], goal: 'Finish on the green', tgY: () => { const r = tgtRect(); return r[1] + r[3] + 24; }, notes: [{ t: 'softer<br>swing', at: () => { const r = rectOf('#dialWrap'); return r && [Math.max(8, r[0] - 70), r[1] - 92]; } }] }); }
     if (green && G.mode === 'putt' && !done.has('putt')) { lit1.add(G.stroke); return show('putt', { say: 'Aim a touch uphill of the hole and pull back gently.', lit: ['hole', 'slope', 'dial'], goal: 'Hole it', tgY: () => { const r = rectOf('#slopeKey'); return r ? r[1] - 60 : null; }, notes: [{ t: 'steeper =<br>more break', at: () => { const r = rectOf('#slopeKey'); return r && [r[0] + r[2] + 14, r[1] + r[3] - 40]; } }] }); }
-    if (G.stroke <= 4 && !lit1.has(G.stroke) && !(done.has('tap') && !done.has('aim') && G.aimGoal === 1)) { lit1.add(G.stroke); return show('go', { say: G.stroke === 2 ? 'Now swing it!' : 'Your shot: pull down, then flick up.', lit: ['dial'], goal: green ? 'Hole it' : 'Land on the green' }); } /* the shot control lit whenever it's your shot (Neil 11-21) */
+    if (!lit1.has(G.stroke) && !(done.has('tap') && !done.has('aim') && G.aimGoal === 1)) { lit1.add(G.stroke); return show('go', { say: G.stroke === 2 ? 'Now swing it!' : 'Your shot: pull down, then flick up.', lit: ['dial'], goal: green ? 'Hole it' : 'Land on the green' }); } /* the shot control lit whenever it's your shot (Neil 11-21) */
   }
   $('#modeRow').addEventListener('click', e => { if (!st || st.id !== 'pick2') return; const b = e.target.closest('.mc'); if (b && b.dataset.m === 'pitch') setTimeout(closeSheets, 180); }); /* picking Pitch closes the sheet (it stays open otherwise, for the club) */
+  { /* TUT_GATE (Neil 11-21): "I should only be able to hit what's in the spotlight": a touch anywhere else is eaten while it's your shot */
+    const inBox = (r, x, y) => r && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
+    const allowed = e => { const t = e.target; if (t && t.closest && (t.closest('#tutO .tg') || t.closest('#tutO .cardW') || t.closest('#quitUI'))) return true;
+      const p = e.touches && e.touches[0] || e.changedTouches && e.changedTouches[0] || e, x = p.clientX, y = p.clientY;
+      if (st) return st.lit.some(k => { const r = box(k); if (!r) return false; if (!CIRC[k]) return inBox(r, x, y); const R = Math.max(r[2], r[3]) / 2; return Math.hypot(x - r[0] - r[2] / 2, y - r[1] - r[3] / 2) <= R; }); /* a round spotlight is hit-tested as the circle it draws, not its box */
+      return !(G.view !== 'flight' && $('#result').hidden && !FLY.on && !MENU.on && !INTRO.on); }; /* no step up: only between shots (the flight, the result card) */
+    for (const ev of ['pointerdown', 'touchstart', 'mousedown', 'click', 'wheel']) addEventListener(ev, e => { if (!TUT_GATE || fin || MENU.on || INTRO.on) return; if (!allowed(e)) { e.stopPropagation(); if (ev !== 'touchstart' && ev !== 'wheel' && e.cancelable) e.preventDefault(); } }, { capture: true, passive: false }); }
   addEventListener('resize', () => draw()); window.__TUTDBG = () => ({ fly: FLY.on, menu: MENU.on, intro: INTRO.on, view: G.view, sw: SW.phase, cam: !!G.camTween, res: $('#result').hidden, sheet: $('#clubSheet').hidden, ball: !!G.ball, aimGoal: G.aimGoal, mode: G.mode, done: [...done] });
   return { tick, get step() { return st && st.id; }, get aimOK() { return !!st && (st.id === 'tap' || st.id === 'aim'); }, done };
 })() : null;
@@ -6588,7 +6598,8 @@ function holeCard(L) {
 }
 // ---- opening titles: a 3×3 board of golfers and course bits that pop in, glance at each other, then roll credits (tap or Skip to jump to the menu)
 const INTRO_DECODE = true; /* Neil (11-18 21:17): "Sometimes in the initial Brady Bunch screen some squares are empty, I think because the image didn't load yet": the golfers' pictures (and the course crest) are decoded before the board starts filling in, so each square comes in with its picture; it waits 1.2 s at most, then goes anyway. false = as v454 */
-const INTRO = { on: false };
+const INTRO = { on: false, fill: false };
+const INTRO_PRE = true; /* Neil 11-21: see #intro.pre and INTRO.fill. false = as v488 */
 async function runIntro() {
   const el = $('#intro'), grid = $('#introGrid'); if (!el || !grid) return;
   if (RM) { el.remove(); return; }
@@ -6614,7 +6625,7 @@ async function runIntro() {
   el.hidden = false; INTRO.on = true; try { HOLESYS.ahead(); } catch (e) {} /* start building the other course's first hole behind the intro */
   let stop = false, done; const fin = new Promise(r => done = r);
   let hyd = false; const hydrate = () => { if (hyd) return false; hyd = true; if (INTRO.onExit) INTRO.onExit(); return true; }; // the home screen comes up under the board (painted, animating) before anything moves
-  const end = async () => { if (stop) return; stop = true; INTRO.on = false; clearInterval(blinkT);
+  const end = async () => { if (stop) return; stop = true; INTRO.on = false; INTRO.fill = false; clearInterval(blinkT);
     { const bt = $('#boot'); INTRO.calm = performance.now() + 1700; if (bt) { bt.classList.add('calm'); setTimeout(() => bt.classList.remove('calm'), 1700); } } // the picked golfer starts bobbing and chatting a beat after the tiles land
     if (hydrate()) { await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await wait(120); } // skipped early: give it a beat to paint
     await new Promise(r => requestAnimationFrame(r));
@@ -6650,10 +6661,12 @@ async function runIntro() {
   (async () => {
     if (INTRO_DECODE) { const urls = [...new Set([...grid.querySelectorAll('image, img')].map(e => e.getAttribute('href') || e.getAttribute('xlink:href') || e.getAttribute('src')).filter(Boolean))]; /* INTRO_DECODE: every picture on the board decoded before the first square comes in (1.2 s at most) */
       await Promise.race([Promise.all(urls.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : new Promise(r => { im.onload = im.onerror = r; })).catch(() => {}); })), wait(1200)]); if (stop) return; }
-    if (SHADER_WARM) { shaderWarm(); await wait(0); if (stop) return; } /* SHADER_WARM: before the first square (the board is still empty), not while the squares come in: its ~200 ms set-up stuttered the last two (Neil 11-21) */
+    if (INTRO_PRE) { el.classList.add('pre'); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await wait(120); if (stop) return; } /* INTRO_PRE: paint them all once (invisibly) first */
+    if (SHADER_WARM) { shaderWarm(); await wait(0); if (stop) return; }
+    INTRO.fill = true; /* INTRO_PRE: no background hole building while the squares come in */ /* SHADER_WARM: before the first square (the board is still empty), not while the squares come in: its ~200 ms set-up stuttered the last two (Neil 11-21) */
     // 1. the board fills in, square by square, round the ring
     for (const k of ring) { if (stop) return; C[k].classList.add('in'); await wait(45); }
-    grid.classList.add('sweep'); hydrate(); await wait(140);
+    INTRO.fill = false; grid.classList.add('sweep'); hydrate(); await wait(140);
     // 2. everyone glances about — at each other, then all at the middle
     // the golfers size each other up: one looks at another, who looks back, then the third gets in on it
     const beats = faces.length > 1 ? faces.map((f, i) => [f, faces[(i + 1) % faces.length]]) : [];
