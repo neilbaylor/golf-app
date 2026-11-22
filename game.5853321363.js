@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v529'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v531'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -6550,7 +6550,9 @@ const QUIT = (() => {
   const ui = $('#quitUI');
   function ask() { ui.hidden = false; const k = ui.querySelector('[data-q="stay"]'); if (k) k.focus({ preventScroll: true }); }
   function home() {
-    if (TUT_INPLACE && TUT_ON && !TUT_M) { try { localStorage.setItem('tp_tut_done', '1'); } catch (e) {} location.replace(location.pathname + location.search); return; } /* TUT_INPLACE: quitting the tutorial counts as skipping it: a clean home screen */
+    if (TUT_INPLACE && TUT_ON && !TUT_M) { /* TUT_INPLACE (Neil 11-22): quitting the tutorial is like quitting any round: back to the home screen, on the course they picked (its first hole was built during the tutorial). It counts as skipping it, so the home button reads Play */
+      try { localStorage.setItem('tp_tut_done', '1'); } catch (e) {} const c = COURSE_DEF[store.get('course', 'hunt')] ? store.get('course', 'hunt') : 'hunt', T = TUTOR; TUT_ON = false; TUTOR = null; window.__TUTOR = null; try { T && T.stop(); } catch (e) { console.error(e); } try { $('#playBtn').textContent = 'Play'; } catch (e) {}
+      if (HOME_BG_WARM) try { HOMESNAP.cover(c); } catch (e) {} MENU.hold = true; HOLESYS.go(c, NINE.first(c), [], () => { MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = 0; }, { pill: false }); }
     if (HOLE_N !== NINE.first(CID)) { if (HOME_BG_WARM) try { HOMESNAP.cover(CID); } catch (e) { console.error(e); } MENU.hold = true; HOLESYS.go(CID, NINE.first(CID), [], () => { MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = 0; }, { pill: false }); } /* quit mid-round: back to the start: hole 1 builds behind the home screen (Play waits for it) */
     const el = $('#boot'); BOOT.on = true; if (!MENU.hold) MENU.t = 1.4; /* the menu first, so whatever happens below you always land on it */
     if (el) { el.style.transition = 'none'; el.hidden = false; el.classList.remove('done'); void el.offsetWidth; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; })); } /* back at once: no fade (its visibility transition would leave the bare course showing for a moment) */
