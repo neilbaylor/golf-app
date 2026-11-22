@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v531'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v533'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1417,7 +1417,7 @@ function detailTex() {
   g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 256);
   g.beginPath(); for (let i = 0; i < 900; i++) { const x = R() * 256, y = R() * 256, l = 4 + R() * 7, a = -1.1 + (R() - .5) * .5; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1.3; g.stroke();
   g.beginPath(); for (let i = 0; i < 140; i++) { const x = R() * 256, y = R() * 256; g.moveTo(x - 3, y - 4); g.lineTo(x, y + 1); g.lineTo(x + 3, y - 4); } g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1.2; g.stroke();
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; return t;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO_CAP ? Math.min(ANISO_CAP, maxAniso) : maxAniso; /* ANISO_CAP (Neil 11-22): the grass detail strokes at 4x too, like the ground map */ return t;
 }
 const DETAIL = detailTex(); SHARED.add(DETAIL);
 function groundMat(map, scale) {
@@ -1503,7 +1503,7 @@ function buildOuter() { /* the land round the painted map (per hole) */
   g.fillStyle = '#5fa23d'; g.fillRect(0, 0, 256, 256);
   for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(40,110,40,${.05 + R() * .06})`; g.beginPath(); g.arc(R() * 256, R() * 256, 10 + R() * 30, 0, 7); g.fill(); }
   g.beginPath(); for (let i = 0; i < 500; i++) { const x = R() * 256, y = R() * 256; g.moveTo(x, y); g.lineTo(x + 3, y - 5); } g.strokeStyle = 'rgba(25,75,25,.25)'; g.lineWidth = 1.2; g.stroke();
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO_CAP ? Math.min(ANISO_CAP, maxAniso) : maxAniso; /* ANISO_CAP (Neil 11-22): the land round the course at 4x too */
   if (AUGD) { /* Augusta: the land runs on past the painted map in rings, carrying the lidar ground out and easing it to one level far off (no bluff, no lake) */
     const u0 = MAP.U0 + .4, u1 = MAP.U1 - .4, v0 = MAP.V0 + .4, v1 = MAP.V1 - .4, base = [], side = (a, b, n) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.round(L / 3)); for (let i = 0; i < k; i++) base.push([a[0] + (b[0] - a[0]) * i / k, a[1] + (b[1] - a[1]) * i / k, n[0], n[1]]); };
     const corner = (p, a0) => { for (let i = 0; i <= 6; i++) { const a = a0 + i / 6 * Math.PI / 2; base.push([p[0], p[1], Math.cos(a), Math.sin(a)]); } }; /* walked anticlockwise; each corner fans its normal round a quarter turn */
