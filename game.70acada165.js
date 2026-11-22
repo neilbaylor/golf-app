@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v512'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v514'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1196,6 +1196,7 @@ function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats witho
   wisps(T * T / 70 * TK, ['#c4a456', '#b8984a', '#d2b465', '#a88d43'], 7, 15, 1.25, 0);
   wisps(T * T / 150 * TK, ['#ead08a', '#f2e0a8'], 6, 12, .95, .35);
   return g.createPattern(c, 'repeat'); }
+const MAP_FILL_BANDS = 4; /* perf508: the map's first paint (its base green over the whole canvas, 2-7 million pixels) was one ~13-18 ms fill inside the build's first map slice (?prof 'courseSteps (1st slice)': 46 ms on OslerBrook 2, 24 on Augusta 12 on this desktop). Now the same fill in this many bands of whole rows, a slice each: the same pixels. 1 = in one go, as v508 */
 function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0; /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
   let needleP = null; /* one tile per painting */
   const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined); /* COURSE_CPU */
@@ -1210,7 +1211,7 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   };
   // rough
   const AK = AUGD ? MAP.W * MAP.H / (1536 * 2752) : 1; /* Augusta's maps are bigger: the same density of marks */
-  g.fillStyle = '#5c9c3a'; g.fillRect(0, 0, MAP.W, MAP.H);
+  g.fillStyle = '#5c9c3a'; if (chunk && MAP_FILL_BANDS > 1) for (let k = 0; k < MAP_FILL_BANDS; k++) { const y0 = Math.floor(MAP.H * k / MAP_FILL_BANDS), y1 = Math.floor(MAP.H * (k + 1) / MAP_FILL_BANDS); g.fillRect(0, y0, MAP.W, y1 - y0); yield flushCv(cv); } else g.fillRect(0, 0, MAP.W, MAP.H); /* MAP_FILL_BANDS */
   for (let i = 0; i < 900 * AK; i++) { g.fillStyle = R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 10 + R() * 60, 0, 7); g.fill(); if (brk(150)) yield flushCv(cv); }
   const hatch = (n, col, lw) => { g.beginPath(); for (let i = 0; i < n; i++) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
   let async = false; if (chunk && HATCH_ASYNC && HATCHW.ok) { flushCv(cv); let turned = false; queueMicrotask(() => { turned = true; }); yield HATCH_WAIT; async = turned; } /* HATCH_ASYNC: in a build run a slice per frame (not straight through)? */
@@ -1916,8 +1917,15 @@ function shaderWarm() { if (!SHADER_WARM || shaderWarm.done) return; shaderWarm.
   try { const t1 = new THREE.DataTexture(new Uint8Array(4), 1, 1, THREE.RGBAFormat); t1.needsUpdate = true; const m = bridgeReflMat(t1, t1, new THREE.Vector4(0, 0, 1, 1), 0, new THREE.Vector4(0, 0, 1, 0));
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
     const o = new THREE.Mesh(g, m), sc = new THREE.Scene(); o.frustumCulled = false; sc.fog = scene.fog; sc.add(o); const t0 = performance.now();
-    renderer.compile(sc, camera); renderer.setScissorTest(true); renderer.setScissor(0, 0, 1, 1); renderer.render(sc, camera); renderer.setScissorTest(false); SHADER_KEEP.push(m); shaderWarm.ms = performance.now() - t0; /* (?prof shows it) */
+    if (SHADER_WARM_LIT) { const W = [o]; if (SHADER_WARM_HUNT) { const gc = g.clone(); gc.setAttribute('color', new THREE.Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1], 3)); const lk = new THREE.Mesh(gc, lakeMat()), /* (a colour attribute of 3, as the lake's: three keys the shader by it too) */ fo = new THREE.Mesh(g, fountainMat(t1)); lk.frustumCulled = fo.frustumCulled = false; W.push(lk, fo); } warmLit(W); for (const w of W) SHADER_KEEP.push(w.material); } /* SHADER_WARM_LIT / SHADER_WARM_HUNT */
+    else { renderer.compile(sc, camera); renderer.setScissorTest(true); renderer.setScissor(0, 0, 1, 1); renderer.render(sc, camera); renderer.setScissorTest(false); SHADER_KEEP.push(m); } shaderWarm.ms = performance.now() - t0; /* (?prof shows it) */
   } catch (e) { console.error(e); } }
+const SHADER_WARM_LIT = true; /* perf508: SHADER_WARM's copy was drawn in a scene of its own, with no lights, and three keys a shader by the lights in the scene too, so the bridge reflection's warm copy got a shader of its own and Augusta 12 still set its up mid-round (census: a new program at 12's build, and again at 15's: the first copy was dropped with 13). Now the warm copies are drawn in the game's own scene (everything else hidden, one 1-px draw, as the hole warm-up does): the very shader the holes use, kept alive by SHADER_KEEP. Nothing drawn differs. false = as v508 */
+const SHADER_WARM_HUNT = false; /* (main, v514: off until Neil decides: it adds ~10-20 ms on desktop, maybe a few hundred ms on an iPhone, before the intro's first square) */ /* perf508 (with SHADER_WARM_LIT): the two other shaders a round meets late, both the Hunt's: Lake Ontario's sheet (first at hole 2's build, while you play 1) and hole 5's pond fountain (at 5's build, while you play 4). Set up behind the titles with the bridge's. Same materials (lakeMat / fountainMat, used by buildLake / buildFountain). false = as v508 */
+function warmLit(objs) { /* SHADER_WARM_LIT: compile + draw objs once into a 1-px scissor inside the real scene (its lights and fog), everything else hidden; then put the scene back */
+  const top = scene.children.map(c => [c, c.visible]); for (const c of scene.children) if (!c.isLight) c.visible = false; for (const o of objs) scene.add(o);
+  try { renderer.setScissorTest(true); renderer.setScissor(0, 0, 1, 1); renderer.render(scene, camera); } finally { for (const o of objs) scene.remove(o); for (const [c, v] of top) c.visible = v; renderer.setScissorTest(false); } }
+const lakeMat = () => new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }); /* the Hunt's Lake Ontario sheet (buildLake; SHADER_WARM_HUNT warms the same) */
 /* ---- Lake Ontario off the bluff down the right (the Hunt only) ---- */
 const FOUNT_T = { value: 0 }; /* the pond fountain's clock: frame() sets it, its shaders do the rest */
 let fountTex = null; /* its sticker art, drawn once and shared by every hole that has the pond */
@@ -1935,7 +1943,8 @@ function fountainArt() { /* 512 x 672: a tall central jet (Neil: "a touch higher
   x.fillStyle = INK; x.beginPath(); x.ellipse(cx, B, 66, 13, 0, 0, 7); x.fill(); x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx, B, 62, 10, 0, 0, 7); x.fill(); /* the foam at its foot */
   const t = new THREE.CanvasTexture(c); t.anisotropy = 2; SHARED.add(t); return t; }
 function buildFountain() { const F = AUGD && AUGD.FOUNTAIN; if (!F) return; /* Hunt 5 and 6: the pond's aerating fountain. One quad, turned to the camera about the vertical in its vertex shader; no lights, no shadow, no ball contact */
-  const Wd = F.h * 1.12, H = Wd * 672 / 512, gy = groundHeight(F.u, F.v), geo = new THREE.PlaneGeometry(Wd, H); geo.translate(0, H / 2 - 12 / 672 * H, 0); /* the art's foot sits 12 px off its bottom edge */
+  const Wd = F.h * 1.12, H = Wd * 672 / 512, gy = groundHeight(F.u, F.v), geo = new THREE.PlaneGeometry(Wd, H); geo.translate(0, H / 2 - 12 / 672 * H, 0); /* the art's foot sits 12 px off its bottom edge */ fountainMat(null, geo, F, gy); }
+function fountainMat(tex, geo, F, gy) { /* the fountain's material, and with geo its mesh into the hole (buildFountain); SHADER_WARM_HUNT takes the material alone (geo null), the very same shader */
   const m = new THREE.ShaderMaterial({ uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null }, t: { value: 0 } }]), transparent: true, depthWrite: false, fog: true,
     vertexShader: `uniform float t; varying vec2 vUv;
       #include <fog_pars_vertex>
@@ -1951,7 +1960,7 @@ function buildFountain() { const F = AUGD && AUGD.FOUNTAIN; if (!F) return; /* H
         float a = c.a * mix(1.0, 0.25 + 0.75 * step(0.45, n), mist); if (a < 0.06) discard; gl_FragColor = vec4(mix(c.rgb, vec3(1.0), mist * 0.6), a);
         #include <fog_fragment>
       }` });
-  m.uniforms.map.value = fountTex || (fountTex = fountainArt()); m.uniforms.t = FOUNT_T; /* (merge copies uniforms: the clock is put back as the shared one) */
+  m.uniforms.map.value = tex || fountTex || (fountTex = fountainArt()); m.uniforms.t = FOUNT_T; if (!geo) return m; /* (merge copies uniforms: the clock is put back as the shared one) */
   const mesh = new THREE.Mesh(geo, m); mesh.position.copy(W(F.u, F.v, gy - .05)); mesh.renderOrder = 4; mesh.userData.ink = false; mesh.castShadow = mesh.receiveShadow = false; HS.add(mesh); }
 let OSLX = null; const oslx = () => OSLX || (OSLER_DEV && typeof OSLER_SRC !== 'undefined' ? (OSLX = eval(OSLER_SRC)) : null); /* OSLER_PUBLIC: evaluated the first time an OslerBrook hole is built (its data may arrive late) */ if (OSLER_DEV && OSL_M && !OSLER_PUBLIC) oslx(); /* OSLER_LIVE: OslerBrook's scenery functions (OSLER_SRC, from osler.<hash>.js), in this scope */
 function buildLake() { if (AUGD && AUGD.lake) { /* the Hunt's data holes: Lake Ontario below the bluff, out to the horizon. One sheet, one draw call: flat at lake level from under the bluff out past the shore,
@@ -1971,7 +1980,7 @@ function buildLake() { if (AUGD && AUGD.lake) { /* the Hunt's data holes: Lake O
       let prev = null; for (let t = 1600; t <= 5600; t += 400) { const x = smooth(1600, 5600, t), se = 30 + 1700 * x, k = [P(-20, t, top, cTop), P(se, t, top, cTop), P(se, t, top, cFace), P(se, t, CD ? Math.min(wy(se, t) - .5, top - 1) : wy(se, t) - .5, cFoot)];
         if (prev) idx.push(prev[0], k[0], k[1], prev[0], k[1], prev[1], prev[2], k[2], k[3], prev[2], k[3], prev[3]); prev = k; } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeBoundingSphere();
-    const lake = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide })); lake.userData.ink = false; lake.renderOrder = -3; HS.add(lake); return; }
+    const lake = new THREE.Mesh(g, lakeMat()); lake.userData.ink = false; lake.renderOrder = -3; HS.add(lake); return; }
   if (AUGD && AUGD.bluff) { const B = AUGD.bluff; /* a data hole's bluff: the lake at its foot (the land beyond the map is held under it: buildOuter) */
     const lake = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: 0x5aa8d8, fog: false })); lake.rotation.x = -Math.PI / 2; lake.position.set(B.mid[0] + B.n[0] * 1990, B.lakeY, -(B.mid[1] + B.n[1] * 1990));
     lake.userData.ink = false; lake.renderOrder = -3; HS.add(lake); } /* drawn before the ground (-2 on data holes), so the ground over it wins */
@@ -6102,6 +6111,19 @@ function setHoleVars(o) { ({ CID, HOLES, HOLE_N, HOLE, COURSE_LOGO, COURSE_NAME,
    landed right on the hand-off, with the greet bubble popping (+650 ms) and the tips fading in (+250 ms). true: after a fly-over the build waits FLY_SETTLE_MS more before its first step.
    Nothing is built or drawn differently; it starts 1.2 s later. false = it starts on the first calm frame (v353). */
 const FLY_SETTLE = true, FLY_SETTLE_MS = 1200; let FLY_CALM_AT = 0;
+const MAP_STRIPS = 192; /* perf508: a prebuilt hole's painted map (one canvas of 2-7 million pixels: OslerBrook 1843x3910, Augusta 12 1920x3238) went to the GPU in one call, the biggest single slice of the background build (?prof 'upload map texture': 92 ms on OslerBrook 2, 55 on Augusta 12 on this desktop; several times that on a phone, in a calm moment on the tee). Now three makes the texture (filters, wrap, anisotropy) and its pixels go up this many rows per slice (read from the CPU canvas, the same bytes, flipped as three flips them), then its mip chain is made as three makes it. WebGL2 only (else as before). 0 = in one go, as v508 */
+const stripsOK = t => { const c = t && t.image; return !!(c && c.getContext && renderer.capabilities.isWebGL2 && c.width * c.height > 1e6 && c.width <= renderer.capabilities.maxTextureSize && c.height <= renderer.capabilities.maxTextureSize && t.format === THREE.RGBAFormat && t.type === THREE.UnsignedByteType && t.internalFormat === null && t.flipY && !t.premultiplyAlpha && t.unpackAlignment === 4 && t.generateMipmaps && t.minFilter === THREE.LinearMipmapLinearFilter && !t.isVideoTexture && !(t.mipmaps && t.mipmaps.length)); };
+function* mapStrips(t) { /* MAP_STRIPS: one big canvas texture onto the GPU a band of rows at a time */
+  const c = t.image, gl = renderer.getContext(), w = c.width, h = c.height, cx = c.getContext('2d'), onU = t.onUpdate, ph = document.createElement('canvas'); ph.width = ph.height = 1;
+  yield; t.onUpdate = null; t.image = ph; try { renderer.initTexture(t); } catch (e) {} finally { t.image = c; t.onUpdate = onU; } /* three makes the GL texture and its sampling state (a 1-px stand-in marks it uploaded) */
+  const P = renderer.properties.get(t), tex = P.__webglTexture; if (!tex) { t.needsUpdate = true; return; }
+  const bind = () => { renderer.state.activeTexture(gl.TEXTURE0); renderer.state.bindTexture(gl.TEXTURE_2D, tex); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE); };
+  try { bind(); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    for (let y = 0; y < h; y += MAP_STRIPS) { yield; const n = Math.min(MAP_STRIPS, h - y), d = cx.getImageData(0, y, w, n).data; bind(); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, h - y - n, w, n, gl.RGBA, gl.UNSIGNED_BYTE, d); } /* canvas row y is GL row h-1-y, as three's flipped upload */
+    yield; bind(); gl.generateMipmap(gl.TEXTURE_2D); P.__maxMipLevel = Math.log2(Math.max(w, h)); if (t.onUpdate) t.onUpdate(t); /* (TEX_FREE: the canvas goes, as after three's upload) */
+  } catch (e) { console.error(e); t.needsUpdate = true; } } /* anything odd: three uploads it whole at its first use, as before */
+const PROG_PIN = true; /* perf508: three frees a shader as soon as no material uses it, so a hole that drops the last user of one (13 dropping the bridge reflection, OslerBrook 5 its reeds) made the next hole that needs it set it up again mid-round (census: Augusta 15, OslerBrook 6). Every shader the game has set up is now held for the session (a few dozen small GPU programs), so each is set up at most once. Nothing drawn differs. false = as v508 */
+function pinProgs() { for (const p of renderer.info.programs) if (!p.pin508) { p.pin508 = 1; p.usedTimes++; } } /* PROG_PIN: one extra use each: never back to 0, never destroyed */
 const HOLESYS = (() => {
   const AHEAD = 1; /* holes prebuilt ahead of the one being played. 2 holds a third hole scene in GPU memory: try it on phones first */
   const BUDGET = { calm: BG_BUDGET || 2.5, wait: 14, home: 6 }; /* (BG_BUDGET) */ /* ms of build work per frame: in the background (calm frames only), under the pill, behind the home screen */
@@ -6121,9 +6143,9 @@ const HOLESYS = (() => {
   function* upload() { /* a prebuilt hole onto the GPU before it's shown: textures one at a time, then programs, then buffers (one 1-px draw) */
     const T = new Set(), add = t => { if (t && t.isTexture && !SHARED.has(t)) T.add(t); };
     HS.group.traverse(o => { for (const m of [].concat(o.material || [])) { for (const k in m) add(m[k]); if (m.uniforms) for (const k in m.uniforms) add(m.uniforms[k].value); } });
-    for (const t of T) { yield; try { renderer.initTexture(t); } catch (e) {} }
+    for (const t of T) { if (MAP_STRIPS && stripsOK(t)) { yield* mapStrips(t); continue; } /* MAP_STRIPS */ yield; try { renderer.initTexture(t); } catch (e) {} }
     yield; scene.add(HS.group); try { renderer.compile(scene, camera); } catch (e) {} finally { scene.remove(HS.group); }
-    yield; if (WARM_SPLIT) yield* warmG(HS.group); else warm(HS.group); }
+    yield; if (WARM_SPLIT) yield* warmG(HS.group); else warm(HS.group); if (PROG_PIN) pinProgs(); }
   function* warmG(grp) { /* WARM_SPLIT: the same warm-up draw in pieces of about WARM_SPLIT bytes of mesh data, one piece a frame */
     const R = []; grp.traverse(o => { if (o.isMesh || o.isLine || o.isPoints || o.isSprite) { let b = 0; const g = o.geometry; if (g) { for (const k in g.attributes) b += g.attributes[k].array.byteLength; if (g.index) b += g.index.array.byteLength; } if (o.isInstancedMesh) b += o.instanceMatrix.array.byteLength + (o.instanceColor ? o.instanceColor.array.byteLength : 0); R.push([o, b]); } });
     const B = []; let cur = [], cb = 0; for (const r of R) { cur.push(r[0]); cb += r[1]; if (cb >= WARM_SPLIT) { B.push(cur); cur = []; cb = 0; } } if (cur.length) B.push(cur);
@@ -6145,7 +6167,7 @@ const HOLESYS = (() => {
   function step(HD) { const t0 = performance.now(); within(HD, () => { let r; try { r = HD.it.next(); } catch (e) { console.error(e); HD.err = e; HD.ready = true; return; } HD.idle = r.value === HATCH_WAIT; if (!HD.idle) HD.n++; if (r.done) { HD.ready = true; est = Math.max(20, HD.n); } }); /* idle: waiting on HATCHW's worker (this frame's slice ends) */
     const dt = performance.now() - t0; HD.ms = (HD.ms || 0) + dt; HD.max = Math.max(HD.max || 0, dt); if (dt > 8) { HD.slow = (HD.slow || 0) + 1; (HD.slowAt = HD.slowAt || []).push([HD.n, Math.round(dt)]); } if (HD.ready) last = { key: HD.key, n: HD.n, ms: Math.round(HD.ms), max: +HD.max.toFixed(1), slow: HD.slow || 0, slowAt: HD.slowAt || [] }; } /* (timings: HOLESYS.last) */
   function use(HD) { /* make HD the hole on screen; the one it replaces is disposed */
-    const old = cur; if (old && old !== HD) { old.v = holeVars(); scene.remove(old.v.HS.group); }
+    if (PROG_PIN) pinProgs(); const old = cur; if (old && old !== HD) { old.v = holeVars(); scene.remove(old.v.HS.group); }
     cur = HD; jobs.delete(HD.key); setHoleVars(HD.v); scene.add(HS.group); CULL = HS.cull; _ck.fill(NaN);
     scene.userData.outer = HS.ud.outer; scene.userData.lowClouds = HS.ud.lowClouds;
     READ.use(HS.read); MINI.use(HS.mini); flag.setHole(); CRITTERS.hole(); holeUI();
