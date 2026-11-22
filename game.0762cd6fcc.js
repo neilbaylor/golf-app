@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v516'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v518'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -64,6 +64,7 @@ const TUT_NO_FRINGE = true; /* Neil 11-21: a 2nd shot that finishes on the fring
 const TUT_TO_COURSE = true; /* Neil 11-21: the tutorial's last card goes straight to the first tee of the course they picked (the last course tapped on the main screen, else the Hunt); its button says Tee off (false = back to the main screen, as v495) */
 const TUT_TG_TOP = true; /* Neil 11-21: the goal / skip tutorial row sits just under the bubble on every step, not down the screen (false = per-step spots, as v495) */
 const TUT_ONE_TIP = true; /* Neil 11-21: one "drag CURVE" line in the tutorial's aim view (Neil's bubble): no aim-view tip card, no hand-written curve note (false = all three, as v495) */
+const TUT_NOW = true; /* Neil 11-22: each tutorial step's spotlight shows straight away (false = it waits for the camera to stop and 0.18 s of calm) */ const TUT_ONE_MOVE = true; /* Neil 11-22: the pitch view opens already framed under Neil's bubble, so the camera moves once, not twice (false = it reframes after the bubble appears) */
 const TUT_CAM = true; /* Neil 11-22: on the tutorial pitch and putt the camera frames the shot below Neil's bubble and the Skip row (they count as top HUD), so nothing sits over the green (false = as v505) */
 const TUT_PUTT_VIEW = true; /* Neil 11-22: the tutorial putt is in the overhead putt view like every putt, never the ball view (false = as v505) */
 const TUT_SNAPPY = true; /* Neil 11-22 ("more refined"): a step's spotlight comes up 0.18 s after things settle (was 0.5 s, which read as a lag) and eases in over a quarter second instead of snapping on (false = as v504) */
@@ -6273,6 +6274,17 @@ function skyHidden() { /* every view ray lands on the outer ground plane before 
     const k = (py - c.y) / _sk.y, x = c.x + _sk.x * k, z = c.z + _sk.z * k;
     if (Math.abs(x - (Q ? Q.x : O.position.x)) > half || Math.abs(z - (Q ? Q.z : O.position.z)) > half || _sk.dot(_skO) * k > camera.far * .98) return false; }
   return true; }
+/* COVER_SKIP (perf516): on the home screen, while an opaque layer covers the whole canvas (the multiplayer lobby, or the sky dip at the fly-over's loop seam and
+   while another course's hole builds behind it, once it has faded fully in), the fly-over's draw is skipped: none of its pixels can show. Everything else in the
+   frame still runs (camera, critters, culling). The canvas keeps its last picture under the cover, and the frame the cover starts to go (the dip's class off, the
+   lobby hidden) draws as before, so it always fades off a current picture. Only when the cover and #boot are at full opacity (no fade running) and the cover's
+   box holds the canvas's. false = the fly-over is always drawn, as v516 */
+const COVER_SKIP = true; const _cov = {};
+function glCovered() {
+  const B = _cov.b || (_cov.b = document.getElementById('boot')); if (!B || B.hidden || B.classList.contains('done')) return false;
+  const L = _cov.l || (_cov.l = document.getElementById('mpLobby')), F = _cov.f || (_cov.f = document.getElementById('homeFade')), c = L && !L.hidden ? L : F && F.classList.contains('on') ? F : null; if (!c) return false;
+  const sb = getComputedStyle(B), sc = getComputedStyle(c); if (sb.opacity !== '1' || sb.visibility !== 'visible' || sc.opacity !== '1' || sc.visibility !== 'visible' || sc.display === 'none' || (c === F && !/^rgb\(/.test(sc.backgroundColor))) return false; /* (the dip: its own solid sky colour under any still) */
+  const r = c.getBoundingClientRect(), q = canvas.getBoundingClientRect(); return r.width > 0 && r.left <= q.left && r.top <= q.top && r.right >= q.right && r.bottom >= q.bottom; }
 function frame(now) {
   if (MPX && MP_BUBBLE_RECT) MPX.pre(); /* MP_BUBBLE_RECT: the chat bubbles' anchors read first, while the layout is clean */
   const rawDt = Math.max(0, (now - last) / 1000), dt = clamp(rawDt, 0, .05) || 0; last = now; HOLESYS.tick(now); if (TUT_M && window.__TUTOR) __TUTOR.tick(now); /* TUT_PLAY */ if (CJ.g) caddieStep(CADDIE_BG_SLICE && FLY.on ? 2.5 : 6); /* CADDIE_SLICE (CADDIE_BG_SLICE: 2.5 ms a frame under the hole's fly-over) */ renderer.info.reset(); applyPendingPR(); /* a slice of any hole being built, first (before this frame's draw) */
@@ -6282,8 +6294,9 @@ function frame(now) {
     homeCam(dt); CRITTERS.update(dt, t); HOMEAV.update(dt);
     flag.wave(t); if (HOME_BG_WARM) try { HOMESNAP.frame(now); } catch (e) {} /* HOME_BG_WARM: a still of this course's home view, once */
     updateCull(); { const ch = Math.max(0, camera.position.y - (AUGD ? groundHeight(camera.position.x, -camera.position.z) : TERRAIN_BASE)); scene.fog.near = 240 + ch * 2.4; scene.fog.far = 1050 + ch * 3.2; }
+    if (!(COVER_SKIP && glCovered())) { /* COVER_SKIP: nothing of the fly-over can show under the lobby or the finished sky dip */
     const _bg = scene.background; if (_bg && _bg.isTexture && skyHidden()) scene.background = null;
-    try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; }
+    try { renderer.clear(); renderer.render(scene, camera); renderer.render(grain.sc, grain.cam); } finally { scene.background = _bg; } }
     requestAnimationFrame(frame); return; }
   if (FF_UNSTICK && G.ff && !FFP.size) G.ff = false; /* FF_UNSTICK: no finger down: no fast-forward */
   { const ff = (G.ff || (MP_FF_SHARE && G.ffR && G.view === 'flight') || (G.ffFlyR && FLY.on)) && (G.view === 'flight' || (FLY_FF && FLY.on)); if (ff !== G._ffShown) { $('#ffwd').classList.toggle('on', ff); G._ffShown = ff; } }
