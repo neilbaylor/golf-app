@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v509'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v511'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -7520,7 +7520,7 @@ if (MULTI) try { MPX = (() => {
     /* MP_LOBBY_CHAT (Neil 11-21, option B): the room's last three lines under the golfer tiles, and a box to add yours */
     const LC = { box: null, list: null, inp: null, log: [], code: '', shift: 0 };
     if (MP_LOBBY_CHAT) { L.classList.add('lc'); const c = document.createElement('div'); c.id = 'mpLChat'; c.innerHTML = '<div class="lines" aria-live="polite"></div><div class="cRow"><input id="mpLIn" type="text" enterkeyhint="send" autocomplete="off" autocorrect="on" placeholder="Say something" aria-label="Chat to the room"><button type="button" id="mpLSend" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11.5 12 5.5l6 6" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>';
-      el('mpSeats').after(c); LC.box = c; LC.list = c.querySelector('.lines'); LC.inp = c.querySelector('#mpLIn');
+      { const sl = document.createElement('div'); sl.id = 'mpLSlot'; el('mpSeats').after(sl); sl.appendChild(c); } LC.box = c; LC.list = c.querySelector('.lines'); LC.inp = c.querySelector('#mpLIn');
       const go = () => { const t = LC.inp.value.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim(); if (!t || !S.room) return; if (send({ t: 'chat', text: [...t].slice(0, K.CHAT_MAX).join('') })) LC.inp.value = ''; };
       LC.inp.addEventListener('input', () => { if (cps(LC.inp.value) > K.CHAT_MAX) LC.inp.value = [...LC.inp.value].slice(0, K.CHAT_MAX).join(''); });
       LC.inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); go(); } else if (e.key === 'Escape') LC.inp.blur(); });
@@ -7529,7 +7529,7 @@ if (MULTI) try { MPX = (() => {
       LC.inp.addEventListener('focus', () => { lift(); setTimeout(lift, 300); setTimeout(lift, 650); }); LC.inp.addEventListener('blur', () => setTimeout(lift, 50)); if (vv) vv.addEventListener('resize', lift); }
     const COL = ['#e0417f', '#2f6fd0', '#c9541c', '#2f8a3a'];
     function drawChat() { if (!LC.box) return; if (S.code !== LC.code) { LC.code = S.code; LC.log.length = 0; } const R = S.room, P = R ? R.players : [];
-      LC.list.innerHTML = LC.log.map(m => { const i = P.findIndex(p => p.id === m.pid), p = P[i]; return `<div class="ln">${face(p ? p.who : m.who)}<span><b style="color:${COL[Math.max(0, i) % 4]}">${esc(p ? p.name : m.name)}</b>${esc(m.text)}</span></div>`; }).join(''); }
+      LC.list.innerHTML = LC.log.map(m => { const i = P.findIndex(p => p.id === m.pid), p = P[i]; return `<div class="ln">${face(p ? p.who : m.who)}<span><b style="color:${COL[Math.max(0, i) % 4]}">${esc(p ? p.name : m.name)}</b>${esc(m.text)}</span></div>`; }).join(''); LC.list.classList.toggle('over', LC.list.scrollHeight > LC.list.clientHeight + 1); }
     function chat(pid, text) { if (!LC.box || L.hidden || S.inRound) return false; if (S.code !== LC.code) { LC.code = S.code; LC.log.length = 0; } const p = pl(pid); LC.log.push({ pid, text, who: p ? p.who : '', name: p ? p.name : 'Someone' }); if (LC.log.length > 3) LC.log.shift(); drawChat(); return true; }
     return { show, hide, draw, link, share, chat }; })();
 
