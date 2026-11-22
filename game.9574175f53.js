@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v499'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v501'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -64,6 +64,7 @@ const TUT_NO_FRINGE = true; /* Neil 11-21: a 2nd shot that finishes on the fring
 const TUT_TO_COURSE = true; /* Neil 11-21: the tutorial's last card goes straight to the first tee of the course they picked (the last course tapped on the main screen, else the Hunt); its button says Tee off (false = back to the main screen, as v495) */
 const TUT_TG_TOP = true; /* Neil 11-21: the goal / skip tutorial row sits just under the bubble on every step, not down the screen (false = per-step spots, as v495) */
 const TUT_ONE_TIP = true; /* Neil 11-21: one "drag CURVE" line in the tutorial's aim view (Neil's bubble): no aim-view tip card, no hand-written curve note (false = all three, as v495) */
+const TUT_PUTT_DODGE = true; /* Neil 11-21: on a long tutorial putt Neil's read moves below the hole so the hole stays in view (false = always up top, as v500) */
 const TUT_FADE = true; /* Neil 11-21: back on, as a soft dip to sky in the home screen's colour and ease (false = the ball just jumps, as v493) */
 const TUT_PLAY = true; /* Neil 11-21: the tutorial itself, played on #tutorial-hole (TUTOR). false = just the hole */
 const TUT_M = TUT_HOLE ? /^#tutorial-hole$/.exec(location.hash) : null;
@@ -6514,6 +6515,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
 #tutO .goal{font:12px/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;background:var(--pink);color:var(--paper);border:2px solid var(--ink);border-radius:10px;padding:5px 9px 3px;box-shadow:2px 2px 0 var(--ink)}
 #tutO .skip,#tutO .ok{font:12px/1 var(--font-display);letter-spacing:.05em;text-transform:uppercase;background:var(--paper);color:var(--ink);border:2px solid var(--ink);border-radius:10px;padding:5px 9px 3px;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
 #tutO .ok{background:var(--sun);font-size:14px;padding:7px 12px 5px}
+#app.tutSayLow #say::before{display:none} /* TUT_PUTT_DODGE: dropped below the hole, off Neil's face: no tail */
 #tutO .note{position:absolute;font:700 29px/.95 Caveat,var(--font-hand);color:#fffaf0;text-shadow:2px 2px 0 #1d2a1a;white-space:nowrap;transform:rotate(-5deg)}
 #tutO .cardW{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 22px;pointer-events:auto;background:rgba(24,36,22,.55)}
 #tutO .cardW .card{width:100%;max-width:330px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:12px}
@@ -6551,13 +6553,16 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
   let fading = false; function fade(fn) { if (!TUT_FADE) { fn(); return; } /* TUT_FADE (Neil 11-21): the move to the set spot happens under a soft dip to sky, the same colour and ease as the home screen's loop seam; it also hides the camera's zoom onto the old lie */
     fading = true; const n = G.stroke, cap = n === 2 ? 'From the rough' : n === 3 ? 'A pitch to the green' : 'The putt'; /* (Neil: no "Shot 2") */
     const f = document.createElement('div'); f.style.cssText = 'position:fixed;inset:0;z-index:59;background:#d6f0ff;opacity:0;transition:opacity .5s cubic-bezier(.45,0,.55,1);pointer-events:none;display:flex;align-items:center;justify-content:center';
-    f.innerHTML = `<b style="font:26px/1 var(--font-display);letter-spacing:.03em;color:var(--ink);opacity:0;transform:translateY(6px);transition:opacity .35s .2s,transform .45s .2s cubic-bezier(.3,1.4,.5,1)">${cap}</b>`; document.body.appendChild(f); const b = f.firstChild;
+    f.innerHTML = `<b style="font:700 44px/1 Caveat,var(--font-hand);color:var(--ink);opacity:0;transform:translateY(6px) rotate(-3deg);transition:opacity .35s .2s,transform .45s .2s cubic-bezier(.3,1.4,.5,1)">${cap}</b>`; /* (Neil 11-21: the handwritten Caveat of the tutorial notes, not the display font) */ document.body.appendChild(f); const b = f.firstChild;
     const until = (ok, max, then) => { const t0 = performance.now(); (function w() { if (ok() || performance.now() - t0 > max) then(); else setTimeout(w, 50); })(); };
-    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; b.style.opacity = '1'; b.style.transform = 'none'; }));
+    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; b.style.opacity = '1'; b.style.transform = 'rotate(-3deg)'; }));
     setTimeout(() => until(() => !G.camTween && SW.phase === 'idle', 1500, () => { fn(); /* under cover: the camera's zoom onto the old lie is done; move the ball */
       setTimeout(() => until(() => !G.camTween, 1500, () => { b.style.transition = 'opacity .25s'; b.style.opacity = '0'; f.style.opacity = '0'; setTimeout(() => { f.remove(); fading = false; calmAt = 0; }, 560); }), 230); }), 560); } /* (Neil 11-21: held 150 ms less than v494's 380) */
   function bub(t) { AV.say(t, { force: true, hold: true }); }
-  function clear() { st = null; undim(); top.innerHTML = ''; ui.innerHTML = ''; }
+  function clear() { st = null; undim(); top.innerHTML = ''; ui.innerHTML = ''; dodge(); }
+  let lowY = 0; const _hp = new THREE.Vector3(); function dodge() { if (!TUT_PUTT_DODGE) return; const S = $('#say'); let y = 0; /* TUT_PUTT_DODGE (Neil 11-21): a long putt puts the hole up top, behind Neil's read: the bubble (and the goal row under it) drops to just below the hole and its label */
+    if (st && st.id === 'putt' && G.view !== 'flight' && S && !S.hidden) { const p = project(_hp.set(PIN.u, groundHeight(PIN.u, PIN.v), -PIN.v)), A = app.getBoundingClientRect(); if (p.z < 1) { const hy = p.y + RECT.canvas.top - A.top, home = st.homeB || (st.homeB = (st.tg ? st.tg.getBoundingClientRect().bottom : S.getBoundingClientRect().bottom + 40) - A.top); if (hy + 100 > 100 && hy - 30 < home) y = Math.round(hy + 100); } }
+    if (Math.abs(y - lowY) < 8 && !!y === !!lowY) return; lowY = y; if (S) S.style.top = y ? y + 'px' : ''; app.classList.toggle('tutSayLow', !!y); }
   function show(id, o) { clear(); st = Object.assign({ id, lit: [], stroke: G.stroke }, o); done.add(id); if (o.say) bub(o.say); st.dimOK = o.dim !== false; st.free = free(); if (st.dimOK && !st.free) dim(st.lit);
     const tg = document.createElement('div'); tg.className = 'tg'; tg.style.left = '14px';
     if (o.ok) { const b = document.createElement('span'); b.className = 'ok'; b.textContent = o.ok; b.onclick = e => { e.stopPropagation(); end(); }; tg.appendChild(b); }
@@ -6593,7 +6598,7 @@ const TUTOR = TUT_PLAY && TUT_M ? (() => {
       else if (id === 'aim') { const t = targetUV(); if (!aimFrom) aimFrom = { u: t.u, v: t.v, c: G.curve }; else if (Math.hypot(t.u - aimFrom.u, t.v - aimFrom.v) > 1 || G.curve !== aimFrom.c || SW.phase === 'down' || G.view === 'flight') end(); else if (G.aimGoal !== 1) end(); }
       else if (id === 'pick1' && sheet()) { show('pick2', { say: 'Pitch flies high and lands soft. Punch stays low under trees. Pick Pitch.', lit: [TUT_PITCH_ONLY ? 'pitchBtn' : 'modes'] }); }
       else if (id === 'pick2' && !sheet()) { clear(); }
-      if (st) draw(); return; }
+      if (st) { draw(); dodge(); } return; }
     if (fading) return;
     if (!(TUT_FADE && G.ball && !FLY.on && G.view !== 'flight' && !cls('flying') && !cls('settling') && !cls('droning') && !cls('resulting') && SW.phase === 'idle' && $('#result').hidden && !sheet()) && !ready(now)) return; /* TUT_FADE: a move starts as soon as the shot is over, so the dip covers the camera's zoom; everything else waits for calm */
     { const S = TUT_SPOTS[Math.min(G.stroke, 4)], d = Math.hypot(PIN.u - G.ball.u, PIN.v - G.ball.v), keep = G.stroke === 2 ? G.lie === 'rough' : G.stroke === 3 ? G.lie !== 'green' && !(TUT_NO_FRINGE && G.lie === 'fringe') && !/sand|bunker|water/.test(G.lie) && d >= 10 && d <= 60 : G.stroke === 4 ? G.lie === 'green' && d * 3 > 10 : false; /* Neil 11-21: a drive already in the rough, a 2nd already in chipping range, a putt already over 10 ft: play it from there */
@@ -7097,6 +7102,7 @@ const MP_FEEL = true; /* undo switch: your swing never waits on the network (inb
 /* mplag (Neil 11-16 16:48, "multiplayer lag as low as possible, for free"): six undo switches (server.js: NEXT_HOLD, FLY_SKIP_ALL). All off = exactly as before. Nothing on screen changes but when it happens (MP_FLY_SKIP_ALL: Neil's ask, a Skip for everyone). */
 const MP_EARLY_NEXT = true; /* turn hand-off: the shooter reports where the ball ended up as soon as the result card is up (not when it goes), so the round trip happens under the card. Every phone still shows the card exactly as long as before (2.75 s or a tap; a holed card 2.6 s), then the next turn is already there. 'next' carries hold (ms of card left) so the server's idle clock starts when the turn shows. Water / OB still waits for Replay / Drop. false = 'next' after the card, as before */
 const MP_AIM_LEAD = 1; /* watching someone aim (no extra bytes): 0 = as before (ease 12/s) | 1 = ease 16/s (~20 ms less lag, no overshoot) | 2 = ease 16/s toward a 60 ms look-ahead from the last two aim samples (~55 ms less lag; can run ~0.6 deg past a stop and settle back) */
+const MP_LOBBY_CHAT = true; /* Neil 11-21 (option B): chat in the waiting room: a card under the (smaller) golfer tiles with the room's last three lines and a send box (false = no lobby chat, as v499) */
 const MP_OPT_CHAT = true; /* your own chat bubble and reaction show at once (the server's echo of them is skipped), when a local copy of the server's checks (length, rate) says it will go through; otherwise as before, on the echo. false = on the echo */
 const MP_FLY_FF_ALL = true; /* Neil (11-18 19:34): "If I fast forward fly over in multiplayer it should for everyone": holding to fast-forward the hole's fly-over tells the room (a tiny 'flyff' on / off for that hole); everyone's fly-over runs at 3x (with the 3x badge) while anyone holds. Speed only. false = each phone's own (needs the server's 'flyff' relay) */
 const MP_FLY_SKIP_ALL = true; /* Neil (11-16): in multiplayer anyone's Skip on the hole's fly-over skips it for everyone, as smoothly as their own Skip (the same glide back to the tee, tips, greet): a tiny 'flyskip' for that hole, relayed once per hole by the server; a phone whose fly-over has ended, or is on another hole, ignores it (one still loading the hole skips it as it starts). false = each phone's own fly-over */
@@ -7447,7 +7453,7 @@ if (MULTI) try { MPX = (() => {
     function panelLine() { const A = rect(app), p = el('mpPanel'), P = p.getBoundingClientRect(); let t = P.top; if (app.classList.contains('kbDock')) { const rw = p.querySelector('.mpRow'); if (rw) t = Math.min(t, rw.getBoundingClientRect().top); } return t - A.top; } /* MP_BUB_ALIGN: the line bubbles sit on: the panel's top (or the docked strip's) */
     const LOG = []; function logLine(pid, text) { if (!KBT) return; LOG.push({ pid, text }); if (LOG.length > 3) LOG.shift(); const L = el('mpLog'); if (L) L.innerHTML = LOG.map(x => `<p${x.pid === S.you ? ' class="me"' : ''}><b>${esc(x.pid === S.you ? 'You' : nm(pl(x.pid)))}</b><span>${esc(x.text)}</span></p>`).join(''); } /* MP_KB_TOP: the last 3 lines, shown over the box while you type */
     function midSwing() { return S.inRound && S.mine && (SW.phase === 'back' || SW.phase === 'down' || (MP_FEEL && performance.now() - S.launchAt < K.POP_AFTER)); } /* and a beat after the launch */
-    function msg(pid, text) { if (midSwing()) { held.push(['m', pid, text]); return; } if (S.mute && pid !== S.you) return; (bq[pid] || (bq[pid] = [])).push(text); typing(pid, false, true); next(pid); }
+    function msg(pid, text) { if (MP_LOBBY_CHAT && !S.inRound && LOBBY.chat(pid, text)) return; /* MP_LOBBY_CHAT: in the waiting room, a line in its chat card */ if (midSwing()) { held.push(['m', pid, text]); return; } if (S.mute && pid !== S.you) return; (bq[pid] || (bq[pid] = [])).push(text); typing(pid, false, true); next(pid); }
     let kbWait0 = 0; const kbOpen = () => { if (!KBD) return false; const vv = window.visualViewport; return app.classList.contains('kbDock') || document.activeElement === inp || !!(vv && (vv.offsetTop > 1 || vv.height < window.innerHeight - 60)); }; /* MP_ME_BUB_WAIT: a phone keyboard still up, or still going down */
     function next(pid) { if (showing[pid] || !(bq[pid] || []).length) return; if (MP_FEEL && midSwing()) return;
       if (MP_ME_BUB_WAIT && pid === S.you && !S.mine) { const now = performance.now(); if (kbOpen() && (!kbWait0 || now - kbWait0 < 1500)) { kbWait0 = kbWait0 || now; setTimeout(() => next(pid), 60); return; } if (kbWait0) { kbWait0 = 0; setTimeout(() => next(pid), 120); return; } } /* MP_ME_BUB_WAIT: your own bubble waits until the keyboard has gone (and a beat to settle; 1.5 s at most) */ /* MP_FEEL: a queued bubble waits for the launch too (tick() starts it) */ const a = anchor(pid); const text = bq[pid].shift(); if (!a) { next(pid); return; }
@@ -7601,7 +7607,7 @@ if (MULTI) try { MPX = (() => {
     function draw() { const R = S.room; el('mpLCode').textContent = S.code || '…';
       const P = R ? R.players : [], k = P.map(p => p.id + p.who + p.conn + p.name).join() + S.you;
       if (k !== seatKey) { seatKey = k; const seats = []; for (let i = 0; i < 4; i++) { const p = P[i];
-          seats.push(p ? `<div class="mpSeat${p.id === S.you ? ' you' : ''}${p.conn ? '' : ' off'}">${p.id === S.you ? '<em>YOU</em>' : ''}${face(p.who)}<b>${esc(p.name)}</b>${p.conn ? '' : '<small>reconnecting…</small>'}</div>`
+          seats.push(p ? `<div class="mpSeat${p.id === S.you ? ' you' : ''}${p.conn ? '' : ' off'}" data-id="${p.id}">${p.id === S.you ? '<em>YOU</em>' : ''}${face(p.who)}<b>${esc(p.name)}</b>${p.conn ? '' : '<small>reconnecting…</small>'}</div>`
             : `<button type="button" class="mpSeat open" data-share="1"><span class="plus">+</span><b>Invite</b><small>open seat</small></button>`); }
         el('mpSeats').innerHTML = seats.join(''); }
       const c = R ? R.course : MENU.course, C = COURSES.find(x => x.id === c) || COURSES[0], n = (COURSE_DEF[C.id].list || (COURSE_DEF[C.id].list = COURSE_DEF[C.id].holes())).length;
@@ -7621,7 +7627,21 @@ if (MULTI) try { MPX = (() => {
     async function copy(t) { let ok = false; try { await navigator.clipboard.writeText(t); ok = true; } catch (e) { ok = MP_SHARE && copyOld(t); } toast(ok ? (MP_SHARE ? 'Link copied' : 'Copied!') : t); }
     el('mpSeats').addEventListener('click', e => { if (e.target.closest('[data-share]')) share(); });
     if (MP_SHARE) { L.classList.add('mpS'); el('mpLShare').hidden = false; el('mpLShare').addEventListener('click', e => { e.stopPropagation(); share(); }); }
-    return { show, hide, draw, link, share }; })();
+    /* MP_LOBBY_CHAT (Neil 11-21, option B): the room's last three lines under the golfer tiles, and a box to add yours */
+    const LC = { box: null, list: null, inp: null, log: [], code: '', shift: 0 };
+    if (MP_LOBBY_CHAT) { L.classList.add('lc'); const c = document.createElement('div'); c.id = 'mpLChat'; c.innerHTML = '<div class="lines" aria-live="polite"></div><div class="cRow"><input id="mpLIn" type="text" enterkeyhint="send" autocomplete="off" autocorrect="on" placeholder="Say something" aria-label="Chat to the room"><button type="button" id="mpLSend" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11.5 12 5.5l6 6" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>';
+      el('mpSeats').after(c); LC.box = c; LC.list = c.querySelector('.lines'); LC.inp = c.querySelector('#mpLIn');
+      const go = () => { const t = LC.inp.value.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim(); if (!t || !S.room) return; if (send({ t: 'chat', text: [...t].slice(0, K.CHAT_MAX).join('') })) LC.inp.value = ''; };
+      LC.inp.addEventListener('input', () => { if (cps(LC.inp.value) > K.CHAT_MAX) LC.inp.value = [...LC.inp.value].slice(0, K.CHAT_MAX).join(''); });
+      LC.inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); go(); } else if (e.key === 'Escape') LC.inp.blur(); });
+      el('mpLSend').addEventListener('pointerdown', e => e.preventDefault()); /* (the box keeps focus: the keyboard stays up for the next line) */ el('mpLSend').addEventListener('click', go);
+      const vv = window.visualViewport, lift = () => { if (!vv || document.activeElement !== LC.inp) { LC.shift = 0; L.style.translate = ''; return; } const r = c.getBoundingClientRect(), d = Math.round(r.bottom - LC.shift + 10 - (vv.height + vv.offsetTop)); LC.shift = d > 0 ? d : 0; L.style.translate = LC.shift ? `0 ${-LC.shift}px` : ''; }; /* the phone keyboard: the lobby rides up so the box stays in view */
+      LC.inp.addEventListener('focus', () => { lift(); setTimeout(lift, 300); setTimeout(lift, 650); }); LC.inp.addEventListener('blur', () => setTimeout(lift, 50)); if (vv) vv.addEventListener('resize', lift); }
+    const COL = ['#e0417f', '#2f6fd0', '#c9541c', '#2f8a3a'];
+    function drawChat() { if (!LC.box) return; if (S.code !== LC.code) { LC.code = S.code; LC.log.length = 0; } const R = S.room, P = R ? R.players : [];
+      LC.list.innerHTML = LC.log.map(m => { const i = P.findIndex(p => p.id === m.pid), p = P[i]; return `<div class="ln">${face(p ? p.who : m.who)}<span><b style="color:${COL[Math.max(0, i) % 4]}">${esc(p ? p.name : m.name)}</b>${esc(m.text)}</span></div>`; }).join(''); }
+    function chat(pid, text) { if (!LC.box || L.hidden || S.inRound) return false; if (S.code !== LC.code) { LC.code = S.code; LC.log.length = 0; } const p = pl(pid); LC.log.push({ pid, text, who: p ? p.who : '', name: p ? p.name : 'Someone' }); if (LC.log.length > 3) LC.log.shift(); drawChat(); return true; }
+    return { show, hide, draw, link, share, chat }; })();
 
   /* ---------- MP_KICK: "<Name> hasn't played in 30 s": PLAY FOR / REMOVE / WAIT (on the others' phones) ---------- */
   const KICK = (() => { const D = document.createElement('div'); D.id = 'mpKick'; D.hidden = true; D.className = 'k' + MP_KICK_STYLE; app.appendChild(D); let cur = null; const dis = {};
