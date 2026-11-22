@@ -79,8 +79,8 @@ def build(src, single=False):
     code = code[:m.start()] + "  if (cid === 'augusta') while (typeof AUG_HOLES === 'undefined') { window.__augLoad(); yield HATCH_WAIT; } /* SPLIT: Augusta's data on its way (an idle step: the frame's slice ends) */\n" + code[m.start():]
     # HOLESYS.boot() builds every other course's first hole synchronously under the boot cover; on a Hunt boot Augusta's data isn't there yet,
     # so that one is left to ahead()'s home-screen prebuild (a normal stepped job, which waits for the data above)
-    m = one(code, r"if \(id !== CID && !jobs\.has\(keyOf\(id, NINE\.first\(id\)\)\)\) \{ const J = start\(id, NINE\.first\(id\)\); while \(!J\.ready\) step\(J\); \}", 'HOLESYS.boot other courses')
-    code = code[:m.start()] + m.group(0).replace("if (id !== CID && ", "if (id !== CID && !(id === 'augusta' && typeof AUG_HOLES === 'undefined') /* SPLIT */ && ", 1) + code[m.end():]
+    m = one(code, r"if \(id !== CID && \(BOOT_FINISH \|\| !jobs\.has\(keyOf\(id, NINE\.first\(id\)\)\)\)\) \{ const J = \(BOOT_FINISH && jobs\.get\(keyOf\(id, NINE\.first\(id\)\)\)\) \|\| start\(id, NINE\.first\(id\)\); while \(!J\.ready && !J\.err\) step\(J\); \}", 'HOLESYS.boot other courses')
+    code = code[:m.start()] + m.group(0).replace("if (id !== CID && ", "if (id !== CID && !(id === 'augusta' && typeof AUG_HOLES === 'undefined') && !(id === 'osler' && typeof OSLER_HOLES === 'undefined') /* SPLIT: data not here: left to the home screen's prebuild */ && ", 1) + code[m.end():]
     # Top-level code that patches Augusta's data as the game script loads (e.g. aug13's `{ const h = AUG_HOLES['13'], ... }`): on a Hunt boot AUG_HOLES isn't
     # there yet, so each such block runs as soon as it is: at once when the data came first (an Augusta boot: exactly as inline), else queued and run by aug.js
     # itself, right after its data and before any build can see it. Any OTHER top-level statement that reads AUG_HOLES stops the build (it would break a Hunt boot).
