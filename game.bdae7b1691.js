@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v523'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v525'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1036,7 +1036,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, 1, 0.3, 2600);
 scene.fog = new THREE.Fog(0xece9dc, 240, 1050);
 const W = (u, v, y = 0) => new THREE.Vector3(u, y, -v);
-const maxAniso = renderer.capabilities.getMaxAnisotropy(); const ANISO_CAP = 6; /* Neil 11-22 (perf516: the ground map's 16x sharpening was ~17% of a Hunt tee frame): the course ground map at 6x (4x looked fine to him, 6 splits the difference; the green art is 4x) (0 = the device's max, v520) */
+const maxAniso = renderer.capabilities.getMaxAnisotropy(); const ANISO_CAP = 4; /* Neil 11-22 (perf516: the ground map's 16x sharpening was ~17% of a Hunt tee frame): the course ground map at 4x (Neil: 6x, then back to 4x), as the green art already is (0 = the device's max, v520) */
 const SHARED = new WeakSet(); /* materials and textures every hole uses: never disposed with a hole (HOLESYS) */
 
 // sky
@@ -2347,7 +2347,11 @@ let _bic = false;
 function ballInCup(on) { if (on === _bic) return; _bic = on; // below the rim: draw the ball only through the cup opening
   for (const m of [ball.material, ballInk.material]) { m.depthTest = !on; m.stencilWrite = on; m.stencilRef = 1; m.stencilFunc = on ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc; m.needsUpdate = true; }
   ball.renderOrder = on ? 6 : 0; ballInk.renderOrder = on ? 6 : 0; ballShadow.visible = !on; }
-const ballTex = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 128);
+const BALL_SKIN = 'triple'; /* Neil 11-22 (option B): a triple-track ball, an ink line between two pink rails, all running ALONG the aim so it shows from behind on a full swing as well as from above on a putt (null = v523: a line across the ball and two pink dots) */
+const ballTex = BALL_SKIN === 'triple' ? (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = 'rgba(29,42,26,.07)'; for (let row = 0; row < 22; row++) { const y = 6 + row * 11.6, w = Math.max(.15, Math.sin(Math.PI * y / 256)), n = Math.round(46 * w); for (let i = 0; i < n; i++) { const x = (i + (row % 2) * .5) * 512 / n; g.beginPath(); g.ellipse(x, y, 3.2 / w, 3.2, 0, 0, 7); g.fill(); } } /* dimples, squeezed toward the poles */
+  g.fillStyle = '#ff4f9a'; g.fillRect(0, 88, 512, 13); g.fillRect(0, 155, 512, 13); g.fillStyle = '#1d2a1a'; g.fillRect(0, 117, 512, 22); /* the tracks run round the equator; the ball's pole points sideways, so they run down the aim line */
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 16; return t; })() : (() => /* (the ball is a few pixels across: full sharpening costs nothing here and keeps the tracks crisp) */ { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 128);
   const Rb = rng(5); g.fillStyle = 'rgba(0,0,0,.05)'; for (let i = 0; i < 420; i++) { g.beginPath(); g.arc(Rb() * 256, Rb() * 128, 1.6, 0, 7); g.fill(); }
   g.fillStyle = '#1d2a1a'; g.fillRect(0, 60, 256, 8); g.fillStyle = '#ff4f9a'; [[64, 34], [192, 94]].forEach(([x, y]) => { g.beginPath(); g.ellipse(x, y, 16, 11, 0, 0, 7); g.fill(); });
   return new THREE.CanvasTexture(c); })();
@@ -3266,10 +3270,12 @@ function* treeEscapeG() {
   return true; }
 function treeEscape() { return runG(treeEscapeG()); }
 const _UP = new THREE.Vector3(0, 1, 0), _fwd = new THREE.Vector3(), _ax = new THREE.Vector3();
+const _bSide = new THREE.Vector3(), _bM = new THREE.Matrix4(), _bAim = { u: NaN, v: NaN };
+function ballAim() { _bAim.u = G.dir.u; _bAim.v = G.dir.v; if (BALL_SKIN !== 'triple') { ball.quaternion.setFromUnitVectors(_UP, _fwd.set(G.dir.u, 0, -G.dir.v).normalize()); return; } const f = _fwd.set(G.dir.u, 0, -G.dir.v).normalize(); _bSide.crossVectors(_UP, f); ball.quaternion.setFromRotationMatrix(_bM.makeBasis(f, _bSide, _UP)); } /* BALL_SKIN triple: local x = the aim, y = sideways (the pole), z = up */
 function placeBall() { ballInCup(false); if (FESCUE) fescueAtBall();
   const p = W(G.ball.u, G.ball.v); const onTee = G.lie === 'tee', gh = groundHeight(G.ball.u, G.ball.v);
   ball.position.set(p.x, gh + BALL_R + (onTee ? .07 : 0) - (G.lie === 'rough' ? .03 : G.lie === 'deep' ? .05 : G.lie === 'fescue' ? .062 : G.lie === 'pine' ? .012 : 0) - (G.lie === 'sand' ? .025 : 0), p.z); ball.userData.restY = ball.position.y; ball.userData.k = 1;
-  ball.quaternion.setFromUnitVectors(_UP, _fwd.set(G.dir.u, 0, -G.dir.v).normalize()); ball.scale.set(1, 1, 1); // stripe faces down the line like an alignment mark
+  ballAim(); ball.scale.set(1, 1, 1); // stripe faces down the line like an alignment mark
   peg.visible = onTee; peg.position.set(p.x, gh + .05, p.z); ballShadow.position.set(p.x, gh + .012, p.z); ballShadow.visible = true;
 }
 
@@ -5290,7 +5296,7 @@ function updateTracer() {
   const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
   if (G.mode === 'putt') { // how far it would roll if the green were flat and straight: it does NOT follow the break
     const D = G.D, e = smoother(G.aimT);
-    for (let s = 0; s <= TR.segs; s++) { const t = s / TR.segs, u = G.ball.u + G.dir.u * D * t, v = G.ball.v + G.dir.v * D * t; trT[s] = t; trPts[s].set(u, groundHeight(u, v) + .035, -v); }
+    const t0 = BALL_SKIN === 'triple' ? Math.min(.3, BALL_R * 3 / Math.max(D, .01)) : 0; /* BALL_SKIN: the putt line starts just past the ball, so the ball's own tracks show and lead into it */ for (let s = 0; s <= TR.segs; s++) { const t = t0 + (1 - t0) * s / TR.segs, u = G.ball.u + G.dir.u * D * t, v = G.ball.v + G.dir.v * D * t; trT[s] = t; trPts[s].set(u, groundHeight(u, v) + .035, -v); }
     TT.red = false; TT.wet = false; treeMk.userData.at = null; tracer.material.color.set(0xffffff); tracer.material.depthTest = tracerInk.material.depthTest = true; trInk = .5; if (tracer.material.map !== solidTex) { tracer.material.map = solidTex; tracer.material.needsUpdate = true; }
     buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(.0042, .0034, e), Math.max(2, D)); trShadow.visible = false;
     const tg = targetUV(); rings.position.set(tg.u, groundHeight(tg.u, tg.v), -tg.v); straightRef.visible = false;
@@ -6291,6 +6297,7 @@ function frame(now) {
   const rawDt = Math.max(0, (now - last) / 1000), dt = clamp(rawDt, 0, .05) || 0; last = now; HOLESYS.tick(now); if (TUT_M && window.__TUTOR) __TUTOR.tick(now); /* TUT_PLAY */ if (CJ.g) caddieStep(CADDIE_BG_SLICE && FLY.on ? 2.5 : 6); /* CADDIE_SLICE (CADDIE_BG_SLICE: 2.5 ms a frame under the hole's fly-over) */ renderer.info.reset(); applyPendingPR(); /* a slice of any hole being built, first (before this frame's draw) */
   if (INTRO.on) { requestAnimationFrame(frame); return; } // the titles cover the screen: draw nothing behind them
   if (!isFinite(SW.vis) || !isFinite(SW.visV)) { SW.vis = 0; SW.visV = 0; } if (!isFinite(camera.fov)) camera.fov = 52; if (!isFinite(G.aimT)) G.aimT = G.aimGoal; const t = now / 1000; FOUNT_T.value = t; /* the pond fountain's spray (one uniform) */ if (FESCUE && G.wind) { if (FESCUE_THICK && G.ball) FESCUE_U.b.value.set(G.ball.u, -G.ball.v, camera.position.x, camera.position.z); FESCUE_U.t.value = RM ? 0 : t; const fk = .06 + .012 * Math.min(25, G.wind.mph || 0); FESCUE_U.w.value.set(Math.cos(G.wind.ang || 0) * fk, -Math.sin(G.wind.ang || 0) * fk); } /* FESCUE: the tufts lean and sway downwind */
+  if (BALL_SKIN === 'triple' && !MENU.on && (G.dir.u !== _bAim.u || G.dir.v !== _bAim.v) && G.view !== 'flight' && SW.phase === 'idle' && !/\b(flying|settling|resulting|droning)\b/.test(app.className)) ballAim(); /* BALL_SKIN: the ball at rest turns its tracks to follow the aim */
   if (MENU.on) { // menu up: just the fly-over (no swing UI, tracer, dial or avatar work)
     homeCam(dt); CRITTERS.update(dt, t); HOMEAV.update(dt);
     flag.wave(t); if (HOME_BG_WARM) try { HOMESNAP.frame(now); } catch (e) {} /* HOME_BG_WARM: a still of this course's home view, once */
