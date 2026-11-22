@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v520'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v522'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1036,7 +1036,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, 1, 0.3, 2600);
 scene.fog = new THREE.Fog(0xece9dc, 240, 1050);
 const W = (u, v, y = 0) => new THREE.Vector3(u, y, -v);
-const maxAniso = renderer.capabilities.getMaxAnisotropy();
+const maxAniso = renderer.capabilities.getMaxAnisotropy(); const ANISO_CAP = 6; /* Neil 11-22 (perf516: the ground map's 16x sharpening was ~17% of a Hunt tee frame): the course ground map at 6x (4x looked fine to him, 6 splits the difference; the green art is 4x) (0 = the device's max, v520) */
 const SHARED = new WeakSet(); /* materials and textures every hole uses: never disposed with a hole (HOLESYS) */
 
 // sky
@@ -1470,7 +1470,7 @@ function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS s
   return { tex, box: new THREE.Vector4(u0, -v1, u1 - u0, v1 - v0) };
 }
 function* courseSteps() { /* the hole's painted map, then the ground it's draped on */
-courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(BUILD_CHUNK2)); courseTex.anisotropy = maxAniso; if (TEX_FREE) courseTex.onUpdate = texFree;
+courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(BUILD_CHUNK2)); courseTex.anisotropy = ANISO_CAP ? Math.min(ANISO_CAP, maxAniso) : maxAniso; /* ANISO_CAP */ if (TEX_FREE) courseTex.onUpdate = texFree;
 const course = new THREE.Mesh(new THREE.PlaneGeometry(MAP.U1 - MAP.U0, MAP.V1 - MAP.V0), groundMat(courseTex, 1));
 course.rotation.x = -Math.PI / 2; course.position.set((MAP.U0 + MAP.U1) / 2, 0, -(MAP.V0 + MAP.V1) / 2); HS.add(course);
 yield* terrainSteps(course); }
