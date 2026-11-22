@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v519'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v521'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1036,7 +1036,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, 1, 0.3, 2600);
 scene.fog = new THREE.Fog(0xece9dc, 240, 1050);
 const W = (u, v, y = 0) => new THREE.Vector3(u, y, -v);
-const maxAniso = renderer.capabilities.getMaxAnisotropy();
+const maxAniso = renderer.capabilities.getMaxAnisotropy(); const ANISO_CAP = 4; /* Neil 11-22 (perf516: the ground map's 16x sharpening was ~17% of a Hunt tee frame): the course ground map at 4x, as the green art already is (0 = the device's max, v520) */
 const SHARED = new WeakSet(); /* materials and textures every hole uses: never disposed with a hole (HOLESYS) */
 
 // sky
@@ -1470,7 +1470,7 @@ function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS s
   return { tex, box: new THREE.Vector4(u0, -v1, u1 - u0, v1 - v0) };
 }
 function* courseSteps() { /* the hole's painted map, then the ground it's draped on */
-courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(BUILD_CHUNK2)); courseTex.anisotropy = maxAniso; if (TEX_FREE) courseTex.onUpdate = texFree;
+courseTex = new THREE.CanvasTexture(yield* paintCourseSteps(BUILD_CHUNK2)); courseTex.anisotropy = ANISO_CAP ? Math.min(ANISO_CAP, maxAniso) : maxAniso; /* ANISO_CAP */ if (TEX_FREE) courseTex.onUpdate = texFree;
 const course = new THREE.Mesh(new THREE.PlaneGeometry(MAP.U1 - MAP.U0, MAP.V1 - MAP.V0), groundMat(courseTex, 1));
 course.rotation.x = -Math.PI / 2; course.position.set((MAP.U0 + MAP.U1) / 2, 0, -(MAP.V0 + MAP.V1) / 2); HS.add(course);
 yield* terrainSteps(course); }
@@ -6641,6 +6641,7 @@ function holeCard(L) {
 // ---- opening titles: a 3×3 board of golfers and course bits that pop in, glance at each other, then roll credits (tap or Skip to jump to the menu)
 const INTRO_DECODE = true; /* Neil (11-18 21:17): "Sometimes in the initial Brady Bunch screen some squares are empty, I think because the image didn't load yet": the golfers' pictures (and the course crest) are decoded before the board starts filling in, so each square comes in with its picture; it waits 1.2 s at most, then goes anyway. false = as v454 */
 const INTRO = { on: false, fill: false };
+const HYD_QUIET = 1200; /* Neil 11-22 (a touch of stutter as the intro hands over to the golfer picker): the background hole build holds off for 1.2 s from that hand-off (0 = it carries on, v519) */
 const INTRO_PRE = true; /* Neil 11-21: see #intro.pre and INTRO.fill. false = as v488 */
 async function runIntro() {
   const el = $('#intro'), grid = $('#introGrid'); if (!el || !grid) return;
@@ -6666,7 +6667,7 @@ async function runIntro() {
   const C = [...grid.children], mid = $('#introMid'), faces = C.filter(c => c.classList.contains('face'));
   el.hidden = false; INTRO.on = true; try { HOLESYS.ahead(); } catch (e) {} /* start building the other course's first hole behind the intro */
   let stop = false, done; const fin = new Promise(r => done = r);
-  let hyd = false; const hydrate = () => { if (hyd) return false; hyd = true; if (INTRO.onExit) INTRO.onExit(); return true; }; // the home screen comes up under the board (painted, animating) before anything moves
+  let hyd = false; const hydrate = () => { if (hyd) return false; hyd = true; if (HYD_QUIET) INTRO.calm = Math.max(INTRO.calm || 0, performance.now() + HYD_QUIET); if (INTRO.onExit) INTRO.onExit(); return true; }; /* HYD_QUIET: no background hole building while the home screen comes up under the board */ // the home screen comes up under the board (painted, animating) before anything moves
   const end = async () => { if (stop) return; stop = true; INTRO.on = false; INTRO.fill = false; clearInterval(blinkT);
     { const bt = $('#boot'); INTRO.calm = performance.now() + 1700; if (bt) { bt.classList.add('calm'); setTimeout(() => bt.classList.remove('calm'), 1700); } } // the picked golfer starts bobbing and chatting a beat after the tiles land
     if (hydrate()) { await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await wait(120); } // skipped early: give it a beat to paint
