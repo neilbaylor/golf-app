@@ -123,9 +123,9 @@ def build(src, single=False):
                + "  addEventListener('pointerdown', function (e) { var t = e.target; if (t && t.closest && t.closest('.course[data-id=\"augusta\"]')) window.__augLoad(); }, true);\n"
                "})();</script>\n")
     tail = ("<script>(function () { var h = location.hash; if (!h && window.__openPick === undefined) { var r = Math.random(); window.__openPick = " + ("r < 1 / 3 ? 'augusta' : r < 2 / 3 ? 'osler' : 'hunt'" if ohash and opub else "r < .5 ? 'augusta' : 'hunt'") + "; } /* OPEN_PICK's rule (OPEN3: any of the courses), on the hash it will see */\n"
-            "  window.__augBoot = h ? /^#augusta(?:-hole-(\\d+))?$/.test(h) : window.__openPick === 'augusta'; })();\n"
+            "  window.__augBoot = " + ("true; /* BOOT_ALL: every course's data in the boot */" if BOOT_ALL else "h ? /^#augusta(?:-hole-(\\d+))?$/.test(h) : window.__openPick === 'augusta';") + " })();\n"
             "if (window.__augBoot) document.write('<script src=\"' + __splitN.aug + '\" onerror=\"__splitFail()\"><\\/script>');"
-            + ("\nif (/^#" + ohash + "(?:-hole-\\d+)?$/.test(location.hash) || (!location.hash && window.__openPick === 'osler')) { window.__oslBoot = true; document.write('<script src=\"' + __splitN.osler + '\" onerror=\"__splitFail()\"><\\/script>'); } /* OslerBrook: in the boot only on its own boot (else on demand, __oslLoad) */" if ohash else '') + ("\nif (location.hash === '#tutorial-hole') document.write('<script src=\"' + __splitN.tut + '\" onerror=\"__splitFail()\"><\\/script>'); /* the tutorial: only on its own boot */" if tut else '') + "</script>\n"
+            + ("\nif (" + ("true /* BOOT_ALL */" if BOOT_ALL and opub else "/^#" + ohash + "(?:-hole-\\d+)?$/.test(location.hash) || (!location.hash && window.__openPick === 'osler')") + ") { window.__oslBoot = true; document.write('<script src=\"' + __splitN.osler + '\" onerror=\"__splitFail()\"><\\/script>'); } /* OslerBrook: in the boot only on its own boot (else on demand, __oslLoad) */" if ohash else '') + ("\nif (location.hash === '#tutorial-hole') document.write('<script src=\"' + __splitN.tut + '\" onerror=\"__splitFail()\"><\\/script>'); /* the tutorial: only on its own boot */" if tut else '') + "</script>\n"
             f'<script src="{names["hunt"]}" onerror="__splitFail()"></script>\n<script src="{names["crew"]}" onerror="__splitFail()"></script>\n<script src="{names["game"]}" onerror="__splitFail()"></script>\n')
     index = head_js + s[:open_] + tail + s[close + len('</script>'):]
     out = {'index.html': index}
@@ -136,6 +136,7 @@ AUG_FIX_A = "(typeof AUG_HOLES !== 'undefined' ? f => f() : f => (window.__augQ 
 AUG_FIX_B = "); /* SPLIT: patches Augusta's data once it's here */"
 AUG_FIX_RUN = "(window.__augQ || []).splice(0).forEach(f => f()); /* SPLIT: the game's patches to this data (queued on a Hunt boot) */\n"
 
+BOOT_ALL = True  # Neil 11-22: every course's data loads with the game (their first holes are built under the loading screen)
 HASHED = re.compile(r'^(game|crew|hunt|aug|osler|tut)\.[0-9a-f]{10}\.js$')
 
 def main():
