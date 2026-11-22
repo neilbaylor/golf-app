@@ -91,7 +91,7 @@ const MP = (() => {
   const MP_AIMCAP = true;   /* ROLLBACK: false -> aim messages of any size up to FRAME_MAX are relayed (before perf2) */
   for (const k in T) if (process.env['MP_' + k]) T[k] = +process.env['MP_' + k]; /* e.g. MP_IDLE=3000 for quick tests */
   const EMO = ['❤️', '😂', '🔥', '👏', '😮', '🙈'];
-  const COURSES = { hunt: 'Toronto Hunt', augusta: 'Augusta National' };
+  const COURSES = { hunt: 'Toronto Hunt', augusta: 'Augusta National', osler: 'OslerBrook' }; /* OSLER_PUBLIC (Neil 11-22): OslerBrook for everyone */
   const RATE = { aim: [20, 30], chat: [1.2, 3], react: [5, 8], typing: [2, 4], ff: [6, 10], flyff: [6, 10], act: [2, 4], who: [2, 4], course: [2, 4], hello: [1, 3], '*': [60, 90] }; /* per second, burst */
   const ENDED = new Map(); let endedN = 0; /* MP_EMPTY_END: code -> the ended round's sids and ids (15 min), so its phones are told rather than seated in a ghost room */
   const rooms = new Map(), socks = new Set(); let msgsIn = 0, msgsOut = 0, bytesIn = 0, bytesOut = 0, bpSkip = 0, bpCut = 0, restoredN = 0;

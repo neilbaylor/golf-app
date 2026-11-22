@@ -51,10 +51,14 @@ def build(src, single=False):
     aug = cut(r'^const AUG_HOLES = \{.*\n', 'AUG_HOLES')
     hunt = cut(r'^const HUNT_HOLES = \{.*\n', 'HUNT_HOLES') + cut(r'^const REAL_H = \(\(\) => \{.*\n', 'REAL_H')
     # OslerBrook (OSLER_LIVE): its single-line data / logo / scenery consts, out to osler.<hash>.js; its hash from the game's COURSE_DEF.osler gate
-    osl, ohash = '', None
+    osl, ohash, opub = '', None, False
     if re.search(r'^const OSLER_HOLES = ', code, re.M):
-        for k in ('HOLES', 'LOGO', 'ESC', 'ESC_K', 'SRC'): osl += cut(r'^const OSLER_' + k + r' = .*\n', 'OSLER_' + k)
-        ohash = one(code, r"^if \(OSLER_DEV && /\^#([a-z0-9-]+)\(\?:-hole-\\d\+\)\?\$/\.test\(location\.hash\)\) COURSE_DEF\.osler = ", 'COURSE_DEF.osler gate').group(1)
+        opub = bool(re.search(r'^const OSLER_PUBLIC = true;', s, re.M))  # OSLER_PUBLIC: on demand for everyone (its logo stays in the game: the home card shows it)
+        for k in (('HOLES', 'ESC', 'ESC_K', 'SRC') if opub else ('HOLES', 'LOGO', 'ESC', 'ESC_K', 'SRC')): osl += cut(r'^const OSLER_' + k + r' = .*\n', 'OSLER_' + k)
+        ohash = '(?:osler|ob-004b22b2)' if opub else one(code, r"^const OSL_RX = .*?/\^#([a-z0-9-]+)\(\?:-hole-", 'OSL_RX').group(1)
+        if opub:
+            m = one(code, r"  if \(OSLER_DEV && cid === 'osler'\) return OSLER_HOLES\[n\] \? yield\* buildDataHoleG\(", 'holeAUGDg osler line')
+            code = code[:m.start()] + "  if (OSLER_DEV && cid === 'osler') while (typeof OSLER_HOLES === 'undefined') { window.__oslLoad(); yield HATCH_WAIT; } /* SPLIT: OslerBrook's data on its way */\n" + code[m.start():]
     # the tutorial (TUT_SPLIT, Neil 11-22: "could be its own file like course data"): tutHoles() as a global function, TUTOR's IIFE as a string the game evals in place
     tut = ''
     if re.search(r'^function tutHoles\(\) \{', code, re.M):
@@ -111,7 +115,7 @@ def build(src, single=False):
                "     Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */\n"
                "  var guess = /^#augusta/.test(h || at);\n"
                "  var N = " + json.dumps(names) + ", pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };\n"
-               "  window.__splitN = N; if (guess) pre(N.aug); " + ("if (/^#" + ohash + "(?:-hole-\\d+)?$/.test(h || at)) pre(N.osler); " if ohash else '') + ("if (h === '#tutorial-hole' && N.tut) pre(N.tut); " if tut else '') + "pre(N.hunt); pre(N.crew); pre(N.game);\n"
+               "  window.__splitN = N; if (guess) pre(N.aug); " + ("if (/^#" + ohash + "(?:-hole-\\d+)?$/.test(h || at)) pre(N.osler); " if ohash else '') + ("var so = null, to = -1e9; window.__oslLoad = function () { if (so || window.__oslBoot || Date.now() - to < 3000) return; to = Date.now(); so = document.createElement('script'); so.src = N.osler; so.async = true; so.onerror = function () { so.remove(); so = null; }; document.head.appendChild(so); }; addEventListener('pointerdown', function (e) { var t = e.target; if (t && t.closest && t.closest('.course[data-id=\\\"osler\\\"]')) window.__oslLoad(); }, true); " if ohash and opub else '') + ("if (h === '#tutorial-hole' && N.tut) pre(N.tut); " if tut else '') + "pre(N.hunt); pre(N.crew); pre(N.game);\n"
                "  var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;\n"
                "    s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */\n"
                "  window.__splitFail = function () { try { var k = 'tp_split_retry', t = +sessionStorage.getItem(k) || 0; if (Date.now() - t < 60000) return; sessionStorage.setItem(k, Date.now()); } catch (e) { return; } location.reload(); }; /* a boot script that failed to load: one fresh reload (no loops) */\n"
@@ -121,7 +125,7 @@ def build(src, single=False):
     tail = ("<script>(function () { var h = location.hash; if (!h && window.__augPick === undefined) window.__augPick = Math.random() < .5; /* AUG_M's rule, on the hash it will see */\n"
             "  window.__augBoot = h ? /^#augusta(?:-hole-(\\d+))?$/.test(h) : window.__augPick; })();\n"
             "if (window.__augBoot) document.write('<script src=\"' + __splitN.aug + '\" onerror=\"__splitFail()\"><\\/script>');"
-            + ("\nif (/^#" + ohash + "(?:-hole-\\d+)?$/.test(location.hash)) document.write('<script src=\"' + __splitN.osler + '\" onerror=\"__splitFail()\"><\\/script>'); /* OslerBrook: only on its own boot */" if ohash else '') + ("\nif (location.hash === '#tutorial-hole') document.write('<script src=\"' + __splitN.tut + '\" onerror=\"__splitFail()\"><\\/script>'); /* the tutorial: only on its own boot */" if tut else '') + "</script>\n"
+            + ("\nif (/^#" + ohash + "(?:-hole-\\d+)?$/.test(location.hash)) { window.__oslBoot = true; document.write('<script src=\"' + __splitN.osler + '\" onerror=\"__splitFail()\"><\\/script>'); } /* OslerBrook: in the boot only on its own boot (else on demand, __oslLoad) */" if ohash else '') + ("\nif (location.hash === '#tutorial-hole') document.write('<script src=\"' + __splitN.tut + '\" onerror=\"__splitFail()\"><\\/script>'); /* the tutorial: only on its own boot */" if tut else '') + "</script>\n"
             f'<script src="{names["hunt"]}" onerror="__splitFail()"></script>\n<script src="{names["crew"]}" onerror="__splitFail()"></script>\n<script src="{names["game"]}" onerror="__splitFail()"></script>\n')
     index = head_js + s[:open_] + tail + s[close + len('</script>'):]
     out = {'index.html': index}
