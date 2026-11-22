@@ -30,7 +30,7 @@ const V = {
   const errs = []; pg.on('pageerror', e => errs.push(e.message));
   await pg.route('**/three.min.js', r => r.fulfill({ path: '/home/claude/golf/node_modules/three/build/three.min.js', contentType: 'text/javascript' }));
   await pg.route('**/fonts.googleapis.com/**', r => r.fulfill({ body: '', contentType: 'text/css' }));
-  await pg.addInitScript(() => { window.__VT = true; window.__logOn = true; });
+  await pg.addInitScript(() => { window.__VT = true; window.__logOn = true; try { localStorage.setItem('tp_tut_done', '1'); } catch (e) {} }); /* TUT_FIRST: bench the game, not the first-visit tutorial */
   await pg.goto('file://' + path.resolve(page));
   const until = async (fn, arg) => pg.waitForFunction(fn, arg, { timeout: 600000, polling: 100 });
   const frames = async (n) => { const t = await pg.evaluate(() => window.__fn) + n; await until(t => window.__fn >= t, t); };
