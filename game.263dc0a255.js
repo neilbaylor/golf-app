@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v525'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v527'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5265,6 +5265,7 @@ const MINI = (() => {
 })();
 
 /* ================= TRACER ================= */
+const TR_ATTACH = { t0: 0, ramp: .2, aim: true, putt: .45 }; /* aim: the taper in the aim view too (pitches included); putt: the putt line starts at the ball's edge, a gentler taper (its start width) */ /* Neil 11-22 (between options D and E): the swing-view tracer starts at the ball, thin there and widening to full over its first few samples, so it comes out of the ball without covering it (null = it starts a little way into the flight, v525) */
 let tracerDirty = true, lastAimT = -1; const lastTrCam = new THREE.Vector3(1e9, 0, 0);
 const trPts = Array.from({ length: TR.segs + 1 }, () => new THREE.Vector3()); const trT = new Float32Array(TR.segs + 1);
 /* the part of the tracer that passes behind the distance readout is redrawn on a small canvas above it (tracer over the number) */
@@ -5296,16 +5297,16 @@ function updateTracer() {
   const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
   if (G.mode === 'putt') { // how far it would roll if the green were flat and straight: it does NOT follow the break
     const D = G.D, e = smoother(G.aimT);
-    const t0 = BALL_SKIN === 'triple' ? Math.min(.3, BALL_R * 3 / Math.max(D, .01)) : 0; /* BALL_SKIN: the putt line starts just past the ball, so the ball's own tracks show and lead into it */ for (let s = 0; s <= TR.segs; s++) { const t = t0 + (1 - t0) * s / TR.segs, u = G.ball.u + G.dir.u * D * t, v = G.ball.v + G.dir.v * D * t; trT[s] = t; trPts[s].set(u, groundHeight(u, v) + .035, -v); }
+    const t0 = TR_ATTACH && TR_ATTACH.putt ? Math.min(.3, BALL_R / Math.max(D, .01)) : BALL_SKIN === 'triple' ? Math.min(.3, BALL_R * 3 / Math.max(D, .01)) : 0; /* TR_ATTACH.putt: from the ball's edge */ /* BALL_SKIN: the putt line starts just past the ball, so the ball's own tracks show and lead into it */ for (let s = 0; s <= TR.segs; s++) { const t = t0 + (1 - t0) * s / TR.segs, u = G.ball.u + G.dir.u * D * t, v = G.ball.v + G.dir.v * D * t; trT[s] = t; trPts[s].set(u, groundHeight(u, v) + .035, -v); }
     TT.red = false; TT.wet = false; treeMk.userData.at = null; tracer.material.color.set(0xffffff); tracer.material.depthTest = tracerInk.material.depthTest = true; trInk = .5; if (tracer.material.map !== solidTex) { tracer.material.map = solidTex; tracer.material.needsUpdate = true; }
-    buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(.0042, .0034, e), Math.max(2, D)); trShadow.visible = false;
+    buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(.0042, .0034, e) * (TR_ATTACH && TR_ATTACH.putt ? lerp(TR_ATTACH.putt, 1, Math.min(1, i / 6)) : 1), Math.max(2, D)); trShadow.visible = false;
     const tg = targetUV(); rings.position.set(tg.u, groundHeight(tg.u, tg.v), -tg.v); straightRef.visible = false;
     MINI.draw({ f: { pts: trPts.map(q => ({ x: q.x, z: q.z })) } }); return;
   }
   const e = smoother(G.aimT), eFlat = smoother(clamp((G.aimT - .1) / .8, 0, 1)), D = G.D, plan = planShot(), pts = plan.track || plan.f.pts, T = pts[pts.length - 1].t;
   for (let s = 0; s <= TR.segs; s++) {
     // start right at the ball; bunch samples near it so the close end stays smooth from behind
-    const u0 = s / TR.segs, t = lerp(.004 + .996 * Math.pow(u0, 1.7), u0, e); trT[s] = t;
+    const u0 = s / TR.segs, t0 = TR_ATTACH ? TR_ATTACH.t0 : .004, t = lerp(t0 + (1 - t0) * Math.pow(u0, 1.7), u0, e); trT[s] = t;
     const q = sampleAt(pts, t * T), gy = groundHW(q.x, q.z), y = Math.max(q.y + (s === 0 ? BALL_R : 0), gy + .15);
     trPts[s].set(q.x, y, q.z); shPts[s].set(q.x, gy + .06, q.z);
   }
@@ -5335,7 +5336,7 @@ function updateTracer() {
   }
   // radius = distance-to-camera × an on-screen width, so the line never pops thin/fat while the camera flies
   trInk = lerp(.38, .62, e); const wantMap = e > .5 ? solidTex : dashTex; if (tracer.material.map !== wantMap) { tracer.material.map = wantMap; tracer.material.needsUpdate = true; }
-  buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(lerp(.0075, .0012, Math.sqrt(t)), .0046, e), Math.max(4, D / 7)); TT.e = e; TT.dashes = Math.max(4, D / 7);
+  buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(lerp(.0075, .0012, Math.sqrt(t)), .0046, e) * (TR_ATTACH ? lerp(lerp(TR_ATTACH.ramp, 1, Math.min(1, i / 6)), 1, TR_ATTACH.aim ? 0 : e) : 1), Math.max(4, D / 7)); TT.e = e; TT.dashes = Math.max(4, D / 7);
   buildShadow(s => camera.position.distanceTo(shPts[s]) * lerp(.004, .0042, e)); trShadow.visible = !G.preview; trShadow.material.opacity = lerp(.2, .3, e); /* no ground shadow in the post-shot zoom on the green */
   MINI.draw(plan);
   const tg = targetUV(); rings.position.set(tg.u, groundHeight(tg.u, tg.v), -tg.v);
