@@ -74,8 +74,7 @@ def build(src, single=False):
     if re.search(r'^(?!AV\.addArt\(|\s|\}|"|\{)\S', art, re.M): die('crew art block holds something other than AV.addArt calls')
     code = code[:a.start()] + a.group(0) + "__CREW(AV); /* SPLIT: the golfers' art, from crew.<hash>.js */\n" + b.group(0) + code[b.end():]
     # Augusta on demand: the boot pick is made in the head (same rule as AUG_M), and a build of an Augusta hole waits for its data
-    m = one(code, r"^const AUG_M = /\^#augusta\(\?:-hole-\(\\d\+\)\)\?\$/\.exec\(location\.hash\) \|\| \(!location\.hash && Math\.random\(\) < \.5 \? \['#augusta', undefined\] : null\);", 'AUG_M')
-    code = code[:m.start()] + m.group(0).replace("Math.random() < .5", "window.__augPick") + code[m.end():]
+    one(code, r"^const OPEN_PICK = location\.hash \? null : window\.__openPick !== undefined \? window\.__openPick :", 'OPEN_PICK')  # OPEN3: the page takes the loader's pick (window.__openPick)
     m = one(code, r"  if \(cid === 'augusta'\) return AUG_HOLES\[n\] \? yield\* buildDataHoleG\(", 'holeAUGDg augusta line')
     code = code[:m.start()] + "  if (cid === 'augusta') while (typeof AUG_HOLES === 'undefined') { window.__augLoad(); yield HATCH_WAIT; } /* SPLIT: Augusta's data on its way (an idle step: the frame's slice ends) */\n" + code[m.start():]
     # HOLESYS.boot() builds every other course's first hole synchronously under the boot cover; on a Hunt boot Augusta's data isn't there yet,
@@ -120,12 +119,13 @@ def build(src, single=False):
                "    s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */\n"
                "  window.__splitFail = function () { try { var k = 'tp_split_retry', t = +sessionStorage.getItem(k) || 0; if (Date.now() - t < 60000) return; sessionStorage.setItem(k, Date.now()); } catch (e) { return; } location.reload(); }; /* a boot script that failed to load: one fresh reload (no loops) */\n"
                "  addEventListener('load', function () { (window.requestIdleCallback || setTimeout)(window.__augLoad, { timeout: 2000 }); }); /* (the home screen's prebuild of Augusta's first hole usually asks first) */\n"
-               "  addEventListener('pointerdown', function (e) { var t = e.target; if (t && t.closest && t.closest('.course[data-id=\"augusta\"]')) window.__augLoad(); }, true);\n"
+               + ("  addEventListener('load', function () { setTimeout(function () { (window.requestIdleCallback || setTimeout)(function () { if (window.__oslLoad) window.__oslLoad(); }, { timeout: 3000 }); }, 1500); }); /* OslerBrook's data too, a little later, so its first hole can build as soon as Augusta's is done (PRE_FAST) */\n" if ohash and opub else '')
+               + "  addEventListener('pointerdown', function (e) { var t = e.target; if (t && t.closest && t.closest('.course[data-id=\"augusta\"]')) window.__augLoad(); }, true);\n"
                "})();</script>\n")
-    tail = ("<script>(function () { var h = location.hash; if (!h && window.__augPick === undefined) window.__augPick = Math.random() < .5; /* AUG_M's rule, on the hash it will see */\n"
-            "  window.__augBoot = h ? /^#augusta(?:-hole-(\\d+))?$/.test(h) : window.__augPick; })();\n"
+    tail = ("<script>(function () { var h = location.hash; if (!h && window.__openPick === undefined) { var r = Math.random(); window.__openPick = " + ("r < 1 / 3 ? 'augusta' : r < 2 / 3 ? 'osler' : 'hunt'" if ohash and opub else "r < .5 ? 'augusta' : 'hunt'") + "; } /* OPEN_PICK's rule (OPEN3: any of the courses), on the hash it will see */\n"
+            "  window.__augBoot = h ? /^#augusta(?:-hole-(\\d+))?$/.test(h) : window.__openPick === 'augusta'; })();\n"
             "if (window.__augBoot) document.write('<script src=\"' + __splitN.aug + '\" onerror=\"__splitFail()\"><\\/script>');"
-            + ("\nif (/^#" + ohash + "(?:-hole-\\d+)?$/.test(location.hash)) { window.__oslBoot = true; document.write('<script src=\"' + __splitN.osler + '\" onerror=\"__splitFail()\"><\\/script>'); } /* OslerBrook: in the boot only on its own boot (else on demand, __oslLoad) */" if ohash else '') + ("\nif (location.hash === '#tutorial-hole') document.write('<script src=\"' + __splitN.tut + '\" onerror=\"__splitFail()\"><\\/script>'); /* the tutorial: only on its own boot */" if tut else '') + "</script>\n"
+            + ("\nif (/^#" + ohash + "(?:-hole-\\d+)?$/.test(location.hash) || (!location.hash && window.__openPick === 'osler')) { window.__oslBoot = true; document.write('<script src=\"' + __splitN.osler + '\" onerror=\"__splitFail()\"><\\/script>'); } /* OslerBrook: in the boot only on its own boot (else on demand, __oslLoad) */" if ohash else '') + ("\nif (location.hash === '#tutorial-hole') document.write('<script src=\"' + __splitN.tut + '\" onerror=\"__splitFail()\"><\\/script>'); /* the tutorial: only on its own boot */" if tut else '') + "</script>\n"
             f'<script src="{names["hunt"]}" onerror="__splitFail()"></script>\n<script src="{names["crew"]}" onerror="__splitFail()"></script>\n<script src="{names["game"]}" onerror="__splitFail()"></script>\n')
     index = head_js + s[:open_] + tail + s[close + len('</script>'):]
     out = {'index.html': index}
