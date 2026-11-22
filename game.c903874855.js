@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v530'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v532'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1417,7 +1417,7 @@ function detailTex() {
   g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 256);
   g.beginPath(); for (let i = 0; i < 900; i++) { const x = R() * 256, y = R() * 256, l = 4 + R() * 7, a = -1.1 + (R() - .5) * .5; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1.3; g.stroke();
   g.beginPath(); for (let i = 0; i < 140; i++) { const x = R() * 256, y = R() * 256; g.moveTo(x - 3, y - 4); g.lineTo(x, y + 1); g.lineTo(x + 3, y - 4); } g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1.2; g.stroke();
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; return t;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO_CAP ? Math.min(ANISO_CAP, maxAniso) : maxAniso; /* ANISO_CAP (Neil 11-22): the grass detail strokes at 4x too, like the ground map */ return t;
 }
 const DETAIL = detailTex(); SHARED.add(DETAIL);
 function groundMat(map, scale) {
