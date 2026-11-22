@@ -10,6 +10,11 @@ Files (each name = first 10 hex of the sha256 of its content, so the same input 
   game.<hash>.js      all the game code (changes every deploy)
   crew.<hash>.js      the golfers' art (the CREW_ART block, run as __CREW(AV) at its old place) and the two course crests
   hunt.<hash>.js      HUNT_HOLES and REAL_H (the Hunt's data)
+  osler.<hash>.js     OslerBrook (OSLER_LIVE, Neil's secret link only): its data, flag logo, escarpment and scenery code (OSLER_HOLES, OSLER_LOGO,
+                      OSLER_ESC(_K), OSLER_SRC). Only in the boot chain when the page boots on that hash (#<hash> / #<hash>-hole-N, also restored from
+                      tp_at); never fetched otherwise (no preload, no idle fetch, and the service worker doesn't prefetch it). Optional: no OSLER_HOLES, no file.
+  tut.<hash>.js       the tutorial (TUT_SPLIT): its hole (tutHoles) and its whole TUTOR module, as a source string the game evals in its own scope (like OSLER_SRC).
+                      Only in the boot chain when the page boots on #tutorial-hole; never fetched otherwise. Optional: no tutHoles, no file.
   aug.<hash>.js       AUG_HOLES (Augusta's data, half the bytes): in the ordered chain only when the page boots on Augusta
                       (#augusta / #augusta-hole-N, also a hash HOLE_URL restores from tp_at, or the fresh load's 50% pick); otherwise fetched
                       as soon as a build needs it (the home screen's prebuild of Augusta's first hole, right after boot; holeAUGDg
@@ -45,6 +50,19 @@ def build(src, single=False):
         m = one(code, pat, what); code = code[:m.start()] + code[m.end():]; return m.group(0)
     aug = cut(r'^const AUG_HOLES = \{.*\n', 'AUG_HOLES')
     hunt = cut(r'^const HUNT_HOLES = \{.*\n', 'HUNT_HOLES') + cut(r'^const REAL_H = \(\(\) => \{.*\n', 'REAL_H')
+    # OslerBrook (OSLER_LIVE): its single-line data / logo / scenery consts, out to osler.<hash>.js; its hash from the game's COURSE_DEF.osler gate
+    osl, ohash = '', None
+    if re.search(r'^const OSLER_HOLES = ', code, re.M):
+        for k in ('HOLES', 'LOGO', 'ESC', 'ESC_K', 'SRC'): osl += cut(r'^const OSLER_' + k + r' = .*\n', 'OSLER_' + k)
+        ohash = one(code, r"^if \(OSLER_DEV && /\^#([a-z0-9-]+)\(\?:-hole-\\d\+\)\?\$/\.test\(location\.hash\)\) COURSE_DEF\.osler = ", 'COURSE_DEF.osler gate').group(1)
+    # the tutorial (TUT_SPLIT, Neil 11-22: "could be its own file like course data"): tutHoles() as a global function, TUTOR's IIFE as a string the game evals in place
+    tut = ''
+    if re.search(r'^function tutHoles\(\) \{', code, re.M):
+        m = one(code, r'^function tutHoles\(\) \{.*?\n  H\.b64 = btoa\(b\); return J; \}\n', 'tutHoles', re.M | re.S); tut += m.group(0); code = code[:m.start()] + code[m.end():]
+        m = one(code, r'^const TUTOR = TUT_PLAY && TUT_M \? (\(\(\) => \{\n.*?\n\}\)\(\)) : null;\n', 'TUTOR module', re.M | re.S)
+        tut += 'window.__TUT_SRC = ' + json.dumps(m.group(1)) + ';\n'
+        code = code[:m.start()] + "const TUTOR = TUT_PLAY && TUT_M && window.__TUT_SRC ? eval(window.__TUT_SRC) : null; /* SPLIT: the tutorial's code, from tut.<hash>.js (only loaded on #tutorial-hole), run here in the game's scope */\n" + code[m.end():]
+        if 'tutHoles' in code.replace('TUT_M ? tutHoles() : null', ''): die('tutHoles is used outside its TUT_M guard')
     logos = cut(r"^const HUNT_LOGO = 'data:image/[^']*';.*\n", 'HUNT_LOGO') + cut(r"^const AUG_LOGO = 'data:image/[^']*';.*\n", 'AUG_LOGO')
     a = one(code, r'^/\* CREW_ART_BEGIN[^\n]*\n', 'CREW_ART_BEGIN'); b = one(code, r'^/\* CREW_ART_END \*/\n', 'CREW_ART_END')
     if b.start() < a.end(): die('crew art markers out of order')
@@ -83,15 +101,17 @@ def build(src, single=False):
         'aug': "'use strict'; /* Tee Party: Augusta National data */\n" + aug + AUG_FIX_RUN,
         'game': code,
     }
+    if tut: files['tut'] = "'use strict'; /* Tee Party: the tutorial (only on #tutorial-hole) */\n" + tut
+    if osl: files['osler'] = "'use strict'; /* Tee Party: OslerBrook (Neil's secret link only). Lidar: Contains information licensed under the Open Government Licence - Ontario */\n" + osl
     names = {k: f'{k}.{hashlib.sha256(v.encode()).hexdigest()[:10]}.js' for k, v in files.items()}
     head_js = ("<script>/* SPLIT loader: starts every download at once; Augusta's 1.9 MB of data is in the boot only when the page opens on Augusta */\n"
-               "(function () { var h = location.hash, at = ''; try { at = !h && sessionStorage.getItem('tp_at') || ''; } catch (e) {} if (!/^#(augusta|augusta-hole-\\d+|hole-\\d+)$/.test(at)) at = '';\n"
+               "(function () { var h = location.hash, at = ''; try { at = !h && sessionStorage.getItem('tp_at') || ''; } catch (e) {} if (!/^#(augusta|augusta-hole-\\d+|hole-\\d+" + ('|' + ohash + '|' + ohash + '-hole-\\d+' if ohash else '') + ")$/.test(at)) at = '';\n"
                "  /* the head scripts below may still change the hash (HOLE_URL puts tp_at back, MP_REJOIN_HOLE / a room link take it off), so this is only the early guess for the preload;\n"
                "     the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of\n"
                "     Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */\n"
                "  var guess = /^#augusta/.test(h || at);\n"
                "  var N = " + json.dumps(names) + ", pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };\n"
-               "  window.__splitN = N; if (guess) pre(N.aug); pre(N.hunt); pre(N.crew); pre(N.game);\n"
+               "  window.__splitN = N; if (guess) pre(N.aug); " + ("if (/^#" + ohash + "(?:-hole-\\d+)?$/.test(h || at)) pre(N.osler); " if ohash else '') + ("if (h === '#tutorial-hole' && N.tut) pre(N.tut); " if tut else '') + "pre(N.hunt); pre(N.crew); pre(N.game);\n"
                "  var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;\n"
                "    s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */\n"
                "  window.__splitFail = function () { try { var k = 'tp_split_retry', t = +sessionStorage.getItem(k) || 0; if (Date.now() - t < 60000) return; sessionStorage.setItem(k, Date.now()); } catch (e) { return; } location.reload(); }; /* a boot script that failed to load: one fresh reload (no loops) */\n"
@@ -100,7 +120,8 @@ def build(src, single=False):
                "})();</script>\n")
     tail = ("<script>(function () { var h = location.hash; if (!h && window.__augPick === undefined) window.__augPick = Math.random() < .5; /* AUG_M's rule, on the hash it will see */\n"
             "  window.__augBoot = h ? /^#augusta(?:-hole-(\\d+))?$/.test(h) : window.__augPick; })();\n"
-            "if (window.__augBoot) document.write('<script src=\"' + __splitN.aug + '\" onerror=\"__splitFail()\"><\\/script>');</script>\n"
+            "if (window.__augBoot) document.write('<script src=\"' + __splitN.aug + '\" onerror=\"__splitFail()\"><\\/script>');"
+            + ("\nif (/^#" + ohash + "(?:-hole-\\d+)?$/.test(location.hash)) document.write('<script src=\"' + __splitN.osler + '\" onerror=\"__splitFail()\"><\\/script>'); /* OslerBrook: only on its own boot */" if ohash else '') + ("\nif (location.hash === '#tutorial-hole') document.write('<script src=\"' + __splitN.tut + '\" onerror=\"__splitFail()\"><\\/script>'); /* the tutorial: only on its own boot */" if tut else '') + "</script>\n"
             f'<script src="{names["hunt"]}" onerror="__splitFail()"></script>\n<script src="{names["crew"]}" onerror="__splitFail()"></script>\n<script src="{names["game"]}" onerror="__splitFail()"></script>\n')
     index = head_js + s[:open_] + tail + s[close + len('</script>'):]
     out = {'index.html': index}
@@ -111,7 +132,7 @@ AUG_FIX_A = "(typeof AUG_HOLES !== 'undefined' ? f => f() : f => (window.__augQ 
 AUG_FIX_B = "); /* SPLIT: patches Augusta's data once it's here */"
 AUG_FIX_RUN = "(window.__augQ || []).splice(0).forEach(f => f()); /* SPLIT: the game's patches to this data (queued on a Hunt boot) */\n"
 
-HASHED = re.compile(r'^(game|crew|hunt|aug)\.[0-9a-f]{10}\.js$')
+HASHED = re.compile(r'^(game|crew|hunt|aug|osler|tut)\.[0-9a-f]{10}\.js$')
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--')]; fl = [x for x in sys.argv[1:] if x.startswith('--')]

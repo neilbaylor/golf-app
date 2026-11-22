@@ -4,7 +4,7 @@
    no signal), so the game still opens. The content-hashed scripts (game/crew/hunt/aug.<hash>.js) are cache-first: a new build has new names.
    three.js (cdnjs, versioned URL) and the fonts are kept after first use. A page is only kept once its scripts are kept too (never a page whose
    scripts are missing), and scripts no kept page names are dropped. Kill switch: SW_ON = false in the page unregisters this and deletes its caches. */
-const CACHE = 'tp-1', HASHED = /^\/(game|crew|hunt|aug|osler)\.[0-9a-f]{10}\.js$/, NAMES = /\b(?:game|crew|hunt|aug|osler)\.[0-9a-f]{10}\.js\b/g; /* osler: OslerBrook (Neil's secret link): kept once fetched, never prefetched */
+const CACHE = 'tp-1', HASHED = /^\/(game|crew|hunt|aug|osler|tut)\.[0-9a-f]{10}\.js$/, NAMES = /\b(?:game|crew|hunt|aug|osler|tut)\.[0-9a-f]{10}\.js\b/g; /* osler: OslerBrook (Neil's secret link): kept once fetched, never prefetched */
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil((async () => { for (const k of await caches.keys()) if (k.startsWith('tp-') && k !== CACHE) await caches.delete(k); await self.clients.claim();
   try { const r = await fetch('/', { cache: 'no-cache' }); if (r.ok) await keepPage(r); } catch (er) {} })())); /* the first visit loaded before this existed: keep the page now (its scripts come from the browser's HTTP cache, no download) */
@@ -19,7 +19,7 @@ function keepFirst(url, opts) { /* cache-first, filled from the network */
 }
 async function keepPage(r) { /* after a good page from the network: keep its scripts, then the page, then drop scripts nothing names */
   const text = await r.clone().text(), want = [...new Set(text.match(NAMES) || [])];
-  for (const n of want) { if (n.startsWith('osler.')) continue; /* (only its own boot fetches it) */ const res = await keepFirst(new URL('/' + n, self.location.origin).href); if (!res.ok) return; }
+  for (const n of want) { if (n.startsWith('osler.') || n.startsWith('tut.')) continue; /* (only its own boot fetches it) */ const res = await keepFirst(new URL('/' + n, self.location.origin).href); if (!res.ok) return; }
   for (const x of new Set(text.match(/https:\/\/cdnjs\.cloudflare\.com\/[^"'\s]+\.js/g) || [])) { try { await keepFirst(x, { mode: 'no-cors', credentials: 'omit' }); } catch (er) {} } /* three.js too, so the first visit is enough to open offline */
   const c = await caches.open(CACHE), old = await c.match('/', IV), oldNames = old ? (await old.text()).match(NAMES) || [] : [];
   await c.put('/', r);

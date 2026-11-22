@@ -23,7 +23,7 @@ files['/index.html'] = files['/'];
 if (fs.existsSync(path.join(__dirname, 'sw.js'))) files['/sw.js'] = [fs.readFileSync(path.join(__dirname, 'sw.js')), 'text/javascript; charset=utf-8']; /* SW_ON (v406): the service worker; served no-cache so a new one is picked up at once */
 /* SPLIT_FILES (perf2, Neil 16 Nov): tools/split_build.py writes the page as index.html plus content-hashed scripts (game/crew/hunt/aug.<hash>.js). They are served with
    a cache-forever header (a new build means new names), compressed like the page (gzip at start, brotli off the main thread). ROLLBACK: false (or a --single build) -> as before. */
-const SPLIT_FILES = true, HASHED = /^\/(game|crew|hunt|aug|osler)\.[0-9a-f]{10}\.js$/; /* (osler: OslerBrook, Neil's secret link only) */
+const SPLIT_FILES = true, HASHED = /^\/(game|crew|hunt|aug|osler|tut)\.[0-9a-f]{10}\.js$/; /* (osler: OslerBrook, Neil's secret link only) */
 if (SPLIT_FILES) for (const n of fs.readdirSync(__dirname)) if (HASHED.test('/' + n)) files['/' + n] = [fs.readFileSync(path.join(__dirname, n)), 'text/javascript; charset=utf-8'];
 /* BR_ASYNC (Neil 11-16 14:12, "can't load the page" after a deploy): the 4 MB page's brotli (quality 11) ran synchronously before listen(), tens of seconds of CPU on a small box, so a new
    deploy started slowly. Now gzip is made at start (well under a second) and the server listens straight away; brotli is made off the main thread and served once it's ready (gzip until then).
