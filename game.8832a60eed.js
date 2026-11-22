@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v533'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v535'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -741,6 +741,7 @@ function crownAt(t, u, v, y, m) { /* is (u,v,y) inside the tree's crown, grown b
   const rel = y - (t.gy ?? (t.gy = groundHeight(t.u, t.v))); if (rel < -m) return false;
   if (t.blobs) { for (const [bx, by, bv, br, bvs = 1] of t.blobs) { const dx = u - (t.u + bx), dz = v - (t.v + bv), dy = rel - by, hr = br * .97 + m, vr = br * bvs * (dy < 0 ? 1.08 : .97) + m; if ((dx * dx + dz * dz) / (hr * hr) + dy * dy / (vr * vr) < 1) return true; } return false; }
   return Math.hypot(t.u - u, t.v - v) < t.r + m && rel < t.h + m; }
+const SPLASH_PCT = true; /* see updateHUD's lie card */
 const LIES = {
   tee: { name: 'Tee box', f: 1 }, fairway: { name: 'Fairway', f: 1 }, fringe: { name: 'Fringe', f: .95, r: .03 }, rough: { name: 'Rough', f: .86, r: .1 }, deep: { name: 'Deep rough', f: .74, r: .15 }, pine: { name: 'Pine straw', f: .8, r: .14 },
   sand: { name: 'Bunker', f: .7, r: .18 }, green: { name: 'Green', f: 1 }, water: { name: 'Water', f: 0 }, trees: { name: 'Trees', f: .8 }, ob: { name: 'Out of bounds', f: .86 }
@@ -3332,7 +3333,7 @@ function updateHUD0() { if (CADDIE_FAST2 && HUD_HOLD) return;
   if (G.view !== 'flight') { setDist(hudDist(), _bic); $('#distNum').classList.remove('live'); setDistLbl(G.mode === 'putt' ? 'Feet · Putter' : `Yards · ${club().name}`, HUD_LATER); const dm = $('#distMode'), mt = G.mode === 'full' || (G.mode === 'putt' && (!MODE_ON_DIAL || (PUTT_TAB_OFF && G.lie === 'green'))) ? '' : MODES[G.mode].name; /* PUTT_TAB_OFF: PUTT only shows when putting from off the green */ /* (MODE_ON_DIAL: the putter gets its PUTT tab too) */ dm.hidden = !mt; app.classList.toggle('hasMode', !!mt && !MODE_ON_DIAL); /* (MODE_ON_DIAL: the bubble never moves for it) */ if (dm.textContent !== mt) dm.textContent = mt; }
   setIH($('#lieIcon'), lieIcons[G.lie] || lieIcons.rough); try { setDialLie(G.lie); } catch (e) {}
   setTx($('#lieName'), LIES[G.lie].name);
-  const pct = Math.round((LIES[G.lie].f || 1) * 100), lo = Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100), lp = $('#liePct'); setTx(lp, lo < pct ? `${lo}–${pct}%` : pct + '%'); lp.classList.toggle('warn', pct < 100); if (!HUD_FAST || lp.hidden !== (G.lie === 'green')) lp.hidden = G.lie === 'green';
+  const spl = SPLASH_PCT && G.mode === 'sand' && G.lie === 'sand' && LIES.sand.r, pct = spl ? 100 : Math.round((LIES[G.lie].f || 1) * 100), lo = spl ? Math.round((1 - LIES.sand.r / LIES.sand.f) * 100) : Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100), lp = $('#liePct'); setTx(lp, lo < pct ? `${lo}–${pct}%` : pct + '%'); lp.classList.toggle('warn', pct < 100 || !!spl); /* SPLASH_PCT (Neil 11-22): with the bunker shot picked, its own range (it lands 74-100% of its number: the 'as short as' label), not a full swing's 52-70% */ if (!HUD_FAST || lp.hidden !== (G.lie === 'green')) lp.hidden = G.lie === 'green';
   const putt = G.mode === 'putt'; setTx($('#clubBadge'), putt ? 'P' : club().id); setTx($('#clubName'), putt ? 'Putter' : club().name); setTx($('#clubMode'), MODES[G.mode].name);
   app.classList.toggle('putting', putt); app.classList.toggle('onGreen', G.lie === 'green'); app.classList.toggle('shortgame', shortGame()); app.classList.toggle('nocurve', noCurve());
   setTx($('#holeTag'), `Hole ${HOLE.n} · Par ${HOLE.par} · Shot ${G.stroke}`);
@@ -3459,7 +3460,7 @@ function strikeFromPoint(el, e) {
 const HUD_CARRY_SHORT = true; /* ROLLBACK: false -> the club sheet header reads "carry distance · <lie> <%>" again and may wrap (before v345). On: short words on one line (Neil, 14 Nov): "Carry · fringe 92–95%", "Putt" for putts ("Putt · fringe 92–95%" off the green; Neil, 14 Nov), "Total" for the sand explosion (SAND_TOTAL: its numbers are the whole run, untouched by the lie); it shrinks to fit, an ellipsis only as a last resort */
 function clubNote() { const L = LIES[G.lie] || {}, lie = (L.name || '').toLowerCase();
   if (G.mode === 'putt') return G.lie === 'green' || (L.f || 1) >= 1 ? 'Putt' : `Putt · ${lie} ${$('#liePct').textContent}`;
-  if (G.mode === 'sand' && (SAND_TOTAL || SAND_CARRY)) return SAND_TOTAL ? 'Total' : 'Carry'; /* SAND_CARRY: the explosion's numbers are untouched by the lie, so no lie note */
+  if (G.mode === 'sand' && (SAND_TOTAL || SAND_CARRY)) return (SAND_TOTAL ? 'Total' : 'Carry') + (SPLASH_PCT && G.lie === 'sand' ? ` · ${lie} ${$('#liePct').textContent}` : ''); /* SAND_CARRY: the explosion's numbers are untouched by the lie's 52-70%; SPLASH_PCT: its own 74-100% shows */
   return (L.f || 1) < 1 ? `Carry · ${lie} ${$('#liePct').textContent}` : 'Carry'; }
 function fitClubNote() { const el = $('#clubLieNote'); el.style.fontSize = ''; let f = 19; while (f > 14 && el.scrollWidth > el.clientWidth + 1) { f -= .5; el.style.fontSize = f + 'px'; } }
 if (HUD_CARRY_SHORT) $('#clubSheet').classList.add('one');
@@ -6466,6 +6467,7 @@ function homeCam(dt) {
 /* HOME_BG_WARM: HOMESNAP, a still of each course's home view at the pose the fly-over restarts from (MENU.t .35), half the screen's CSS size, JPEG (~25 KB; this tab, and
    localStorage so the next visit has it too). Taken once per visit to that course's home view, 1.5 s after it settles, in one extra draw before that frame's own (never seen).
    A switch (or a quit home) to a course whose first hole still has to build shows it under the sky dip in place of the blank sky; the live fly-over fades in over it. */
+const HOMESNAP_HIDDEN = true; /* see HOMESNAP.hidden (false = taken 1.5 s after a course's home view settles, in view, v534) */
 const HOMESNAP = (() => {
   const T0 = .35, SCALE = .5, LS = 'tp_hsnap:', mem = {}, cv = document.createElement('canvas'), _p = new THREE.Vector3(), _l = new THREE.Vector3(), _q = new THREE.Quaternion();
   let seen = null, at = 0, busy = false, shown = false, offAt = 0;
@@ -6487,14 +6489,17 @@ const HOMESNAP = (() => {
   function frame(now) { /* the frame loop's home branch, before its culling and draw */
     if (!HOME_BG_WARM) return;
     if (shown) { if (MENU.fade || MENU.hold) offAt = now; else if (now - offAt > 700) clear(); } /* the live fly-over has faded back in over it */
+    if (HOMESNAP_HIDDEN) return; /* HOMESNAP_HIDDEN: only taken while something covers the screen (hidden()) */
     if (busy || MENU.hold || INTRO.on || HOLESYS.busy) return; const H = HOLESYS.cur; if (!H || H.cid !== CID || H.i !== NINE.first(CID)) return;
     const k = key(CID, H.i); if (k !== seen) { seen = k; at = now + 1500; return; } if (now < at || (mem[k] && !mem[k].old)) return;
     take(k); }
+  function hidden() { /* HOMESNAP_HIDDEN (Neil 11-22: a tiny stutter the first time a course's home view shows): its extra draw and read-back now happen under a cover (the intro board, or the sky dip of a course switch), never in a frame you see */
+    if (!HOME_BG_WARM || busy) return; const H = HOLESYS.cur; if (!H || H.cid !== CID || H.i !== NINE.first(CID)) return; const k = key(CID, H.i); if (mem[k] && !mem[k].old) return; seen = k; take(k); }
   function cover(cid) { /* about to dip to sky for (cid)'s first hole: if it still has to build, its still instead of the blank sky */
     if (!HOME_BG_WARM) return; const i = NINE.first(cid), el = renderer.domElement, ar = el.clientWidth / Math.max(1, el.clientHeight), s = !HOLESYS.isReady(cid, i) && get(cid, i);
     if (s && Math.abs(s.ar / ar - 1) < .15) { $('#homeFade').style.background = `#d6f0ff url("${s.url}") center / cover no-repeat`; shown = true; offAt = performance.now(); } else clear(); }
   function clear() { if (!shown) return; shown = false; $('#homeFade').style.background = ''; }
-  return { frame, cover, clear, get shown() { return shown; }, get keys() { return Object.keys(mem).filter(k => !mem[k].old); } };
+  return { frame, cover, clear, hidden, get shown() { return shown; }, get keys() { return Object.keys(mem).filter(k => !mem[k].old); } };
 })();
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
@@ -6728,6 +6733,7 @@ async function runIntro() {
       await Promise.race([Promise.all(urls.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : new Promise(r => { im.onload = im.onerror = r; })).catch(() => {}); })), wait(1200)]); if (stop) return; }
     if (INTRO_PRE) { el.classList.add('pre'); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await wait(120); if (stop) return; } /* INTRO_PRE: paint them all once (invisibly) first */
     if (SHADER_WARM) { shaderWarm(); await wait(0); if (stop) return; }
+    if (HOMESNAP_HIDDEN) { try { HOMESNAP.hidden(); } catch (e) {} await wait(0); if (stop) return; } /* HOMESNAP_HIDDEN: this course's home still, in the same covered beat as the shader warm-up (the board is still empty) */
     INTRO.fill = true; /* INTRO_PRE: no background hole building while the squares come in */ /* SHADER_WARM: before the first square (the board is still empty), not while the squares come in: its ~200 ms set-up stuttered the last two (Neil 11-21) */
     // 1. the board fills in, square by square, round the ring
     for (const k of ring) { if (stop) return; C[k].classList.add('in'); await wait(45); }
@@ -6964,7 +6970,7 @@ const BOARD = (() => {
   { const crs = $('#courses'); if (CSEL2) { crs.classList.remove('two', 'nineOn'); crs.classList.add('cs2'); crs.innerHTML = COURSES.map(c => `<button type="button" class="course${c.id === MENU.course ? ' sel' : ''}" role="radio" aria-checked="${c.id === MENU.course}" aria-label="${c.name}" data-id="${c.id}"><img class="cimg${c.thin ? ' thin' : ''}" src="${c.logo}" alt=""></button>`).join('') + '<div class="cinfo"></div>'; } else { crs.classList.toggle('two', COURSES.length > 1); crs.innerHTML = COURSES.map(c => `<button type="button" class="course${c.id === MENU.course ? ' sel' : ''}" role="radio" aria-checked="${c.id === MENU.course}" data-id="${c.id}"><span class="cl clw${c.thin ? ' thinw' : ''}"${c.logo !== HUNT_LOGO ? ` style="--logo:url(${c.logo})"` : ''}><img class="clogo${c.thin ? ' thin' : ''}" src="${c.logo}" alt=""><span class="glint"></span></span><span><b>${c.name}</b><small class="csub">${c.sub.split(' · ').map(x => `<span>${x}</span>`).join('')}</small>${c.credit ? `<small class="osm">${c.credit}</small>` : ''}</span></button>`).join(''); }
     crs.addEventListener('click', e => { const b = e.target.closest('.course'); if (!b) return; PICKQ.flush(); MENU.course = b.dataset.id; store.set('course', MENU.course); crs.querySelectorAll('.course').forEach(x => { x.classList.toggle('sel', x === b); x.setAttribute('aria-checked', x === b); });
       NINEUI.drawHome(); if (b.dataset.id !== CID || HOLESYS.busy || (NINES_PICK && !NINE_BG_STAY && HOLESYS.cur && HOLESYS.cur.i !== NINE.first(b.dataset.id))) homeTo(b.dataset.id); });
-    function homeTo(cid) { const hf = $('#homeFade'); hf.classList.add('quick'); clearTimeout(hf._q); if (HOME_BG_WARM) HOMESNAP.cover(cid); MENU.hold = true; HOLESYS.go(cid, NINE.first(cid), [], () => { MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = .35; /* just past the seam's sky hold, so it fades straight back in */ hf._q = setTimeout(() => hf.classList.remove('quick'), 400); }, { pill: false, hold: 260 }); } /* no loader on the home screen (Neil): it fades to sky, swaps (usually prebuilt), and the fly-over fades back in */ /* (the sky dip holds while it builds: the fly-over comes back up from the seam) */ /* that course's first hole, built in place behind this screen (a small pill while it builds) */ /* NINES_PICK: the first hole of its nine (10 on the back 9) */
+    function homeTo(cid) { const hf = $('#homeFade'); hf.classList.add('quick'); clearTimeout(hf._q); if (HOME_BG_WARM) HOMESNAP.cover(cid); MENU.hold = true; HOLESYS.go(cid, NINE.first(cid), [], () => { if (HOMESNAP_HIDDEN) try { HOMESNAP.hidden(); } catch (e) {} /* (still under the sky dip) */ MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = .35; /* just past the seam's sky hold, so it fades straight back in */ hf._q = setTimeout(() => hf.classList.remove('quick'), 400); }, { pill: false, hold: 260 }); } /* no loader on the home screen (Neil): it fades to sky, swaps (usually prebuilt), and the fly-over fades back in */ /* (the sky dip holds while it builds: the fly-over comes back up from the seam) */ /* that course's first hole, built in place behind this screen (a small pill while it builds) */ /* NINES_PICK: the first hole of its nine (10 on the back 9) */
     NINEUI.home = cid => { if (MENU.on && MENU.course === cid && (cid !== CID || HOLESYS.busy || !HOLESYS.cur || HOLESYS.cur.i !== NINE.first(cid))) homeTo(cid); }; /* NINES_PICK: the fly-over behind is the hole Play starts on */
     NINEUI.pickHome = (cid, v) => { NINE.set(cid, v); NINEUI.drawHome(); if (!NINE_BG_STAY) NINEUI.home(cid); }; NINEUI.drawHome(); }
   const slowT = setTimeout(() => el.classList.add('slow'), 350), cap = (p, ms) => Promise.race([p, new Promise(r => setTimeout(r, ms))]);
