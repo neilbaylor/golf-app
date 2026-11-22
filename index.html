@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.881b0e3f33.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.7aa9a1c598.js", "tut": "tut.a5caf00844.js", "osler": "osler.1d53dc22fe.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.881b0e3f33.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.f83b06bf10.js", "tut": "tut.2c33173da5.js", "osler": "osler.1d53dc22fe.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); if (/^#(?:osler|ob-004b22b2)(?:-hole-\d+)?$/.test(h || at)) pre(N.osler); var so = null, to = -1e9; window.__oslLoad = function () { if (so || window.__oslBoot || Date.now() - to < 3000) return; to = Date.now(); so = document.createElement('script'); so.src = N.osler; so.async = true; so.onerror = function () { so.remove(); so = null; }; document.head.appendChild(so); }; addEventListener('pointerdown', function (e) { var t = e.target; if (t && t.closest && t.closest('.course[data-id=\"osler\"]')) window.__oslLoad(); }, true); if (h === '#tutorial-hole' && N.tut) pre(N.tut); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -33,6 +33,7 @@ try { if (location.hash === '#reset-tutorial') { localStorage.removeItem('tp_tut
 const TUT_FIRST = true; /* Neil 11-22: the tutorial goes live: until it's been played or skipped once on this device, the home screen's PLAY button reads TUTORIAL. They pick their golfer and course as usual; it opens the tutorial hole (the small loader pill over the splash), and its Tee off / Skip lands on that course's first tee. Never in a room or on a hole link. false = PLAY as before (the tutorial only on #tutorial-hole) */ /* (defined up here: the splash's own script labels the button before the first paint) */
 const REED_WARM = true; /* see oslx(): false = OslerBrook's reed shader set up at hole 2's build, as v514 */
 const OSL_HOME_PRE = true; /* Neil 11-22 ("Osler doesn't have a background on the main screen"): OslerBrook's first hole is built behind the home screen like the others (its data fetched then), so tapping its crest swaps straight to its fly-over instead of a long sky dip while it builds. It's still left out of the boot's own build. false = built only once it's tapped, as v511 */
+const CSEL_CARD = true; if (CSEL_CARD) document.documentElement.classList.add('cselCard'); /* Neil 11-22 (option C, bunker white-sand): the crests sit inside the course card, a line between them and the name, the name a size up; the lobby's crests bigger and centred in their part of the card (false = crests over a separate slim card, v516) */ const MP_SEATS_UP = 3; if (MP_SEATS_UP) document.documentElement.style.setProperty('--seatsUp', -MP_SEATS_UP + 'px'); /* Neil 11-22: the lobby's golfer cards a few px higher (0 = as v516) */
 const CSEL2 = true; /* Neil 11-22 (option D2): the course picker as a row of round crests (the picked one bigger, pink-ringed) over one slim card: its name and holes on the left, F9 / B9 / 18 on the right. Home screen and MP lobby. false = the side-by-side cards with F9/B9 stickers, as v508 */
 const OSLER_PUBLIC = true; /* Neil 11-22: OslerBrook for everyone, as a 9-hole course: on the home screen and in rooms, its own #osler / #osler-hole-N links (the old #ob-004b22b2 link still works). Its data (osler.<hash>.js) loads when it's wanted, like Augusta's. false = Neil's secret link only, as v508 */
 const OSL_RX = OSLER_PUBLIC ? /^#(?:osler|ob-004b22b2)(?:-hole-(\d+))?$/ : /^#ob-004b22b2(?:-hole-(\d+))?$/;
@@ -53,7 +54,7 @@ try { if (MP_SHARE) { const q = new URLSearchParams(location.search), hm = /^#ro
 /* coming in from "Next hole" / "Play again": the hole loader covers the very first paint */
 /* RESUME_SPLASH (Neil 17 Nov, v413): a refresh that lands back on a hole shows the regular Tee Party splash (not the blue hole card) and goes straight onto the hole. false = the blue card, as v412 */
 const RESUME_SPLASH = true, QUIT_HOME_FIX = true;
-try { const tr = sessionStorage.getItem('tp_round') || ''; if (/"tutHole":/.test(tr)) { document.documentElement.classList.add('tutNext'); const h = JSON.parse(tr).tutHole; document.addEventListener('DOMContentLoaded', () => { const p = document.getElementById('holePill'); if (!p) return; p.querySelector('b').textContent = h.t || 'Hole ' + h.n; p.querySelector('.hr span').textContent = h.sub || 'Par ' + h.par + ' · ' + h.yds + ' yds'; }); } /* TUT_TEE_LOADER: from the tutorial's Tee off: the small between-holes pill carries on over the splash */
+try { const tr = sessionStorage.getItem('tp_round') || ''; if (/"tutHole":/.test(tr)) { document.documentElement.classList.add('tutNext'); const h = JSON.parse(tr).tutHole; window.__tutH = h; document.addEventListener('DOMContentLoaded', () => { const p = document.getElementById('holePill'); if (!p) return; p.querySelector('b').textContent = h.t || 'Hole ' + h.n; p.querySelector('.hr span').textContent = h.sub || 'Par ' + h.par + ' · ' + h.yds + ' yds'; }); } /* TUT_TEE_LOADER: from the tutorial's Tee off: the small between-holes pill carries on over the splash */
   else if ((!RESUME_SPLASH && /^#(augusta-)?hole-\d+$/.test(location.hash)) || /"go":true/.test(tr) || sessionStorage.getItem('tp_home')) document.documentElement.classList.add('holeNext'); } catch (e) {}
 /* iOS home-screen app: with the translucent status bar the page is laid out one status-bar short, which leaves a strip of
    page background along the bottom. Stretch the page to the full screen height there. */
@@ -384,6 +385,8 @@ html #boot .courses.cs2 .cinfo .chips.off i{cursor:default}
 html #boot #mpLobby .courses.cs2{row-gap:8px;column-gap:14px}
 html #boot #mpLobby .courses.cs2 .course{width:52px;height:52px;margin:7px 0}html #boot #mpLobby .courses.cs2 .course.sel{width:66px;height:66px;margin:0}
 html #boot #mpLobby .courses.cs2 .cinfo{min-height:44px;padding:5px 8px 5px 12px}
+html.cselCard #boot .courses.cs2{row-gap:0}html.cselCard #boot .courses.cs2 .course{position:relative;z-index:2;margin:19px 0 -1px;box-shadow:none}html.cselCard #boot .courses.cs2 .course.sel{margin:10px 0 -10px}html.cselCard #boot .courses.cs2 .cinfo{position:relative;z-index:1;margin-top:-82px;padding-top:110px;background:#f4e8cc linear-gradient(rgba(29,42,26,.25),rgba(29,42,26,.25)) no-repeat 14px 100px/calc(100% - 28px) 2px}html.cselCard #boot .courses.cs2 .cinfo b{font-size:19px}html.cselCard #boot .courses.cs2 .cinfo small{font-size:15px;opacity:.85}html.cselCard #boot #mpLobby .courses.cs2{row-gap:0}html.cselCard #boot #mpLobby .courses.cs2 .course{width:62px;height:62px;margin:21px 0 9px}html.cselCard #boot #mpLobby .courses.cs2 .course.sel{width:80px;height:80px;margin:12px 0 0}html.cselCard #boot #mpLobby .courses.cs2 .cinfo{margin-top:-92px;padding-top:115px;background-position:12px 104px;background-size:calc(100% - 24px) 2px}@media (max-height:720px){html.cselCard #boot #mpLobby .courses.cs2 .course{width:54px;height:54px;margin:16px 0 6px}html.cselCard #boot #mpLobby .courses.cs2 .course.sel{width:68px;height:68px;margin:9px 0 -1px}html.cselCard #boot #mpLobby .courses.cs2 .cinfo{margin-top:-76px;padding-top:94px;background-position:12px 86px}} /* (a short phone: the lobby's crests a size down so the golfer cards keep their room) */ /* CSEL_CARD: the card reaches up behind the crest row (its top = the row's top), so nothing else moves; crest margins keep the row the same height whichever is picked */
+
 #boot .course .clw{flex:none;width:68px}
 #boot .course .clogo{display:block;width:100%;height:auto;filter:drop-shadow(1.5px 2px 0 rgba(29,42,26,.85))}
 /* the club crest gently rocks and catches the light now and then */
@@ -512,7 +515,8 @@ html.nineOv #boot #mpLobby .course .nineBtns,html.nineOvAll #boot .course .nineB
 #holePill .hr b{font:19px/1.1 var(--font-display);color:var(--ink);white-space:nowrap}
 #holePill .hr span{font:15px/1.1 var(--font-hand);color:var(--ink);opacity:.7;white-space:nowrap}
 #holePill .hb{display:block;margin-top:6px;height:10px;border:2.5px solid var(--ink);border-radius:8px;background:#ece2c4;overflow:hidden}
-html.tutNext #holePill[hidden]{display:block!important}html.tutNext #holePill .hb s{transform:scaleX(.6);animation:tutBar 3s cubic-bezier(.2,.6,.4,1) forwards}@keyframes tutBar{to{transform:scaleX(.96)}}
+html.tutNext #holePill[hidden]{display:block!important}html.tutNext #boot .ldr{display:none!important} /* (the pill is the loader: no second "Warming up" ball under it) */
+html.tutNext #holePill .hb s{transform:scaleX(.6);animation:tutBar 3s cubic-bezier(.2,.6,.4,1) forwards}@keyframes tutBar{to{transform:scaleX(.96)}}
 #holePill .hb s{display:block;height:100%;width:100%;background:#f2b705;box-shadow:inset -2.5px 0 0 var(--ink);transform-origin:0 50%;transform:scaleX(.04);transition:transform .2s linear}
 #holeLdr{position:absolute;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 45%,#2b3f8f,#141b3a 75%);opacity:0;transition:opacity .4s}
 #holeLdr.on,html.holeNext #holeLdr{opacity:1}
@@ -878,9 +882,9 @@ html.uiS #app #boot::before{margin-bottom:calc(-1 * clamp(10px,calc(2.2vh / var(
 .mpSeat.open b{color:rgba(29,42,26,.6)}
 /* the face, name and open-seat ring grow with the tile (container units; older browsers keep the sizes above) */
 .mpSeat{container-type:size}.mpSeat .mpFace{width:min(66cqw,54cqh,170px);height:min(66cqw,54cqh,170px);border-width:3.5px}.mpSeat b{font-size:clamp(20px,min(14cqw,9.5cqh),30px)}.mpSeat small{font-size:clamp(14px,min(8.5cqw,6cqh),18px)}
-.mpSeat.open .plus{width:min(60cqw,49cqh,150px);height:min(60cqw,49cqh,150px);font-size:clamp(44px,22cqw,64px)}
+.mpSeat.open .plus{width:min(60cqw,49cqh,150px);height:min(60cqw,49cqh,150px);font-size:clamp(44px,22cqw,64px)}html.cselCard .mpSeat.open .plus{font-size:clamp(24px,min(max(44px,22cqw),31cqh),64px)} /* (CSEL_CARD: on a short phone the + shrinks with its circle instead of spilling out of it) */
 #mpLobby.mpS #mpSeats{margin-top:auto}
-#mpSeats{padding-top:10px}
+#mpSeats{padding-top:10px}#mpSeats{position:relative;top:var(--seatsUp,0px)}
 #mpLobby.lc #mpSeats{flex-basis:292px}
 #mpLChat{width:min(calc(100% - 32px),360px);box-sizing:border-box;flex:none;background:var(--paper);border:3.5px solid var(--ink);border-radius:var(--wob);box-shadow:4px 5px 0 var(--ink);padding:9px 10px 10px;display:flex;flex-direction:column;gap:6px;position:relative;z-index:2}
 #mpLChat .ln{display:flex;align-items:flex-start;gap:8px;font:18px/1.15 var(--font-hand);color:var(--ink);overflow-wrap:anywhere;animation:mpPop .26s cubic-bezier(.3,1.7,.5,1)}
@@ -1057,7 +1061,7 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
   (function () { var SPLASH_STILL = true; if (!SPLASH_STILL) return; try { var H = document.documentElement, st = document.getElementById('stats'); H.classList.add('nineOv', 'nineOvAll');
     if (st && !st.firstChild) { var row = '<span class="k">Power</span><span class="v"><span class="pips l1"><i class="on"></i><i class="on"></i><i></i></span><b>Good</b></span>'; st.innerHTML = '<span style="display:contents;visibility:hidden">' + row + row + row + row + '<span class="shape">Draws it · Righty</span></span>'; }
     try { var pb = document.getElementById('playBtn'); if (pb && TUT_FIRST && !localStorage.getItem('tp_tut_done') && !window.__mpRoom && !sessionStorage.getItem('tp_mp') && !/^#(tutorial-hole|osler|ob-004b22b2)/.test(location.hash)) pb.textContent = 'Tutorial'; } catch (e) {} /* TUT_FIRST: the button reads Tutorial from the first paint (it used to switch over once the game had loaded) */
-    var cr = document.getElementById('courses'); if (cr && !cr.firstChild && typeof CSEL2 !== 'undefined' && CSEL2) { cr.classList.add('cs2'); cr.innerHTML = '<span aria-hidden="true" style="display:block;visibility:hidden;width:1px;height:144px"></span>'; } /* CSEL2: crest row + slim card */ if (cr && !cr.firstChild) { cr.classList.add('two', 'nineOn'); cr.innerHTML = '<span aria-hidden="true" style="display:block;visibility:hidden;width:1px;height:calc(var(--cardH) + 1px)"></span>'; } /* the course cards' row: a card-tall stand-in, with the F9/B9 room under it */
+    var cr = document.getElementById('courses'); if (cr && !cr.firstChild && typeof CSEL2 !== 'undefined' && CSEL2) { cr.classList.add('cs2'); cr.innerHTML = '<span aria-hidden="true" style="display:block;visibility:hidden;width:1px;height:' + (document.documentElement.classList.contains('cselCard') ? 161 : 144) + 'px"></span>'; } /* (CSEL_CARD: the card is 161 px tall) */ /* CSEL2: crest row + slim card */ if (cr && !cr.firstChild) { cr.classList.add('two', 'nineOn'); cr.innerHTML = '<span aria-hidden="true" style="display:block;visibility:hidden;width:1px;height:calc(var(--cardH) + 1px)"></span>'; } /* the course cards' row: a card-tall stand-in, with the F9/B9 room under it */
   } catch (e) {} })();</script>
   <script>(function () { var b = document.getElementById('boot'), t = document.getElementById('bootTitle'), ok = function () { b.classList.add('fontOk'); }; /* the title waits for its logo font, so it never swaps fonts in front of you (3 s cap) */
     if (!b || !t || !document.fonts || !document.fonts.load) { if (b) ok(); return; }
@@ -1222,6 +1226,7 @@ html.mpSideUp #mpSide{left:auto;right:12px;top:var(--mpSideTop,calc(env(safe-are
   <div id="perf">–</div>
   <div id="ver" aria-hidden="true"></div>
   <div id="holePill" hidden aria-live="polite"><div class="hpl"><div class="hr"><b>Hole 2</b><span>Par 4 · 300 yds</span></div><i class="hb"><s></s></i></div></div>
+  <script>try { const h = window.__tutH, p = document.getElementById('holePill'); if (h && p) { p.querySelector('b').textContent = h.t || 'Hole ' + h.n; p.querySelector('.hr span').textContent = h.sub || 'Par ' + h.par + ' · ' + h.yds + ' yds'; } } catch (e) {} /* TUT_PILL_EARLY (Neil 11-22): the carried-over pill gets its words the moment it exists (DOMContentLoaded waits for the game script, so it showed the markup's "Hole 2" for seconds) */</script>
   <div id="holeLdr" hidden aria-live="polite"><div class="hl"><img alt="" class="hlc"><b>Hole 1</b><span>Par 4</span><i class="hlb"></i></div></div>
 </div>
 
@@ -1233,5 +1238,5 @@ if (/^#(?:osler|ob-004b22b2)(?:-hole-\d+)?$/.test(location.hash)) { window.__osl
 if (location.hash === '#tutorial-hole') document.write('<script src="' + __splitN.tut + '" onerror="__splitFail()"><\/script>'); /* the tutorial: only on its own boot */</script>
 <script src="hunt.881b0e3f33.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.7aa9a1c598.js" onerror="__splitFail()"></script>
+<script src="game.f83b06bf10.js" onerror="__splitFail()"></script>
 
