@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.881b0e3f33.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.dffcbb040d.js", "osler": "osler.51122a0888.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.881b0e3f33.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.2b3b0501f8.js", "osler": "osler.51122a0888.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); if (/^#ob-004b22b2(?:-hole-\d+)?$/.test(h || at)) pre(N.osler); pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -853,7 +853,18 @@ html.uiS #app #boot::before{margin-bottom:calc(-1 * clamp(10px,calc(2.2vh / var(
 .mpSeat{container-type:size}.mpSeat .mpFace{width:min(66cqw,54cqh,170px);height:min(66cqw,54cqh,170px);border-width:3.5px}.mpSeat b{font-size:clamp(20px,min(14cqw,9.5cqh),30px)}.mpSeat small{font-size:clamp(14px,min(8.5cqw,6cqh),18px)}
 .mpSeat.open .plus{width:min(60cqw,49cqh,150px);height:min(60cqw,49cqh,150px);font-size:clamp(44px,22cqw,64px)}
 #mpLobby.mpS #mpSeats{margin-top:auto}
-#mpSeats{padding-top:10px} /* (Neil 11-16 16:28: a little room between the room code row and the golfer tiles) */
+#mpSeats{padding-top:10px}
+#mpLobby.lc #mpSeats{flex-basis:292px}
+#mpLChat{width:min(calc(100% - 32px),360px);box-sizing:border-box;flex:none;background:var(--paper);border:3.5px solid var(--ink);border-radius:var(--wob);box-shadow:4px 5px 0 var(--ink);padding:9px 10px 10px;display:flex;flex-direction:column;gap:6px;position:relative;z-index:2}
+#mpLChat .ln{display:flex;align-items:flex-start;gap:8px;font:18px/1.15 var(--font-hand);color:var(--ink);overflow-wrap:anywhere;animation:mpPop .26s cubic-bezier(.3,1.7,.5,1)}
+#mpLChat .ln .mpFace{width:28px;height:28px;flex:none;border-width:2px}
+#mpLChat .ln b{font:14px/1 var(--font-display);letter-spacing:.03em;margin-right:5px;position:relative;top:1px}
+#mpLChat .ln span{padding-top:4px;min-width:0}
+#mpLChat .cRow{display:flex;align-items:center}
+#mpLIn{flex:1;min-width:0;height:42px;box-sizing:border-box;border-radius:999px;border:2.5px solid var(--ink);background:#fff;font:19px/34px var(--font-hand);padding:0 48px 5px 16px;color:var(--ink);outline:none;-webkit-appearance:none;appearance:none}
+#mpLIn::placeholder{color:rgba(29,42,26,.45)}
+#mpLSend{width:32px;height:32px;margin-left:-40px;flex:none;border-radius:50%;border:2.5px solid var(--ink);background:var(--pink);padding:0;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+#mpLSend svg{width:18px;height:18px}#mpLSend:active{transform:scale(.9)} /* (Neil 11-16 16:28: a little room between the room code row and the golfer tiles) */
 #boot #mpLobby .playBtn.solo:disabled{opacity:.45;filter:saturate(.6);pointer-events:none;box-shadow:4px 5px 0 rgba(29,42,26,.55)} /* MP_MIN2: TEE OFF dimmed while you're alone */
 .mpSeat.open.pulse .plus{animation:mpInv 1.6s ease-in-out infinite}.mpSeat.open.pulse b{animation:mpInvT 1.6s ease-in-out infinite}@keyframes mpInv{0%,100%{transform:scale(1);border-color:rgba(29,42,26,.45)}50%{transform:scale(1.07);border-color:rgba(29,42,26,.8)}}@keyframes mpInvT{0%,100%{color:rgba(29,42,26,.6)}50%{color:rgba(29,42,26,.9)}}@media (prefers-reduced-motion:reduce){.mpSeat.open.pulse .plus,.mpSeat.open.pulse b{animation:none}} /* MP_MIN2: the first open seat's Invite breathes while you're alone */ /* MP_SHARE (Neil 09:22): the tiles a bit lower: the spare height splits evenly three ways, above the tiles, the course cards and TEE OFF */
 #mpLWait{font-size:16px;color:#fff;text-shadow:1.5px 1.5px 0 var(--ink),-1px -1px 0 var(--ink),1px -1px 0 var(--ink),-1px 1px 0 var(--ink);text-align:center;min-height:18px}
@@ -1188,5 +1199,5 @@ if (window.__augBoot) document.write('<script src="' + __splitN.aug + '" onerror
 if (/^#ob-004b22b2(?:-hole-\d+)?$/.test(location.hash)) document.write('<script src="' + __splitN.osler + '" onerror="__splitFail()"><\/script>'); /* OslerBrook: only on its own boot */</script>
 <script src="hunt.881b0e3f33.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.dffcbb040d.js" onerror="__splitFail()"></script>
+<script src="game.2b3b0501f8.js" onerror="__splitFail()"></script>
 
