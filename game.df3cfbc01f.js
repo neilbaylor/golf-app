@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v522'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v524'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2347,7 +2347,11 @@ let _bic = false;
 function ballInCup(on) { if (on === _bic) return; _bic = on; // below the rim: draw the ball only through the cup opening
   for (const m of [ball.material, ballInk.material]) { m.depthTest = !on; m.stencilWrite = on; m.stencilRef = 1; m.stencilFunc = on ? THREE.EqualStencilFunc : THREE.AlwaysStencilFunc; m.needsUpdate = true; }
   ball.renderOrder = on ? 6 : 0; ballInk.renderOrder = on ? 6 : 0; ballShadow.visible = !on; }
-const ballTex = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 128);
+const BALL_SKIN = 'triple'; /* Neil 11-22 (option B): a triple-track ball, an ink line between two pink rails, all running ALONG the aim so it shows from behind on a full swing as well as from above on a putt (null = v523: a line across the ball and two pink dots) */
+const ballTex = BALL_SKIN === 'triple' ? (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = 'rgba(29,42,26,.07)'; for (let row = 0; row < 22; row++) { const y = 6 + row * 11.6, w = Math.max(.15, Math.sin(Math.PI * y / 256)), n = Math.round(46 * w); for (let i = 0; i < n; i++) { const x = (i + (row % 2) * .5) * 512 / n; g.beginPath(); g.ellipse(x, y, 3.2 / w, 3.2, 0, 0, 7); g.fill(); } } /* dimples, squeezed toward the poles */
+  g.fillStyle = '#ff4f9a'; g.fillRect(0, 88, 512, 13); g.fillRect(0, 155, 512, 13); g.fillStyle = '#1d2a1a'; g.fillRect(0, 117, 512, 22); /* the tracks run round the equator; the ball's pole points sideways, so they run down the aim line */
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 16; return t; })() : (() => /* (the ball is a few pixels across: full sharpening costs nothing here and keeps the tracks crisp) */ { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 128);
   const Rb = rng(5); g.fillStyle = 'rgba(0,0,0,.05)'; for (let i = 0; i < 420; i++) { g.beginPath(); g.arc(Rb() * 256, Rb() * 128, 1.6, 0, 7); g.fill(); }
   g.fillStyle = '#1d2a1a'; g.fillRect(0, 60, 256, 8); g.fillStyle = '#ff4f9a'; [[64, 34], [192, 94]].forEach(([x, y]) => { g.beginPath(); g.ellipse(x, y, 16, 11, 0, 0, 7); g.fill(); });
   return new THREE.CanvasTexture(c); })();
@@ -2605,6 +2609,7 @@ const MODE_ON_DIAL = true; /* Neil (11-20 21:19, picked option C on the design c
 try { if (MODE_ON_DIAL) { const m = document.getElementById('distMode'), w = document.getElementById('dialWrap'); if (m && w) { w.appendChild(m); m.classList.add('onDial'); } } } catch (e) {}
 const SG_PERF = { chip: 1.15, pitch: 1.15, sand: 1.15 }; /* (v471: the pitch too) */ /* Neil (11-18 22:44): chips and bunker shots "still too hard... make a touch more forgiving": their PERFECT tempo window 15% wider (the good band beyond it moves out with it). null = as v466 */
 if (SG_PERF) for (const k in SG_PERF) MODES[k].perf *= SG_PERF[k];
+const SWING_EASE = { pitch: 1.1, flop: 1.1, sand: 1.1, full: .95, power: .95, punch: .95 }; const swingEase = (m = G.mode) => SWING_EASE && SWING_EASE[m] || 1; /* Neil 11-22: pitch, flop and greenside bunker swings 10% more forgiving, full swings (full, power, punch) 5% less: the perfect tempo window, the good band past it and the dead-straight swipe window all scale (null = as v522) */
 const MODE_ORDER = ['power', 'full', 'punch', 'pitch', 'flop', 'sand', 'putt'];
 /* CLUB_DIFF (Neil): the longer the club, the harder a good shot. Each club scales the tempo window (perfect and good bands) and the dead-straight line window;
    the 7 iron keeps today's window, the driver is the tightest (88% of today), the lob wedge the most forgiving (110%). Golfer attributes still multiply on top. Full swings only (full, power, punch):
@@ -3265,10 +3270,12 @@ function* treeEscapeG() {
   return true; }
 function treeEscape() { return runG(treeEscapeG()); }
 const _UP = new THREE.Vector3(0, 1, 0), _fwd = new THREE.Vector3(), _ax = new THREE.Vector3();
+const _bSide = new THREE.Vector3(), _bM = new THREE.Matrix4(), _bAim = { u: NaN, v: NaN };
+function ballAim() { _bAim.u = G.dir.u; _bAim.v = G.dir.v; if (BALL_SKIN !== 'triple') { ball.quaternion.setFromUnitVectors(_UP, _fwd.set(G.dir.u, 0, -G.dir.v).normalize()); return; } const f = _fwd.set(G.dir.u, 0, -G.dir.v).normalize(); _bSide.crossVectors(_UP, f); ball.quaternion.setFromRotationMatrix(_bM.makeBasis(f, _bSide, _UP)); } /* BALL_SKIN triple: local x = the aim, y = sideways (the pole), z = up */
 function placeBall() { ballInCup(false); if (FESCUE) fescueAtBall();
   const p = W(G.ball.u, G.ball.v); const onTee = G.lie === 'tee', gh = groundHeight(G.ball.u, G.ball.v);
   ball.position.set(p.x, gh + BALL_R + (onTee ? .07 : 0) - (G.lie === 'rough' ? .03 : G.lie === 'deep' ? .05 : G.lie === 'fescue' ? .062 : G.lie === 'pine' ? .012 : 0) - (G.lie === 'sand' ? .025 : 0), p.z); ball.userData.restY = ball.position.y; ball.userData.k = 1;
-  ball.quaternion.setFromUnitVectors(_UP, _fwd.set(G.dir.u, 0, -G.dir.v).normalize()); ball.scale.set(1, 1, 1); // stripe faces down the line like an alignment mark
+  ballAim(); ball.scale.set(1, 1, 1); // stripe faces down the line like an alignment mark
   peg.visible = onTee; peg.position.set(p.x, gh + .05, p.z); ballShadow.position.set(p.x, gh + .012, p.z); ballShadow.visible = true;
 }
 
@@ -3567,7 +3574,7 @@ ${[1, 2, 3].map(sd => boilGroup(sd, null)).join('')}
 <g id="aimOv" opacity="0" pointer-events="none"><circle cx="110" cy="110" r="88" fill="rgba(29,42,26,.55)"/><text x="110" y="104" text-anchor="middle" font-family="Luckiest Guy, sans-serif" font-size="25" fill="#fff" stroke="${INK}" stroke-width="5" paint-order="stroke">Back to</text><text x="110" y="134" text-anchor="middle" font-family="Luckiest Guy, sans-serif" font-size="25" fill="#fff" stroke="${INK}" stroke-width="5" paint-order="stroke">Swing</text></g>`;
 const elKnob = $('#knob'), elChev = $('#chev'), elBadge = $('#badge'), elPwr = $('#pwrFill'), elTmp = $('#tmpFill'), elTgt = $('#tgtLine'), elAimOv = $('#aimOv'), boils = [...dial.querySelectorAll('.boil')];
 function applyModeTempo() {
-  const M = MODES[G.mode] || MODES.full; TEMPO = M.tempo; PERFECT = M.perf * (G.mode === 'putt' ? 1 : .95) * (G.mode === 'putt' ? att('putt') : ['pitch', 'flop', 'sand', 'chip'].includes(G.mode) ? att('sg') : att('acc')) * (G.mode === 'putt' ? 1 : 1 - (1 - (LIES[G.lie] ? LIES[G.lie].f || 1 : 1)) * (G.mode === 'sand' ? .43 : G.lie === 'sand' ? .667 : .8)) * clubK(); /* CLUB_DIFF: the club's own window */ /* from sand: the explosion shot 13% tighter, any other swing 20% (Neil's numbers); other lies as before */ /* a worse lie (lower percent) leaves less margin: sand 76%, deep rough 79%, rough 89% of the window */ METER_RATE = M.rate; Q_LO = Math.exp(-PERFECT); Q_HI = Math.exp(PERFECT);
+  const M = MODES[G.mode] || MODES.full; TEMPO = M.tempo; PERFECT = M.perf * (G.mode === 'putt' ? 1 : .95) * (G.mode === 'putt' ? att('putt') : ['pitch', 'flop', 'sand', 'chip'].includes(G.mode) ? att('sg') : att('acc')) * (G.mode === 'putt' ? 1 : 1 - (1 - (LIES[G.lie] ? LIES[G.lie].f || 1 : 1)) * (G.mode === 'sand' ? .43 : G.lie === 'sand' ? .667 : .8)) * clubK() * swingEase(); /* CLUB_DIFF: the club's own window */ /* SWING_EASE */ /* from sand: the explosion shot 13% tighter, any other swing 20% (Neil's numbers); other lies as before */ /* a worse lie (lower percent) leaves less margin: sand 76%, deep rough 79%, rough 89% of the window */ METER_RATE = M.rate; Q_LO = Math.exp(-PERFECT); Q_HI = Math.exp(PERFECT);
   const z = $('#perfZone'), tk = $('#perfTicks'); if (!z || !tk) return;
   z.setAttribute('d', arc(qAng(clamp(Q_LO, 0, Q_MAX)), qAng(clamp(Q_HI, 0, Q_MAX)), RA));
   tk.innerHTML = [Q_LO, Q_HI].map(q => { q = clamp(q, 0, Q_MAX); const a = pt(qAng(q), RA - 9.5), b = pt(qAng(q), RA + 9.5); return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${INK}" stroke-width="3.2" stroke-linecap="round"/>`; }).join('');
@@ -4117,7 +4124,7 @@ function treeHit(t, u, v, y) {
    false = full wind on every airborne shot (v353) */
 const WIND_SHAPE = { T: 4.5, tPow: 1.25, apex: 20, aPow: .5, pitchMax: .2 };
 function windScale(f, p, m = G.mode) { if (m === 'putt') return 0; if (!WIND_SHAPE || !f) return 1; const W = WIND_SHAPE, T = f.t || 0, A = Math.max(0, (f.apex || 0) - p.y); const k = Math.pow(clamp(T / W.T, 0, 1), W.tPow) * Math.pow(clamp(A / W.apex, 0, 1), W.aPow); return m === 'pitch' ? Math.min(k, W.pitchMax) : k; } /* f: the shot's CALM flight (PHYS.fly, no wind), p: its start; m: the shot type (anything that flies a windy shot, e.g. a caddie fit, passes its own) */
-const pureWin = (tight = MODES[G.mode].tight || 1) => 1.47 * tight * att('aim', 'acc') * clubK(); /* the dead-straight swipe window, degrees (CLUB_DIFF: per club) */
+const pureWin = (tight = MODES[G.mode].tight || 1) => 1.47 * tight * att('aim', 'acc') * clubK() * swingEase(); /* the dead-straight swipe window, degrees (CLUB_DIFF: per club) */
 function launch(sw) {
   caddieSync(); /* CADDIE_SLICE: the strike (MP's too) uses the final pick */
   if (G.mode === 'putt') return launchPutt(sw);
@@ -4125,7 +4132,7 @@ function launch(sw) {
   const cl = club(), F = G.Feff, D = G.D, ps = pStar(), d = G.dir, r = right(d), h = G.height;
   let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (PH_RULE ? PH_RULE.win : .009) * tight) { p = ps; pinHigh = true; }
   let carry = dOfP(p);
-  const terr = Math.abs(Math.log(sw.ratio / TEMPO)); const tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .12 * clubK() ? 'good' : 'off'; const quick = sw.ratio > TEMPO; /* CLUB_DIFF: the good band scales with the club too */
+  const terr = Math.abs(Math.log(sw.ratio / TEMPO)); const tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .12 * clubK() * swingEase() ? 'good' : 'off'; const quick = sw.ratio > TEMPO; /* CLUB_DIFF: the good band scales with the club too */
   const sgT = SG_TEMPO && (G.mode === 'sand' || G.mode === 'chip' || G.mode === 'flop' || (G.mode === 'pitch' && D <= 50)) ? SG_TEMPO : null; /* SG_TEMPO: around the green */
   carry *= 1 - clamp((terr - PERFECT) * .275 * risk * (sgT ? sgT.carry : 1), 0, .155 * risk * (sgT ? sgT.carry : 1));
   { const L = LIES[G.lie]; if (L.r) { const k = SAND_CUT && G.lie === 'sand' && G.mode !== 'sand' ? clamp(.25 + .75 * (terr - PERFECT) / .2, .25, 1) : 1; G.lieRoll = 1 - Math.random() * k * L.r / L.f; carry *= G.lieRoll; } else G.lieRoll = 1; } /* SAND_CUT: out of sand the cut follows the strike (a perfect tempo loses at most a quarter of the range, the whole range is back by an off one) */ // bad lie: comes out anywhere in its range (shown number = top)
@@ -5289,7 +5296,7 @@ function updateTracer() {
   const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
   if (G.mode === 'putt') { // how far it would roll if the green were flat and straight: it does NOT follow the break
     const D = G.D, e = smoother(G.aimT);
-    for (let s = 0; s <= TR.segs; s++) { const t = s / TR.segs, u = G.ball.u + G.dir.u * D * t, v = G.ball.v + G.dir.v * D * t; trT[s] = t; trPts[s].set(u, groundHeight(u, v) + .035, -v); }
+    const t0 = BALL_SKIN === 'triple' ? Math.min(.3, BALL_R * 3 / Math.max(D, .01)) : 0; /* BALL_SKIN: the putt line starts just past the ball, so the ball's own tracks show and lead into it */ for (let s = 0; s <= TR.segs; s++) { const t = t0 + (1 - t0) * s / TR.segs, u = G.ball.u + G.dir.u * D * t, v = G.ball.v + G.dir.v * D * t; trT[s] = t; trPts[s].set(u, groundHeight(u, v) + .035, -v); }
     TT.red = false; TT.wet = false; treeMk.userData.at = null; tracer.material.color.set(0xffffff); tracer.material.depthTest = tracerInk.material.depthTest = true; trInk = .5; if (tracer.material.map !== solidTex) { tracer.material.map = solidTex; tracer.material.needsUpdate = true; }
     buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(.0042, .0034, e), Math.max(2, D)); trShadow.visible = false;
     const tg = targetUV(); rings.position.set(tg.u, groundHeight(tg.u, tg.v), -tg.v); straightRef.visible = false;
@@ -6290,6 +6297,7 @@ function frame(now) {
   const rawDt = Math.max(0, (now - last) / 1000), dt = clamp(rawDt, 0, .05) || 0; last = now; HOLESYS.tick(now); if (TUT_M && window.__TUTOR) __TUTOR.tick(now); /* TUT_PLAY */ if (CJ.g) caddieStep(CADDIE_BG_SLICE && FLY.on ? 2.5 : 6); /* CADDIE_SLICE (CADDIE_BG_SLICE: 2.5 ms a frame under the hole's fly-over) */ renderer.info.reset(); applyPendingPR(); /* a slice of any hole being built, first (before this frame's draw) */
   if (INTRO.on) { requestAnimationFrame(frame); return; } // the titles cover the screen: draw nothing behind them
   if (!isFinite(SW.vis) || !isFinite(SW.visV)) { SW.vis = 0; SW.visV = 0; } if (!isFinite(camera.fov)) camera.fov = 52; if (!isFinite(G.aimT)) G.aimT = G.aimGoal; const t = now / 1000; FOUNT_T.value = t; /* the pond fountain's spray (one uniform) */ if (FESCUE && G.wind) { if (FESCUE_THICK && G.ball) FESCUE_U.b.value.set(G.ball.u, -G.ball.v, camera.position.x, camera.position.z); FESCUE_U.t.value = RM ? 0 : t; const fk = .06 + .012 * Math.min(25, G.wind.mph || 0); FESCUE_U.w.value.set(Math.cos(G.wind.ang || 0) * fk, -Math.sin(G.wind.ang || 0) * fk); } /* FESCUE: the tufts lean and sway downwind */
+  if (BALL_SKIN === 'triple' && !MENU.on && (G.dir.u !== _bAim.u || G.dir.v !== _bAim.v) && G.view !== 'flight' && SW.phase === 'idle' && !/\b(flying|settling|resulting|droning)\b/.test(app.className)) ballAim(); /* BALL_SKIN: the ball at rest turns its tracks to follow the aim */
   if (MENU.on) { // menu up: just the fly-over (no swing UI, tracer, dial or avatar work)
     homeCam(dt); CRITTERS.update(dt, t); HOMEAV.update(dt);
     flag.wave(t); if (HOME_BG_WARM) try { HOMESNAP.frame(now); } catch (e) {} /* HOME_BG_WARM: a still of this course's home view, once */
