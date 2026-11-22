@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v534'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v536'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -6467,6 +6467,7 @@ function homeCam(dt) {
 /* HOME_BG_WARM: HOMESNAP, a still of each course's home view at the pose the fly-over restarts from (MENU.t .35), half the screen's CSS size, JPEG (~25 KB; this tab, and
    localStorage so the next visit has it too). Taken once per visit to that course's home view, 1.5 s after it settles, in one extra draw before that frame's own (never seen).
    A switch (or a quit home) to a course whose first hole still has to build shows it under the sky dip in place of the blank sky; the live fly-over fades in over it. */
+const HOMESNAP_HIDDEN = true; /* see HOMESNAP.hidden (false = taken 1.5 s after a course's home view settles, in view, v534) */
 const HOMESNAP = (() => {
   const T0 = .35, SCALE = .5, LS = 'tp_hsnap:', mem = {}, cv = document.createElement('canvas'), _p = new THREE.Vector3(), _l = new THREE.Vector3(), _q = new THREE.Quaternion();
   let seen = null, at = 0, busy = false, shown = false, offAt = 0;
@@ -6488,14 +6489,17 @@ const HOMESNAP = (() => {
   function frame(now) { /* the frame loop's home branch, before its culling and draw */
     if (!HOME_BG_WARM) return;
     if (shown) { if (MENU.fade || MENU.hold) offAt = now; else if (now - offAt > 700) clear(); } /* the live fly-over has faded back in over it */
+    if (HOMESNAP_HIDDEN) return; /* HOMESNAP_HIDDEN: only taken while something covers the screen (hidden()) */
     if (busy || MENU.hold || INTRO.on || HOLESYS.busy) return; const H = HOLESYS.cur; if (!H || H.cid !== CID || H.i !== NINE.first(CID)) return;
     const k = key(CID, H.i); if (k !== seen) { seen = k; at = now + 1500; return; } if (now < at || (mem[k] && !mem[k].old)) return;
     take(k); }
+  function hidden() { /* HOMESNAP_HIDDEN (Neil 11-22: a tiny stutter the first time a course's home view shows): its extra draw and read-back now happen under a cover (the intro board, or the sky dip of a course switch), never in a frame you see */
+    if (!HOME_BG_WARM || busy) return; const H = HOLESYS.cur; if (!H || H.cid !== CID || H.i !== NINE.first(CID)) return; const k = key(CID, H.i); if (mem[k] && !mem[k].old) return; seen = k; take(k); }
   function cover(cid) { /* about to dip to sky for (cid)'s first hole: if it still has to build, its still instead of the blank sky */
     if (!HOME_BG_WARM) return; const i = NINE.first(cid), el = renderer.domElement, ar = el.clientWidth / Math.max(1, el.clientHeight), s = !HOLESYS.isReady(cid, i) && get(cid, i);
     if (s && Math.abs(s.ar / ar - 1) < .15) { $('#homeFade').style.background = `#d6f0ff url("${s.url}") center / cover no-repeat`; shown = true; offAt = performance.now(); } else clear(); }
   function clear() { if (!shown) return; shown = false; $('#homeFade').style.background = ''; }
-  return { frame, cover, clear, get shown() { return shown; }, get keys() { return Object.keys(mem).filter(k => !mem[k].old); } };
+  return { frame, cover, clear, hidden, get shown() { return shown; }, get keys() { return Object.keys(mem).filter(k => !mem[k].old); } };
 })();
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
@@ -6729,6 +6733,7 @@ async function runIntro() {
       await Promise.race([Promise.all(urls.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : new Promise(r => { im.onload = im.onerror = r; })).catch(() => {}); })), wait(1200)]); if (stop) return; }
     if (INTRO_PRE) { el.classList.add('pre'); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await wait(120); if (stop) return; } /* INTRO_PRE: paint them all once (invisibly) first */
     if (SHADER_WARM) { shaderWarm(); await wait(0); if (stop) return; }
+    if (HOMESNAP_HIDDEN) { try { HOMESNAP.hidden(); } catch (e) {} await wait(0); if (stop) return; } /* HOMESNAP_HIDDEN: this course's home still, in the same covered beat as the shader warm-up (the board is still empty) */
     INTRO.fill = true; /* INTRO_PRE: no background hole building while the squares come in */ /* SHADER_WARM: before the first square (the board is still empty), not while the squares come in: its ~200 ms set-up stuttered the last two (Neil 11-21) */
     // 1. the board fills in, square by square, round the ring
     for (const k of ring) { if (stop) return; C[k].classList.add('in'); await wait(45); }
@@ -6965,7 +6970,7 @@ const BOARD = (() => {
   { const crs = $('#courses'); if (CSEL2) { crs.classList.remove('two', 'nineOn'); crs.classList.add('cs2'); crs.innerHTML = COURSES.map(c => `<button type="button" class="course${c.id === MENU.course ? ' sel' : ''}" role="radio" aria-checked="${c.id === MENU.course}" aria-label="${c.name}" data-id="${c.id}"><img class="cimg${c.thin ? ' thin' : ''}" src="${c.logo}" alt=""></button>`).join('') + '<div class="cinfo"></div>'; } else { crs.classList.toggle('two', COURSES.length > 1); crs.innerHTML = COURSES.map(c => `<button type="button" class="course${c.id === MENU.course ? ' sel' : ''}" role="radio" aria-checked="${c.id === MENU.course}" data-id="${c.id}"><span class="cl clw${c.thin ? ' thinw' : ''}"${c.logo !== HUNT_LOGO ? ` style="--logo:url(${c.logo})"` : ''}><img class="clogo${c.thin ? ' thin' : ''}" src="${c.logo}" alt=""><span class="glint"></span></span><span><b>${c.name}</b><small class="csub">${c.sub.split(' · ').map(x => `<span>${x}</span>`).join('')}</small>${c.credit ? `<small class="osm">${c.credit}</small>` : ''}</span></button>`).join(''); }
     crs.addEventListener('click', e => { const b = e.target.closest('.course'); if (!b) return; PICKQ.flush(); MENU.course = b.dataset.id; store.set('course', MENU.course); crs.querySelectorAll('.course').forEach(x => { x.classList.toggle('sel', x === b); x.setAttribute('aria-checked', x === b); });
       NINEUI.drawHome(); if (b.dataset.id !== CID || HOLESYS.busy || (NINES_PICK && !NINE_BG_STAY && HOLESYS.cur && HOLESYS.cur.i !== NINE.first(b.dataset.id))) homeTo(b.dataset.id); });
-    function homeTo(cid) { const hf = $('#homeFade'); hf.classList.add('quick'); clearTimeout(hf._q); if (HOME_BG_WARM) HOMESNAP.cover(cid); MENU.hold = true; HOLESYS.go(cid, NINE.first(cid), [], () => { MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = .35; /* just past the seam's sky hold, so it fades straight back in */ hf._q = setTimeout(() => hf.classList.remove('quick'), 400); }, { pill: false, hold: 260 }); } /* no loader on the home screen (Neil): it fades to sky, swaps (usually prebuilt), and the fly-over fades back in */ /* (the sky dip holds while it builds: the fly-over comes back up from the seam) */ /* that course's first hole, built in place behind this screen (a small pill while it builds) */ /* NINES_PICK: the first hole of its nine (10 on the back 9) */
+    function homeTo(cid) { const hf = $('#homeFade'); hf.classList.add('quick'); clearTimeout(hf._q); if (HOME_BG_WARM) HOMESNAP.cover(cid); MENU.hold = true; HOLESYS.go(cid, NINE.first(cid), [], () => { if (HOMESNAP_HIDDEN) try { HOMESNAP.hidden(); } catch (e) {} /* (still under the sky dip) */ MENU.hold = false; WIND.hole(HOLE_N); setupShot(0, 0, 'tee'); updateHUD(); MENU.t = .35; /* just past the seam's sky hold, so it fades straight back in */ hf._q = setTimeout(() => hf.classList.remove('quick'), 400); }, { pill: false, hold: 260 }); } /* no loader on the home screen (Neil): it fades to sky, swaps (usually prebuilt), and the fly-over fades back in */ /* (the sky dip holds while it builds: the fly-over comes back up from the seam) */ /* that course's first hole, built in place behind this screen (a small pill while it builds) */ /* NINES_PICK: the first hole of its nine (10 on the back 9) */
     NINEUI.home = cid => { if (MENU.on && MENU.course === cid && (cid !== CID || HOLESYS.busy || !HOLESYS.cur || HOLESYS.cur.i !== NINE.first(cid))) homeTo(cid); }; /* NINES_PICK: the fly-over behind is the hole Play starts on */
     NINEUI.pickHome = (cid, v) => { NINE.set(cid, v); NINEUI.drawHome(); if (!NINE_BG_STAY) NINEUI.home(cid); }; NINEUI.drawHome(); }
   const slowT = setTimeout(() => el.classList.add('slow'), 350), cap = (p, ms) => Promise.race([p, new Promise(r => setTimeout(r, ms))]);
@@ -7055,6 +7060,7 @@ const MP_FEEL = true; /* undo switch: your swing never waits on the network (inb
 const MP_EARLY_NEXT = true; /* turn hand-off: the shooter reports where the ball ended up as soon as the result card is up (not when it goes), so the round trip happens under the card. Every phone still shows the card exactly as long as before (2.75 s or a tap; a holed card 2.6 s), then the next turn is already there. 'next' carries hold (ms of card left) so the server's idle clock starts when the turn shows. Water / OB still waits for Replay / Drop. false = 'next' after the card, as before */
 const MP_AIM_LEAD = 1; /* watching someone aim (no extra bytes): 0 = as before (ease 12/s) | 1 = ease 16/s (~20 ms less lag, no overshoot) | 2 = ease 16/s toward a 60 ms look-ahead from the last two aim samples (~55 ms less lag; can run ~0.6 deg past a stop and settle back) */
 const MP_LOBBY_SCROLL = true; /* Neil 11-22: the lobby chat keeps the room's last 30 lines and they scroll (only the lines, never the type box); a send blurs the box, as in a round (false = the last three, no scroll) */
+const MP_CSEL_KEEP = true;
 const MP_LOBBY_CHAT = true; /* Neil 11-21 (option B): chat in the waiting room: a card under the (smaller) golfer tiles with the room's last three lines and a send box (false = no lobby chat, as v499) */
 const MP_OPT_CHAT = true; /* your own chat bubble and reaction show at once (the server's echo of them is skipped), when a local copy of the server's checks (length, rate) says it will go through; otherwise as before, on the echo. false = on the echo */
 const MP_FLY_FF_ALL = true; /* Neil (11-18 19:34): "If I fast forward fly over in multiplayer it should for everyone": holding to fast-forward the hole's fly-over tells the room (a tiny 'flyff' on / off for that hole); everyone's fly-over runs at 3x (with the 3x badge) while anyone holds. Speed only. false = each phone's own (needs the server's 'flyff' relay) */
@@ -7566,7 +7572,7 @@ if (MULTI) try { MPX = (() => {
       const c = R ? R.course : MENU.course, C = COURSES.find(x => x.id === c) || COURSES[0], n = (COURSE_DEF[C.id].list || (COURSE_DEF[C.id].list = COURSE_DEF[C.id].holes())).length;
       if (NINES_PICK) NINEUI.drawHome(); /* (the room's nine on the home cards too, which this box copies) */
       { const box = el('mpCourse'), home = $('#courses'), c = R ? R.course : MENU.course; /* the home screen's own course cards, the room's course picked (pink ring) */
-        if (home && box._src !== home.innerHTML) { box._src = home.innerHTML; box.innerHTML = home.innerHTML; }
+        if (home && (MP_CSEL_KEEP ? box._key !== [...home.querySelectorAll('.course')].map(x => x.dataset.id).join() || !box.querySelector('.course') : box._src !== home.innerHTML)) { box._src = home.innerHTML; box._key = [...home.querySelectorAll('.course')].map(x => x.dataset.id).join(); box.innerHTML = home.innerHTML; } /* MP_CSEL_KEEP (Neil 11-22: the lobby's crests didn't grow or fade on a switch): the crests are only copied again when the set of courses changes, so a new pick just moves the 'sel' class and the CSS grows / fades it like on the home screen */
         box.querySelectorAll('.course').forEach(x => { const on = x.dataset.id === c; x.classList.toggle('sel', on); x.setAttribute('aria-checked', on); });
         if (CSEL2) box.classList.remove('two'), box.classList.add('cs2'); if (NINES_PICK || CSEL2) NINEUI.draw(box, R ? (id, v) => send({ t: 'nine', v }) : null); } /* NINES_PICK: anyone in the room picks the nine, as with the course */
       const solo = MP_MIN2 && P.length < 2; el('mpTee').disabled = !R || !S.you || solo; el('mpTee').classList.toggle('solo', solo); { const o = el('mpSeats').querySelectorAll('.mpSeat.open'); o.forEach((x, i) => x.classList.toggle('pulse', solo && i === 0)); } /* MP_MIN2: alone, TEE OFF waits; the first Invite seat says why */ { const w = el('mpLWait'), tx = !R ? (S.status === 'offline' ? 'Offline' : S.status === 'error' ? "Can't reach the server" : 'Joining…') : P.length < 2 && !MP_SHARE ? 'Share the code: friends join with it' : ''; /* MP_SHARE (Neil 09:22): no hint line (Share is the invite); only Joining / Offline while connecting */ w.textContent = tx; w.hidden = !tx; } /* Neil 15:58: no "N golfers in" line once friends are in (the line is gone, not left blank) */
