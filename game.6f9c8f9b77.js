@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v532'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v534'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -741,6 +741,7 @@ function crownAt(t, u, v, y, m) { /* is (u,v,y) inside the tree's crown, grown b
   const rel = y - (t.gy ?? (t.gy = groundHeight(t.u, t.v))); if (rel < -m) return false;
   if (t.blobs) { for (const [bx, by, bv, br, bvs = 1] of t.blobs) { const dx = u - (t.u + bx), dz = v - (t.v + bv), dy = rel - by, hr = br * .97 + m, vr = br * bvs * (dy < 0 ? 1.08 : .97) + m; if ((dx * dx + dz * dz) / (hr * hr) + dy * dy / (vr * vr) < 1) return true; } return false; }
   return Math.hypot(t.u - u, t.v - v) < t.r + m && rel < t.h + m; }
+const SPLASH_PCT = true; /* see updateHUD's lie card */
 const LIES = {
   tee: { name: 'Tee box', f: 1 }, fairway: { name: 'Fairway', f: 1 }, fringe: { name: 'Fringe', f: .95, r: .03 }, rough: { name: 'Rough', f: .86, r: .1 }, deep: { name: 'Deep rough', f: .74, r: .15 }, pine: { name: 'Pine straw', f: .8, r: .14 },
   sand: { name: 'Bunker', f: .7, r: .18 }, green: { name: 'Green', f: 1 }, water: { name: 'Water', f: 0 }, trees: { name: 'Trees', f: .8 }, ob: { name: 'Out of bounds', f: .86 }
@@ -1503,7 +1504,7 @@ function buildOuter() { /* the land round the painted map (per hole) */
   g.fillStyle = '#5fa23d'; g.fillRect(0, 0, 256, 256);
   for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(40,110,40,${.05 + R() * .06})`; g.beginPath(); g.arc(R() * 256, R() * 256, 10 + R() * 30, 0, 7); g.fill(); }
   g.beginPath(); for (let i = 0; i < 500; i++) { const x = R() * 256, y = R() * 256; g.moveTo(x, y); g.lineTo(x + 3, y - 5); } g.strokeStyle = 'rgba(25,75,25,.25)'; g.lineWidth = 1.2; g.stroke();
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso;
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO_CAP ? Math.min(ANISO_CAP, maxAniso) : maxAniso; /* ANISO_CAP (Neil 11-22): the land round the course at 4x too */
   if (AUGD) { /* Augusta: the land runs on past the painted map in rings, carrying the lidar ground out and easing it to one level far off (no bluff, no lake) */
     const u0 = MAP.U0 + .4, u1 = MAP.U1 - .4, v0 = MAP.V0 + .4, v1 = MAP.V1 - .4, base = [], side = (a, b, n) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.round(L / 3)); for (let i = 0; i < k; i++) base.push([a[0] + (b[0] - a[0]) * i / k, a[1] + (b[1] - a[1]) * i / k, n[0], n[1]]); };
     const corner = (p, a0) => { for (let i = 0; i <= 6; i++) { const a = a0 + i / 6 * Math.PI / 2; base.push([p[0], p[1], Math.cos(a), Math.sin(a)]); } }; /* walked anticlockwise; each corner fans its normal round a quarter turn */
@@ -3332,7 +3333,7 @@ function updateHUD0() { if (CADDIE_FAST2 && HUD_HOLD) return;
   if (G.view !== 'flight') { setDist(hudDist(), _bic); $('#distNum').classList.remove('live'); setDistLbl(G.mode === 'putt' ? 'Feet · Putter' : `Yards · ${club().name}`, HUD_LATER); const dm = $('#distMode'), mt = G.mode === 'full' || (G.mode === 'putt' && (!MODE_ON_DIAL || (PUTT_TAB_OFF && G.lie === 'green'))) ? '' : MODES[G.mode].name; /* PUTT_TAB_OFF: PUTT only shows when putting from off the green */ /* (MODE_ON_DIAL: the putter gets its PUTT tab too) */ dm.hidden = !mt; app.classList.toggle('hasMode', !!mt && !MODE_ON_DIAL); /* (MODE_ON_DIAL: the bubble never moves for it) */ if (dm.textContent !== mt) dm.textContent = mt; }
   setIH($('#lieIcon'), lieIcons[G.lie] || lieIcons.rough); try { setDialLie(G.lie); } catch (e) {}
   setTx($('#lieName'), LIES[G.lie].name);
-  const pct = Math.round((LIES[G.lie].f || 1) * 100), lo = Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100), lp = $('#liePct'); setTx(lp, lo < pct ? `${lo}–${pct}%` : pct + '%'); lp.classList.toggle('warn', pct < 100); if (!HUD_FAST || lp.hidden !== (G.lie === 'green')) lp.hidden = G.lie === 'green';
+  const spl = SPLASH_PCT && G.mode === 'sand' && G.lie === 'sand' && LIES.sand.r, pct = spl ? 100 : Math.round((LIES[G.lie].f || 1) * 100), lo = spl ? Math.round((1 - LIES.sand.r / LIES.sand.f) * 100) : Math.round(((LIES[G.lie].f || 1) - (LIES[G.lie].r || 0)) * 100), lp = $('#liePct'); setTx(lp, lo < pct ? `${lo}–${pct}%` : pct + '%'); lp.classList.toggle('warn', pct < 100 || !!spl); /* SPLASH_PCT (Neil 11-22): with the bunker shot picked, its own range (it lands 74-100% of its number: the 'as short as' label), not a full swing's 52-70% */ if (!HUD_FAST || lp.hidden !== (G.lie === 'green')) lp.hidden = G.lie === 'green';
   const putt = G.mode === 'putt'; setTx($('#clubBadge'), putt ? 'P' : club().id); setTx($('#clubName'), putt ? 'Putter' : club().name); setTx($('#clubMode'), MODES[G.mode].name);
   app.classList.toggle('putting', putt); app.classList.toggle('onGreen', G.lie === 'green'); app.classList.toggle('shortgame', shortGame()); app.classList.toggle('nocurve', noCurve());
   setTx($('#holeTag'), `Hole ${HOLE.n} · Par ${HOLE.par} · Shot ${G.stroke}`);
@@ -3459,7 +3460,7 @@ function strikeFromPoint(el, e) {
 const HUD_CARRY_SHORT = true; /* ROLLBACK: false -> the club sheet header reads "carry distance · <lie> <%>" again and may wrap (before v345). On: short words on one line (Neil, 14 Nov): "Carry · fringe 92–95%", "Putt" for putts ("Putt · fringe 92–95%" off the green; Neil, 14 Nov), "Total" for the sand explosion (SAND_TOTAL: its numbers are the whole run, untouched by the lie); it shrinks to fit, an ellipsis only as a last resort */
 function clubNote() { const L = LIES[G.lie] || {}, lie = (L.name || '').toLowerCase();
   if (G.mode === 'putt') return G.lie === 'green' || (L.f || 1) >= 1 ? 'Putt' : `Putt · ${lie} ${$('#liePct').textContent}`;
-  if (G.mode === 'sand' && (SAND_TOTAL || SAND_CARRY)) return SAND_TOTAL ? 'Total' : 'Carry'; /* SAND_CARRY: the explosion's numbers are untouched by the lie, so no lie note */
+  if (G.mode === 'sand' && (SAND_TOTAL || SAND_CARRY)) return (SAND_TOTAL ? 'Total' : 'Carry') + (SPLASH_PCT && G.lie === 'sand' ? ` · ${lie} ${$('#liePct').textContent}` : ''); /* SAND_CARRY: the explosion's numbers are untouched by the lie's 52-70%; SPLASH_PCT: its own 74-100% shows */
   return (L.f || 1) < 1 ? `Carry · ${lie} ${$('#liePct').textContent}` : 'Carry'; }
 function fitClubNote() { const el = $('#clubLieNote'); el.style.fontSize = ''; let f = 19; while (f > 14 && el.scrollWidth > el.clientWidth + 1) { f -= .5; el.style.fontSize = f + 'px'; } }
 if (HUD_CARRY_SHORT) $('#clubSheet').classList.add('one');
