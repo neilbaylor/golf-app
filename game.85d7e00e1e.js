@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v561'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v563'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -749,6 +749,9 @@ function crownAt(t, u, v, y, m) { /* is (u,v,y) inside the tree's crown, grown b
   if (t.blobs) { for (const [bx, by, bv, br, bvs = 1] of t.blobs) { const dx = u - (t.u + bx), dz = v - (t.v + bv), dy = rel - by, hr = br * .97 + m, vr = br * bvs * (dy < 0 ? 1.08 : .97) + m; if ((dx * dx + dz * dz) / (hr * hr) + dy * dy / (vr * vr) < 1) return true; } return false; }
   return Math.hypot(t.u - u, t.v - v) < t.r + m && rel < t.h + m; }
 const SPLASH_PCT = true; /* see updateHUD's lie card */
+const SG_POWER_WIN = { pitch: .02, flop: .02, sand: .02 }; /* Neil 11-23 (an ok uphill pitch on Augusta 3 came up way short): pitch, flop and greenside bunker power within 2% of the meter of the perfect power plays as perfect (was 0.6%, as full swings still are) (null = as v562) */
+const SWING_EASE2 = true; /* Neil 11-23: pitch, flop and greenside bunker swings more forgiving again (1.25x the base windows, was 1.1x), full swings a little less (0.92x, was 0.95x) (false = as v561) */
+const DRIVE_250 = true; /* Neil 11-23: a perfect driver carries 250 for a Good-power golfer (was 255) and 265 for Great (was ~269: Great's distance factor 1.055 -> 1.06, all clubs); Average follows at ~235 (was ~240) (false = as v561) */
 const LIES = {
   tee: { name: 'Tee box', f: 1 }, fairway: { name: 'Fairway', f: 1 }, fringe: { name: 'Fringe', f: .95, r: .03 }, rough: { name: 'Rough', f: .86, r: .1 }, deep: { name: 'Deep rough', f: .74, r: .15 }, pine: { name: 'Pine straw', f: .8, r: .14 },
   sand: { name: 'Bunker', f: .7, r: .18 }, green: { name: 'Green', f: 1 }, water: { name: 'Water', f: 0 }, trees: { name: 'Trees', f: .8 }, ob: { name: 'Out of bounds', f: .86 }
@@ -756,7 +759,7 @@ const LIES = {
 if (FESCUE) LIES.fescue = { name: 'Fescue', f: .6, r: .18 }; /* FESCUE: worse than deep rough (.74, .15): 42-60% of the club's carry */
 courseGeom(); holeUI(); /* the opening hole */
 const CLUBS = [
-  { id: 'Dr', name: 'Driver', full: 255, loft: 10.5, wood: 1 }, { id: '3w', name: '3 Wood', full: 230, loft: 15, wood: 1 },
+  { id: 'Dr', name: 'Driver', full: DRIVE_250 ? 250 : 255, loft: 10.5, wood: 1 }, { id: '3w', name: '3 Wood', full: 230, loft: 15, wood: 1 },
   { id: '5w', name: '5 Wood', full: 212, loft: 18, wood: 1 }, { id: '4h', name: '4 Hybrid', full: 198, loft: 22, wood: 1 },
   { id: '5i', name: '5 Iron', full: 185, loft: 26 }, { id: '6i', name: '6 Iron', full: 175, loft: 30 },
   { id: '7i', name: '7 Iron', full: 165, loft: 34 }, { id: '8i', name: '8 Iron', full: 155, loft: 38 },
@@ -2598,7 +2601,7 @@ const CHARS = { // attributes: 0 average · 1 good · 2 great; shape = the shot 
   piggy:  { name: 'Piggy',  lefty: false, pow: 1, acc: 0, sg: 2, putt: 1, shape: 'draw' } }; /* PIGGY (Neil 16 Nov): his stats line. Cocky grinder: draws it, great short game, good putter */
 const ME = () => CHARS[G.who] || CHARS.neil;
 const ATTR = { // what each level does
-  pow:  [.94, 1, 1.055],  // full-swing distance (club carries scale with it)
+  pow:  [.94, 1, DRIVE_250 ? 1.06 : 1.055], /* DRIVE_250: great 1.06 (driver 265) */  // full-swing distance (club carries scale with it)
   acc:  [.88, 1, 1.12],   // full-swing tempo window
   aim:  [.85, 1, 1.15],   // full-swing "dead straight" path window; misses scale the other way
   sg:   [.88, 1, 1.14],   // pitch / flop / bunker tempo window
@@ -2760,7 +2763,7 @@ const MODE_ON_DIAL = true; /* Neil (11-20 21:19, picked option C on the design c
 try { if (MODE_ON_DIAL) { const m = document.getElementById('distMode'), w = document.getElementById('dialWrap'); if (m && w) { w.appendChild(m); m.classList.add('onDial'); } } } catch (e) {}
 const SG_PERF = { chip: 1.15, pitch: 1.15, sand: 1.15 }; /* (v471: the pitch too) */ /* Neil (11-18 22:44): chips and bunker shots "still too hard... make a touch more forgiving": their PERFECT tempo window 15% wider (the good band beyond it moves out with it). null = as v466 */
 if (SG_PERF) for (const k in SG_PERF) MODES[k].perf *= SG_PERF[k];
-const SWING_EASE = { pitch: 1.1, flop: 1.1, sand: 1.1, full: .95, power: .95, punch: .95 }; const swingEase = (m = G.mode) => SWING_EASE && SWING_EASE[m] || 1; /* Neil 11-22: pitch, flop and greenside bunker swings 10% more forgiving, full swings (full, power, punch) 5% less: the perfect tempo window, the good band past it and the dead-straight swipe window all scale (null = as v522) */
+const SWING_EASE = SWING_EASE2 ? { pitch: 1.25, flop: 1.25, sand: 1.25, full: .92, power: .92, punch: .92 } : { pitch: 1.1, flop: 1.1, sand: 1.1, full: .95, power: .95, punch: .95 }; const swingEase = (m = G.mode) => SWING_EASE && SWING_EASE[m] || 1; /* Neil 11-22: pitch, flop and greenside bunker swings 10% more forgiving, full swings (full, power, punch) 5% less: the perfect tempo window, the good band past it and the dead-straight swipe window all scale (null = as v522) */
 const MODE_ORDER = ['power', 'full', 'punch', 'pitch', 'flop', 'sand', 'putt'];
 /* CLUB_DIFF (Neil): the longer the club, the harder a good shot. Each club scales the tempo window (perfect and good bands) and the dead-straight line window;
    the 7 iron keeps today's window, the driver is the tightest (88% of today), the lob wedge the most forgiving (110%). Golfer attributes still multiply on top. Full swings only (full, power, punch):
@@ -3177,6 +3180,7 @@ function* caddieEnd0G(pl, cf, lm, treeOnly) { /* (CADDIE_FAST3: pause points bet
   return { u: E.x, v: -E.z, lie: gd.events.some(e => e.type === 'water') ? 'water' : gd.lie, land, landLie, holed: !!gd.holed }; }
 /* CADDIE_CARRY: fit the default so a perfect strike, over the real ground and (CADDIE_WIND) in the prevailing wind, LANDS on the target the caddie picked. A few flights, no roll */
 /* PITCH_FIT2: the landing spot for a pitch or greenside splash at the pin. A cheap run-out model (v401's: the plan's landing, moved, rolled on a plane tilted like the green from there to the pin) searched ALONG the line: s = how far along it lands, a(s) = how far along it stops; bracket a(s) = pd, then secant/halving (a jump, e.g. landing on the bank vs the green, ends on the closer side); the break is aimed off sideways as it goes. Then one fit to that spot and the real run-out over the real green; up to PF2.RF refits while it misses by more than PF2.TOL. PF2X.lie: off a lie with a range, a perfect strike carries (1 - q) of the meter on average, so the plan (the top of the range) is fitted to land 1/(1 - q) as far, and its real finish is read back by that shorter landing (measured: the finish moves 1.05 yds per yd of landing). Returns the fitTo result (or null: leave it to the plain fit) and sets G.pfMiss (yds the chosen plan stops past the pin, - short) */
+const PITCH_HOLD = null; /* (tried 11-23, off: protecting a light uphill pitch needs the landing ~5 yds deeper, which leaves a good strike well past the pin; Neil: don't punish good chips. Was { rise: .12, marg: .15, past: 4, minRise: .8, sand: true }) */ /* see pitchFit2G (null = as v561) */
 function* pitchFit2G(E0, fitTo, T0) { G.pfT = true; /* (the guard looks at this setup) */
   const b = G.ball, f0 = E0.fl, A0 = f0.pts[f0.pts.length - 1], sand = G.lie === 'sand', pd = Math.hypot(PIN.u - b.u, PIN.v - b.v) || 1, fu = (PIN.u - b.u) / pd, fv = (PIN.v - b.v) / pd;
   const al = (u, v) => (u - b.u) * fu + (v - b.v) * fv, sd = (u, v) => (u - b.u) * fv - (v - b.v) * fu, at2 = (s, l) => ({ u: b.u + fu * s + fv * l, v: b.v + fv * s - fu * l }); /* along / across the line, and back */
@@ -3206,7 +3210,13 @@ function* pitchFit2G(E0, fitTo, T0) { G.pfT = true; /* (the guard looks at this 
     let n; if (rl && rh && rh.s - rl.s > .15) { const w = rh.s - rl.s; n = clamp(rl.s + (pd - rl.f) * w / ((rh.f - rl.f) || 1), rl.s + w * .15, rh.s - w * .15); } else n = c.s + (pd - c.f) * gain;
     best = yield* fitTo(at2(clamp(n, 1, pd + 8) / (1 - q), c.l - c.z * .9), best.E, .1, 1); yield* chk(best); } /* (one flight per refit: the check reads where it really landed) */
   { const c = C.reduce((x, y) => y.err < x.err ? y : x); if (c.err > 5 && !(c.f != null && stuck(c))) { const b0 = yield* fitTo(T0, E0); yield* chk(b0); } } /* nothing near (a tree in the way, a jump in the run-out): v401's carry to the pin as well, the best finish wins */
-  const w = C.reduce((x, y) => y.err < x.err ? y : x); G.dir = { u: Math.sin(w.a), v: Math.cos(w.a) }; G.D = w.D; G.pfMiss = w.f == null ? null : w.f - pd; return w.best; }
+  let w = C.reduce((x, y) => y.err < x.err ? y : x);
+  if (PITCH_HOLD && (PITCH_HOLD.sand || !sand) && w.f != null && w.best && w.best.E && !w.best.E.tree) { /* PITCH_HOLD (Neil 11-23, Augusta 3: an ok uphill pitch came up way short): when the landing sits just over the top of a bank the green is raised on, a strike a little light lands on the bank's face and rolls back down. The bank is found on the real ground along the line (the last stretch rising more than PITCH_HOLD.rise yd per yd before the landing); the landing must be PITCH_HOLD.marg of the carry past its top, so a strike that much light still lands on top. Only if a perfect strike then stops no more than PITCH_HOLD.past past the pin (a good shot isn't punished), else the plan stays as it was */
+    const H = PITCH_HOLD, lL = sd(w.best.E.u, w.best.E.v), sL = al(w.best.E.u, w.best.E.v), hAt = x => { const P = at2(x, lL * x / (sL || 1)); return groundHW(P.u, -P.v); };
+    let top = null; for (let x = Math.max(2, sL * .4); x <= sL + 1; x += .5) if ((hAt(x + .5) - hAt(x - .5)) > H.rise) top = x + .5;
+    const need = top == null ? 0 : top + H.marg * sL;
+    if (top != null && sL < need && hAt(sL) - hAt(0) > H.minRise) { const nb = yield* fitTo(at2(need / (1 - q), lL), w.best.E, .1, 2); yield* chk(nb); const c = C[C.length - 1]; if (c.f != null && c.f - pd <= H.past && c.f > pd - 2) { w = c; G.pHold = +(need - sL).toFixed(1); } } }
+  G.dir = { u: Math.sin(w.a), v: Math.cos(w.a) }; G.D = w.D; G.pfMiss = w.f == null ? null : w.f - pd; return w.best; }
 /* CHIP_FIT: best = PITCH_FIT2's plan (G.dir, G.D) for a pitch or greenside splash at the pin. Looks at what a perfect strike's spread does with it (calm look-aheads, scaled by the wind's carry ratio) and, if the spread runs off the green or far past/short, re-picks the meter yardage on a grid of real look-aheads. Returns the fitTo result for the plan it leaves (its own wind flight: caddieFl stays true), sets G.cfLoss (the expected miss + off-green yds of the spread) and G.cfLong (its mean yds past the pin); G.pfMiss stays PITCH_FIT2's (its wedge step reads it as before) */
 function* chipFitG(best, fitTo, wv) { G.cfLoss = null; G.cfLong = 0; if (!best || !best.E || best.E.tree || !G.ball) return best;
   const b = G.ball, pd = Math.hypot(PIN.u - b.u, PIN.v - b.v) || 1, fu = (PIN.u - b.u) / pd, fv = (PIN.v - b.v) / pd, al = (u, v) => (u - b.u) * fu + (v - b.v) * fv, sd = (u, v) => (u - b.u) * fv - (v - b.v) * fu;
@@ -4293,7 +4303,7 @@ function launch(sw) {
   if (G.mode === 'putt') return launchPutt(sw);
   const tight = MODES[G.mode].tight || 1, mrisk = MODES[G.mode].risk || 1, risk = mrisk * 1.1; /* 1.1: every full-swing shot punishes flaws a touch more */
   const cl = club(), F = G.Feff, D = G.D, ps = pStar(), d = G.dir, r = right(d), h = G.height;
-  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (PH_RULE ? PH_RULE.win : .009) * tight) { p = ps; pinHigh = true; }
+  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (SG_POWER_WIN && SG_POWER_WIN[G.mode] ? SG_POWER_WIN[G.mode] : (PH_RULE ? PH_RULE.win : .009) * tight)) { p = ps; pinHigh = true; } /* SG_POWER_WIN: the short game's wider window */
   let carry = dOfP(p);
   const terr = Math.abs(Math.log(sw.ratio / TEMPO)); const tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .12 * clubK() * swingEase() ? 'good' : 'off'; const quick = sw.ratio > TEMPO; /* CLUB_DIFF: the good band scales with the club too */
   const sgT = SG_TEMPO && (G.mode === 'sand' || G.mode === 'chip' || G.mode === 'flop' || (G.mode === 'pitch' && D <= 50)) ? SG_TEMPO : null; /* SG_TEMPO: around the green */
