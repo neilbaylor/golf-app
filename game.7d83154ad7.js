@@ -6399,7 +6399,7 @@ const HOLESYS = (() => {
 })();
 /* the small "Loading" pill (between holes, over the end-of-hole card; on the home screen when switching course): only while the hole isn't built yet */
 function tutExit() { /* TUT_INPLACE: Tee off / Skip: the tutorial's layer goes, the course they picked swaps in (built during the tutorial, so usually at once), a new round with its fly-over */
-  const c = COURSE_DEF[store.get('course', 'hunt')] ? store.get('course', 'hunt') : 'hunt', f = NINE.first(c), T = TUTOR; TUT_ON = false; TUTOR = null; window.__TUTOR = null; try { T && T.stop(); } catch (e) { console.error(e); }
+  const c = COURSE_DEF[store.get('course', 'hunt')] ? store.get('course', 'hunt') : 'hunt', f = NINE.first(c), T = TUTOR; TUT_ON = false; TUTOR = null; window.__TUTOR = null; try { T && T.stop(); } catch (e) { console.error(e); } try { $('#playBtn').textContent = 'Play'; } catch (e) {}
   G.stroke = 1; G.log = []; G.gimmeAdd = 0; HOLESYS.go(c, f, [], () => { FLY.reset(); playHole(); }, { pill: true }); }
 if (TUT_INPLACE) addEventListener('load', () => (window.requestIdleCallback || setTimeout)(() => { if (!tutWanted()) return; const go = () => { if (tutDefine()) try { HOLESYS.ahead(); } catch (e) {} }; if (tutDefine()) go(); else if (window.__tutLoad) window.__tutLoad(go); }, { timeout: 2500 })); /* TUT_INPLACE: once the page is up, a first-time player's tutorial (its file in the split build) and its hole, behind the home screen */
 const PILL = (() => { const el = $('#holePill'), bar = el.querySelector('s'), hp = el.querySelector('.hpl'); let to = 0;
