@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v545'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v547'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1502,9 +1502,22 @@ function* terrainSteps(course) { // the painted course on the terrain, as 4x7 ti
     }
     geo.computeBoundingSphere(); yield;
     const m = new THREE.Mesh(geo, course.material); m.rotation.x = -Math.PI / 2; m.position.set(tu, 0, -tv); m.userData.courseTile = true; if (AUGD) m.renderOrder = -2; HS.add(m);
+    if (GROUND_SKIRT && GROUND_LOD) { const ed = [ti > 0, ti < TU - 1, tj > 0, tj < TV - 1]; let D = 0; /* how far a skirt must hang: the steepest step between neighbouring grid points along its edges (a bound on where the half-detail twin's edge can sit) */
+      const e1 = (i0, j0, di, dj, n) => { for (let k = 0; k <= n; k++) { const i = i0 + di * k, j = j0 + dj * k; D = Math.max(D, Math.abs(H(i + di, j + dj) - H(i, j)), Math.abs(H(i - di, j - dj) - H(i, j))); } };
+      if (ed[0]) e1(ti * su, tj * sv, 0, 1, sv); if (ed[1]) e1((ti + 1) * su, tj * sv, 0, 1, sv); if (ed[2]) e1(ti * su, tj * sv, 1, 0, su); if (ed[3]) e1(ti * su, (tj + 1) * sv, 1, 0, su);
+      const sk = skirtGeo(geo, ed, .3 + D * 1.5); if (sk) { const s = new THREE.Mesh(sk, course.material); s.userData.skirt = true; if (AUGD) s.renderOrder = -2; m.add(s); } }
     if (!half) fine = m; else { m.visible = false; (HS.ud.gtiles || (HS.ud.gtiles = [])).push({ fine, coarse: m, c: new THREE.Vector3(tu, geo.boundingSphere.center.z, -tv), r: Math.hypot(su * du, sv * dv) / 2 }); } }
   }
 }
+function skirtGeo(geo, ed, D) { /* GROUND_SKIRT: a strip hanging down from a ground tile's inner edges (ed: left, right, bottom, top), lit and coloured as the edge it hangs from */
+  const P = geo.parameters, gx = P.widthSegments, gy = P.heightSegments, pa = geo.attributes.position, uv = geo.attributes.uv, nm = geo.attributes.normal, pos = [], uvs = [], nms = [], idx = []; let n = 0;
+  const lists = [[ed[0], k => k * (gx + 1), gy, -1, 0], [ed[1], k => k * (gx + 1) + gx, gy, 1, 0], [ed[2], k => gy * (gx + 1) + k, gx, 0, -1], [ed[3], k => k, gx, 0, 1]]; /* (row 0 is the tile's top edge, +y) */
+  for (const [on, at, cnt, ox, oy] of lists) { if (!on) continue;
+    for (let k = 0; k < cnt; k++) { const a = at(k), b = at(k + 1), base = n;
+      for (const [v, dz] of [[a, 0], [b, 0], [a, -D], [b, -D]]) { pos.push(pa.getX(v), pa.getY(v), pa.getZ(v) + dz); uvs.push(uv.getX(v), uv.getY(v)); nms.push(nm.getX(v), nm.getY(v), nm.getZ(v)); n++; }
+      const bx = pa.getX(b) - pa.getX(a), by = pa.getY(b) - pa.getY(a), out = (by * -D) * ox - (bx * -D) * oy; /* (b - a) x (a' - a), against the outward side: front faces outward */
+      if (out > 0) idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2); else idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3); } }
+  if (!n) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nms, 3)); g.setIndex(idx); g.computeBoundingSphere(); return g; }
 function buildOuter() { /* the land round the painted map (per hole) */
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); const R = rng(9);
   g.fillStyle = '#5fa23d'; g.fillRect(0, 0, 256, 256);
@@ -1540,11 +1553,100 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
       if (same) { for (let i = 3; i < n * 4; i += 4) L.sph[i] = Math.max(L.sph[i], sph[i]); C.lead = L; } } }
   if (opt.lod) { const f = new THREE.InstancedMesh(opt.lod, mat, n); f.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (cols) { f.setColorAt(0, new THREE.Color()); f.instanceColor.setUsage(THREE.DynamicDrawUsage); }
     f.count = 0; f.visible = false; if (opt.off) f.position.copy(opt.off); if (opt.ud) Object.assign(f.userData, opt.ud); C.fm = f; C.fpi = new Int32Array(n).fill(-1); } /* "far trees: simple": the same instances, far off, in a simpler mesh */
+  if (TERRAIN_OCC) occInst(C, geo, opt.lod, o); /* TERRAIN_OCC */
   HS.cull.push(C); HS.add(m); if (C.fm) HS.add(C.fm); return m;
+}
+/* TERRAIN_OCC (perf526): trees wholly hidden behind the ground are not drawn. Swiftshader shades every fragment it rasterizes, hidden or not (no early depth reject: a full-screen
+   quad drawn first leaves the frame time unchanged), and the bluff woods of the Hunt 1 and 9 (hundreds of pines on the slope below the lip, out of sight from the tee) cost
+   ~20% of those frames. A strict test, so the picture is the same pixel for pixel: the ground is bounded from below per 3-yd cell (the lowest corner of every drawn tile
+   triangle touching it, fine and coarse twins both); once the camera has held still, a horizon is built round it (cells -> the steepest ground slope per sliver of bearing and
+   distance; only the slivers some instance needs, a slice a frame), and an instance is dropped only when its whole bounding sphere (the mesh, its ink hull and its far mesh)
+   lies below that horizon, behind ground nearer than it, with a 0.3 yd margin. Only ground nearer than the first seam between a fine and a coarse GROUND_LOD tile counts (their edges don't
+   match: a sight line can slip under the ground through that crack). Only plain toon / ink meshes (no shader that moves vertices); camera inside the map and above
+   the ground. While the camera moves nothing changes from before. false = as v526 */
+const TERRAIN_OCC = true;
+const OCC = { NB: 1024, R0: 1.5, LR: Math.log(1.05), K: 0, CW: 3, M: .3, st: 0, go: false, it: null, gi: null, cull: null, u: 0, v: 0, y: 0, b0: 0, b1: 0, dh: 0, HB: null, need: null, needC: null };
+OCC.K = Math.ceil(Math.log(4000 / OCC.R0) / OCC.LR) + 1;
+const _om = new THREE.Matrix4(), _ov = new THREE.Vector3();
+const occPA = (x, y) => y >= 0 ? (x >= 0 ? y / (x + y) : 1 - x / (y - x)) : (x < 0 ? 2 - y / (-x - y) : 3 + x / (x - y)); /* a pseudo-angle (0..4, monotonic in bearing): bins without trig */
+function occInst(C, geo, lod, off) { /* the instances' bounding spheres in the hole, kept on the lead (a twin and the far mesh widen them) */
+  const L = C.lead || C, mt = C.m.material, ok = !C.m.userData.tuft && !mt.transparent && mt.depthTest && mt.depthFunc === THREE.LessEqualDepth && ((mt.isMeshToonMaterial && mt.onBeforeCompile === THREE.Material.prototype.onBeforeCompile) || mt === inkMat);
+  C.oo = [off.x, off.y, off.z]; L.occOK = L.occOK !== false && ok; if (!L.occOK) { L.os = null; return; } const S = L.os || (L.os = new Float32Array(L.n * 4));
+  for (const g of lod ? [geo, lod] : [geo]) { if (!g.boundingSphere) g.computeBoundingSphere(); const gs = g.boundingSphere;
+    for (let i = 0; i < C.n; i++) { _om.fromArray(C.all, i * 16); _ov.copy(gs.center).applyMatrix4(_om); const x = _ov.x + off.x, y = _ov.y + off.y, z = _ov.z + off.z, r = gs.radius * _om.getMaxScaleOnAxis(), j = i * 4;
+      if (!(S[j + 3] > 0)) { S[j] = x; S[j + 1] = y; S[j + 2] = z; S[j + 3] = r; continue; }
+      const dx = x - S[j], dy = y - S[j + 1], dz = z - S[j + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz), r0 = S[j + 3]; if (d + r <= r0) continue; if (d + r0 <= r) { S[j] = x; S[j + 1] = y; S[j + 2] = z; S[j + 3] = r; continue; }
+      const R = (d + r0 + r) / 2, t = (R - r0) / d; S[j] += dx * t; S[j + 1] += dy * t; S[j + 2] += dz * t; S[j + 3] = R * 1.001 + .01; } } }
+function* occGridG(grp) { /* the ground's lower (and upper) bound per cell, from every tile triangle (built on the hole's first still frames, a slice a frame: the hole build is untouched) */
+  if (!grp) return null; const tiles = []; grp.traverse(o => { if (o.userData.courseTile) tiles.push(o); }); if (!tiles.length) return null;
+  for (const t of tiles) { const m = t.material; if (t.parent !== grp || m.transparent || !m.depthWrite || !m.depthTest || m.side !== THREE.FrontSide || m.colorWrite === false) return null; } /* only opaque, depth-writing, one-sided ground right in the hole group */
+  let U0 = 1e9, U1 = -1e9, V0 = 1e9, V1 = -1e9; const W = [];
+  for (const t of tiles) { t.updateMatrix(); const P = t.geometry.attributes.position, A = new Float32Array(P.count * 3); for (let i = 0; i < P.count; i++) { if (i % 2000 === 1999) yield; _ov.fromBufferAttribute(P, i).applyMatrix4(t.matrix); A[i * 3] = _ov.x; A[i * 3 + 1] = _ov.y; A[i * 3 + 2] = -_ov.z; if (_ov.x < U0) U0 = _ov.x; if (_ov.x > U1) U1 = _ov.x; if (-_ov.z < V0) V0 = -_ov.z; if (-_ov.z > V1) V1 = -_ov.z; } W.push(A); yield; }
+  const CW = OCC.CW, NU = Math.floor((U1 - U0) / CW), NV = Math.floor((V1 - V0) / CW), cmin = new Float32Array(NU * NV).fill(Infinity), cmax = new Float32Array(NU * NV).fill(-Infinity); yield;
+  for (let q = 0; q < tiles.length; q++) { const A = W[q], I = tiles[q].geometry.index.array;
+    for (let f = 0; f < I.length; f += 3) { const i0 = I[f] * 3, i1 = I[f + 1] * 3, i2 = I[f + 2] * 3, h0 = Math.min(A[i0 + 1], A[i1 + 1], A[i2 + 1]), h1 = Math.max(A[i0 + 1], A[i1 + 1], A[i2 + 1]);
+      const ca = Math.max(0, Math.floor((Math.min(A[i0], A[i1], A[i2]) - U0) / CW)), cb = Math.min(NU - 1, Math.floor((Math.max(A[i0], A[i1], A[i2]) - U0) / CW)), ra = Math.max(0, Math.floor((Math.min(A[i0 + 2], A[i1 + 2], A[i2 + 2]) - V0) / CW)), rb = Math.min(NV - 1, Math.floor((Math.max(A[i0 + 2], A[i1 + 2], A[i2 + 2]) - V0) / CW));
+      for (let cj = ra; cj <= rb; cj++) for (let ci = ca; ci <= cb; ci++) { const k = cj * NU + ci; if (h0 < cmin[k]) cmin[k] = h0; if (h1 > cmax[k]) cmax[k] = h1; }
+      if (f % 4500 === 4497) yield; } }
+  const T = [], byPos = new Map(); for (const t of tiles) { const k = t.position.x.toFixed(2) + ',' + t.position.z.toFixed(2), w = t.geometry.parameters.width / 2, h = t.geometry.parameters.height / 2; let e = byPos.get(k); /* the tiles (each with its GROUND_LOD twin): where a fine one meets a coarse one their edges don't match (cracks) */
+    if (!e) { e = { u0: t.position.x - w, u1: t.position.x + w, v0: -t.position.z - h, v1: -t.position.z + h, m: [] }; byPos.set(k, e); T.push(e); } e.m.push(t); }
+  return { U0, V0, NU, NV, cmin, cmax, T };
+}
+function occSeams(g) { /* per bin, the distance to the nearest seam between tiles drawn at different detail (a crack a sight line could slip under the ground through): only ground nearer than that counts */
+  const DS = OCC.DS || (OCC.DS = new Float32Array(OCC.NB)), NB = OCC.NB, bw = 4 / NB, T = g.T; DS.fill(1e9);
+  for (const e of T) { let k = 0; for (let i = 0; i < e.m.length; i++) if (e.m[i].visible) k |= 1 << i; e.k = k; if (!k) return false; } /* a tile not drawn at all: no culling */
+  for (let a = 0; a < T.length; a++) for (let b = a + 1; b < T.length; b++) { const A = T[a], B = T[b]; if (A.k === B.k) continue; let x0, x1, y0, y1;
+    if (Math.abs(A.u1 - B.u0) < .05 || Math.abs(B.u1 - A.u0) < .05) { x0 = x1 = Math.abs(A.u1 - B.u0) < .05 ? A.u1 : A.u0; y0 = Math.max(A.v0, B.v0); y1 = Math.min(A.v1, B.v1); }
+    else if (Math.abs(A.v1 - B.v0) < .05 || Math.abs(B.v1 - A.v0) < .05) { y0 = y1 = Math.abs(A.v1 - B.v0) < .05 ? A.v1 : A.v0; x0 = Math.max(A.u0, B.u0); x1 = Math.min(A.u1, B.u1); } else continue;
+    if (y1 < y0 - .05 || x1 < x0 - .05) continue; x0 -= OCC.u + .1; x1 -= OCC.u - .1; y0 -= OCC.v + .1; y1 -= OCC.v - .1; /* (relative to the camera, a little longer) */
+    const ex = x0 > 0 ? x0 : x1 < 0 ? -x1 : 0, ey = y0 > 0 ? y0 : y1 < 0 ? -y1 : 0, dm = Math.sqrt(ex * ex + ey * ey); if (dm < 1) return false; /* the camera on a seam: no culling */
+    const pc = occPA((x0 + x1) / 2, (y0 + y1) / 2); let lo = 9, hi = -9; for (const [px, py] of [[x0, y0], [x1, y1]]) { let d = occPA(px, py) - pc; if (d > 2) d -= 4; else if (d < -2) d += 4; if (d < lo) lo = d; if (d > hi) hi = d; }
+    for (let q = Math.floor((pc + lo) / bw); q <= Math.floor((pc + hi) / bw); q++) { const bb = ((q % NB) + NB) % NB; if (dm < DS[bb]) DS[bb] = dm; } }
+  return true;
+}
+function occSpan(x, y, z, r) { /* the bins a sphere's bearings span, from the camera */ const du = x - OCC.u, dv = -z - OCC.v, dh2 = du * du + dv * dv; if (dh2 <= (r + .5) * (r + .5)) return false;
+  const dh = Math.sqrt(dh2), s = r / dh, c = Math.sqrt(1 - s * s), pc = occPA(du, dv); let p1 = occPA(du * c - dv * s, dv * c + du * s) - pc, p2 = occPA(du * c + dv * s, dv * c - du * s) - pc;
+  if (p1 > 2) p1 -= 4; else if (p1 < -2) p1 += 4; if (p2 > 2) p2 -= 4; else if (p2 < -2) p2 += 4; const bw = 4 / OCC.NB; OCC.b0 = Math.floor((pc + Math.min(p1, p2)) / bw); OCC.b1 = Math.floor((pc + Math.max(p1, p2)) / bw); OCC.dh = dh; return true; }
+function occHid(S, j) { /* the whole sphere below the horizon of nearer ground, in every bin it spans */
+  const r = S[j + 3]; if (!occSpan(S[j], S[j + 1], S[j + 2], r)) return false; const dh = OCC.dh, dy = S[j + 1] - OCC.y, d2 = dh * dh + dy * dy - r * r; if (d2 <= 0) return false;
+  const ta = dy / dh, tb = r / Math.sqrt(d2), den = 1 - ta * tb; if (den <= 0) return false; const te = (ta + tb) / den, dn = dh - r - .5; if (dn < OCC.R0) return false; /* te: tan of the sphere's top elevation */
+  const NB = OCC.NB, K = OCC.K, HB = OCC.HB, k = Math.min(K - 1, Math.floor(Math.log(dn / OCC.R0) / OCC.LR)); for (let b = OCC.b0; b <= OCC.b1; b++) { const bb = ((b % NB) + NB) % NB; if (!(HB[bb * K + k] > te)) return false; } return true; }
+function* occHorizonG(g) { /* the horizon round a still camera: per bin and distance ring, the steepest slope up to nearer ground that covers the whole bin */
+  const cp = camera.position, cu = cp.x, cv = -cp.z, cy = cp.y, CW = OCC.CW, NB = OCC.NB, K = OCC.K, NU = g.NU, NV = g.NV, grp = CULL[0].m.parent;
+  if (!grp || grp.parent !== scene || grp.position.lengthSq() || grp.quaternion.w !== 1 || grp.scale.x !== 1 || grp.scale.y !== 1 || grp.scale.z !== 1) return false; for (const C of CULL) if (C.m.parent !== grp || (C.oo && (C.m.position.x !== C.oo[0] || C.m.position.y !== C.oo[1] || C.m.position.z !== C.oo[2])) || C.m.quaternion.w !== 1 || C.m.scale.x !== 1 || C.m.scale.y !== 1 || C.m.scale.z !== 1) return false; /* every kind right in that group, unrotated (the spheres are its offset + instance matrices) */
+  const ci0 = Math.floor((cu - g.U0) / CW), cj0 = Math.floor((cv - g.V0) / CW); if (!(ci0 >= 1 && cj0 >= 1 && ci0 <= NU - 2 && cj0 <= NV - 2)) return false; /* inside the map: every sight line to a cell runs over drawn ground */
+  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if (!(cy > g.cmax[(cj0 + dj) * NU + ci0 + di] + .05)) return false; /* above the ground */
+  OCC.u = cu; OCC.v = cv; OCC.y = cy; const need = OCC.need || (OCC.need = new Uint8Array(NB)), needC = OCC.needC || (OCC.needC = new Int32Array(NB + 1)), HB = OCC.HB || (OCC.HB = new Float32Array(NB * K)); need.fill(0); let nn = 0;
+  let nq = 0; for (const C of CULL) { if (C.lead || !C.os || !C.vl) continue; const S = C.os; for (let q = 0; q < C.nv; q++) { if (++nq % 1000 === 0) yield; const j = C.vl[q] * 4; if (!occSpan(S[j], S[j + 1], S[j + 2], S[j + 3])) continue; for (let b = OCC.b0; b <= OCC.b1; b++) { const bb = ((b % NB) + NB) % NB; if (!need[bb]) { need[bb] = 1; nn++; } } } }
+  if (!nn || !occSeams(g)) return false; const DS = OCC.DS; needC[0] = 0; for (let b = 0; b < NB; b++) needC[b + 1] = needC[b] + need[b]; HB.fill(-1e9); const bw = 4 / NB, cmin = g.cmin; yield;
+  for (let cj = 0; cj < NV; cj++) { const y0 = g.V0 + cj * CW - cv, y1 = y0 + CW, ey = y0 > 0 ? y0 : y1 < 0 ? -y1 : 0;
+    for (let ci = 0; ci < NU; ci++) { const h = cmin[cj * NU + ci]; if (!(h < 1e9)) continue; const x0 = g.U0 + ci * CW - cu, x1 = x0 + CW, ex = x0 > 0 ? x0 : x1 < 0 ? -x1 : 0, tn2 = ex * ex + ey * ey; if (tn2 < 1) continue;
+      const pc = occPA(x0 + CW / 2, y0 + CW / 2); let lo = 9, hi = -9, d;
+      d = occPA(x0, y0) - pc; if (d > 2) d -= 4; else if (d < -2) d += 4; if (d < lo) lo = d; if (d > hi) hi = d;
+      d = occPA(x1, y0) - pc; if (d > 2) d -= 4; else if (d < -2) d += 4; if (d < lo) lo = d; if (d > hi) hi = d;
+      d = occPA(x0, y1) - pc; if (d > 2) d -= 4; else if (d < -2) d += 4; if (d < lo) lo = d; if (d > hi) hi = d;
+      d = occPA(x1, y1) - pc; if (d > 2) d -= 4; else if (d < -2) d += 4; if (d < lo) lo = d; if (d > hi) hi = d;
+      const bs = Math.ceil((pc + lo) / bw), be = Math.floor((pc + hi) / bw) - 1; if (be < bs) continue; /* the bins wholly inside the cell's bearings */
+      let any = false; if (bs >= 0 && be < NB) any = needC[be + 1] > needC[bs]; else for (let b = bs; b <= be && !any; b++) any = need[((b % NB) + NB) % NB] === 1; if (!any) continue;
+      const tf = Math.sqrt(Math.max(x0 * x0, x1 * x1) + Math.max(y0 * y0, y1 * y1)), hl = h - OCC.M - cy, sl = hl / (hl < 0 ? Math.sqrt(tn2) : tf); /* the slope a sight line must stay under to meet ground in this cell */
+      let kf = Math.ceil(Math.log(tf / OCC.R0) / OCC.LR); if (kf < 0) kf = 0; if (kf >= K) continue;
+      for (let b = bs; b <= be; b++) { const bb = b < 0 ? b + NB : b >= NB ? b - NB : b; if (!need[bb] || tf > DS[bb]) continue; const q = bb * K + kf; if (sl > HB[q]) HB[q] = sl; } }
+    if (cj % 4 === 3) yield; }
+  for (let b = 0; b < NB; b++) { if (b % 128 === 127) yield; if (!need[b]) continue; let m = -1e9; for (let k = 0; k < K; k++) { const q = b * K + k; if (HB[q] > m) m = HB[q]; HB[q] = m; } }
+  return true;
+}
+function occTick() { /* a still frame: a slice of the hole's ground bounds (once a hole), then of the horizon; true on the frame after it is ready (cull again with it: the cull gets a frame to itself) */
+  if (OCC.go) { OCC.go = false; return true; } if (OCC.st >= 2) return false; if (OCC.cull !== CULL) { OCC.cull = CULL; OCC.gi = null; OCC.it = null; OCC.st = 0; }
+  const t0 = performance.now(); /* about 2 ms of it a frame */
+  while (!CULL.occG) { if (!OCC.gi) OCC.gi = occGridG(CULL.length && CULL[0].m.parent); const r = OCC.gi.next(); if (r.done) { CULL.occG = r.value || 'none'; OCC.gi = null; } else if (performance.now() - t0 > 2) return false; }
+  if (CULL.occG === 'none') { OCC.st = 3; return false; }
+  for (;;) { if (!OCC.it) OCC.it = occHorizonG(CULL.occG); const r = OCC.it.next(); if (r.done) { OCC.it = null; OCC.st = r.value ? 2 : 3; OCC.go = OCC.st === 2; return false; } if (performance.now() - t0 > 2) return false; }
 }
 const FAR_CROWN = 'fly'; /* Neil (11-18 18:54-18:55): "try distant tree tops off for now" / "actually only off for fly over". During a hole's fly-over, tree crowns (broadleaf, loblolly, the Ontario pines' needle pads) are drawn full at every distance; the rest of the time crowns beyond 120 yd use the simple mesh as before. Far trunks, far azaleas and their ink cut, far bushes and the ground LOD stay simple throughout. Cost during the fly-over: Augusta 8 peaks at ~440k triangles (from ~295k), the Hunt 9 ~310k (from ~255k). true = simple always (as v446), false = full always */
 const FAR_TRUNK = true; /* Augusta 8 lightening, option 2 (preview for Neil 11-18): with "far trees: simple", trunks and branches beyond 120 yd are drawn as a 4-sided open tube (8 tris, not 28) and without their ink outline. false = as v437 */
 const AZ_INK_CUT = 200; /* option 3: the far azalea domes' ink outline is dropped beyond this many yd (0 = never, as v437) */
+const WAY_UNDER = 4; /* Neil 11-22: a round 4 or more under par says "Way under par!" (0 = always "Under par!", v546) */
+const GROUND_SKIRT = false; /* Neil 11-22: where a full-detail ground tile meets a half-detail one their edges don't quite match, and a hairline crack showed what's under the ground; each tile's inner edges now carry a short skirt hanging down (its own edge's colour and light), which closes the crack. Out of sight everywhere else (false = as v546) */
 const GROUND_LOD = 120; /* option 4: course ground tiles whose nearest edge is beyond this many yd are drawn from a half-resolution twin (a quarter of the triangles). 0 = off, as v437 */
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
 const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
@@ -1569,7 +1671,7 @@ function updateCull() {
   if (_cPT !== PLAN_TREE) { same = false; _cPT = PLAN_TREE; }
   if (GHOST_LINE) { const a = trPts[TR.segs], b = trPts[TR.segs >> 1], k = a.x + a.y * 3.1 + a.z * 7.3 + b.x * 11.7 + b.y * 13.9 + b.z * 17.3 + (tracer.visible ? 1e6 : 0) + (G.view === 'aim' ? 2e6 : 0); if (updateCull.gk !== k) { same = false; updateCull.gk = k; } } /* GHOST_LINE: the tracer moved */
   if (FAR_CROWN === 'fly' && updateCull.fly !== FLY.on) { same = false; updateCull.fly = FLY.on; } /* FAR_CROWN: the crowns' mesh changes as the fly-over starts and ends */
-  if (same) return;
+  if (same) { if (!(TERRAIN_OCC && occTick())) return; } else if (TERRAIN_OCC) { OCC.st = 0; OCC.it = null; OCC.go = false; } /* TERRAIN_OCC: a moving camera culls as before; once it holds still the horizon is built over a few frames, then the trees behind the ground drop out */
   { // a tree in the way of the ball (or wrapped round the camera) steps aside
     _blk.clear(); const cx0 = camera.position.x, cy0 = camera.position.y, cz0 = camera.position.z, bx = ball.position.x, by = ball.position.y, bz = ball.position.z, dx = bx - cx0, dz = bz - cz0, L2 = dx * dx + dz * dz || 1e-6;
     const line = G.view !== 'aim' || G.aimT < .5, aimKeep = AIM_TREES_KEEP === true && !line; /* AIM_TREES_KEEP: the aim view hides no tree (only one the camera is really inside) */
@@ -1595,6 +1697,7 @@ function updateCull() {
   _cmx.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _cf.setFromProjectionMatrix(_cmx);
   const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
   const lod = FARLOD.on, FD2 = FARLOD.d2;
+  const occOn = TERRAIN_OCC && OCC.st === 2; /* TERRAIN_OCC */
   for (const C of CULL) {
     const lodC = lod && !(C.crown && FAR_CROWN === 'fly' && FLY.on); /* FAR_CROWN: crowns full during the fly-over */
     if (C.fm && !lodC && C.fm.visible) { C.fm.visible = false; C.fm.count = 0; }
@@ -1603,7 +1706,7 @@ function updateCull() {
     if (C.lead) { V = C.lead.vl; nv = C.lead.nv; } /* a twin: its lead (just before it) has tested the same centres this frame */
     else { V = C.vl || (C.vl = new Int32Array(C.n)); if (C.gq) C.gq.length = 0;
       for (let i = 0; i < C.n; i++) {
-        { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (_gho.size && C.crown && C.tid[i] >= 0 && _gho.has(C.tid[i])) { (C.gq || (C.gq = [])).push(i); continue; } /* GHOST_LINE */ if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far * (FLY_FAR > 1 && FLY.on ? FLY_FAR : 1) + r, d2 = dx * dx + dy * dy + dz * dz; if (d2 > fr * fr) continue; if (FAR_GROW) { const B = Math.max(20, C.far * .2), d = Math.sqrt(d2), gs = C.gs || (C.gs = new Float32Array(C.n)); gs[i] = d <= fr - B ? 1 : smooth(fr, fr - B, d); } } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; }
+        { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (_gho.size && C.crown && C.tid[i] >= 0 && _gho.has(C.tid[i])) { (C.gq || (C.gq = [])).push(i); continue; } /* GHOST_LINE */ if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far * (FLY_FAR > 1 && FLY.on ? FLY_FAR : 1) + r, d2 = dx * dx + dy * dy + dz * dz; if (d2 > fr * fr) continue; if (FAR_GROW) { const B = Math.max(20, C.far * .2), d = Math.sqrt(d2), gs = C.gs || (C.gs = new Float32Array(C.n)); gs[i] = d <= fr - B ? 1 : smooth(fr, fr - B, d); } } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; if (occOn && C.os && occHid(C.os, j)) continue; }
         V[nv++] = i; }
       C.nv = nv; }
     const im = C.m.instanceMatrix.array, ic = C.cols && C.m.instanceColor.array, A = C.all, Cc = C.cols; let k = 0, ch = false; const pi = C.pi || (C.pi = new Int32Array(C.n).fill(-1));
@@ -6669,7 +6772,7 @@ function showRoundCard() { /* after the last hole: a real scorecard (nine holes 
   const stats = [['Fairways', fwH.length ? `${fwH.filter(h => h.fw).length}/${fwH.length}` : '—'], ['Greens', has ? `${H.filter(h => h.gir).length}/${H.length}` : '—'], ['Putts', has ? sum(H, h => h.putts || 0) : '—'], ['Long drive', drv ? `${Math.round(drv)} yds` : '—']];
   $('#result').classList.add('round');
   $('#resWord').textContent = ''; $('#resSub').textContent = '';
-  $('#resCard').innerHTML = `<div class="rc"><div class="rtop"><div class="rwho"><b>${d < 0 ? 'Under par!' : d === 0 ? 'Level par!' : 'Round done!'}</b>${course} · ${who}</div><div class="rtot"><b>${tot}</b><span>${dt}</span></div></div>${rows.map(table).join('')}<div class="rst">${stats.map(([k, v]) => `<div><i>${k}</i><b>${v}</b></div>`).join('')}</div></div>`;
+  $('#resCard').innerHTML = `<div class="rc"><div class="rtop"><div class="rwho"><b>${d < 0 ? (WAY_UNDER && d <= -WAY_UNDER ? 'Way under par!' : 'Under par!') : d === 0 ? 'Level par!' : 'Round done!'}</b>${course} · ${who}</div><div class="rtot"><b>${tot}</b><span>${dt}</span></div></div>${rows.map(table).join('')}<div class="rst">${stats.map(([k, v]) => `<div><i>${k}</i><b>${v}</b></div>`).join('')}</div></div>`;
   $('#resBtns').innerHTML = `<button class="btn quit" data-a="quit">Home</button><button class="btn go" data-a="newround">Play again</button>`;
   { const k = d < 0 ? 'roundGood' : d <= H.length ? 'roundOk' : 'roundBad'; setTimeout(() => AV.say(line(k), { mood: k === 'roundGood' ? 'happy' : k === 'roundBad' ? 'sad' : 'neutral', moodFor: 2.5 }), 700); } }
 function holeCard(L) {

@@ -4,7 +4,7 @@
      the real decision is made at the scripts' place (the tail), on the hash AUG_M will read; the fresh load's 50% pick is made there too, at the same point of
      Math.random's sequence as AUG_M's (after three.js), so on a fresh Augusta pick its data starts at the tail rather than here */
   var guess = /^#augusta/.test(h || at);
-  var N = {"hunt": "hunt.881b0e3f33.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.dd85bf57f5.js", "tut": "tut.ee3a464359.js", "osler": "osler.1d53dc22fe.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
+  var N = {"hunt": "hunt.881b0e3f33.js", "crew": "crew.dcc1d47ab5.js", "aug": "aug.b200abac93.js", "game": "game.582fd05651.js", "tut": "tut.ee3a464359.js", "osler": "osler.1d53dc22fe.js"}, pre = function (n) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = n; document.head.appendChild(l); };
   window.__splitN = N; if (guess) pre(N.aug); if (/^#(?:osler|ob-004b22b2)(?:-hole-\d+)?$/.test(h || at)) pre(N.osler); var so = null, to = -1e9; window.__oslLoad = function () { if (so || window.__oslBoot || Date.now() - to < 3000) return; to = Date.now(); so = document.createElement('script'); so.src = N.osler; so.async = true; so.onerror = function () { so.remove(); so = null; }; document.head.appendChild(so); }; addEventListener('pointerdown', function (e) { var t = e.target; if (t && t.closest && t.closest('.course[data-id=\"osler\"]')) window.__oslLoad(); }, true); if (h === '#tutorial-hole' && N.tut) pre(N.tut); var tso = null, tcb = []; window.__tutLoad = function (cb) { if (cb) tcb.push(cb); if (tso) return; tso = document.createElement('script'); tso.src = N.tut; tso.async = true; tso.onload = function () { var a = tcb; tcb = []; a.forEach(function (f) { try { f(); } catch (e) {} }); }; tso.onerror = function () { tso.remove(); tso = null; }; document.head.appendChild(tso); }; pre(N.hunt); pre(N.crew); pre(N.game);
   var s = null, t0 = -1e9; window.__augLoad = function () { if (s || window.__augBoot || Date.now() - t0 < 3000) return; t0 = Date.now(); s = document.createElement('script'); s.src = N.aug; s.async = true;
     s.onerror = function () { s.remove(); s = null; }; document.head.appendChild(s); }; /* a failed fetch is tried again (at most every 3 s) the next time it's wanted */
@@ -1242,5 +1242,5 @@ if (true /* BOOT_ALL */) { window.__oslBoot = true; document.write('<script src=
 if (location.hash === '#tutorial-hole') document.write('<script src="' + __splitN.tut + '" onerror="__splitFail()"><\/script>'); /* the tutorial: only on its own boot */</script>
 <script src="hunt.881b0e3f33.js" onerror="__splitFail()"></script>
 <script src="crew.dcc1d47ab5.js" onerror="__splitFail()"></script>
-<script src="game.dd85bf57f5.js" onerror="__splitFail()"></script>
+<script src="game.582fd05651.js" onerror="__splitFail()"></script>
 
