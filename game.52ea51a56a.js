@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v556'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v558'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1679,6 +1679,7 @@ function occTick() { /* a still frame: a slice of the hole's ground bounds (once
 const FAR_CROWN = 'fly'; /* Neil (11-18 18:54-18:55): "try distant tree tops off for now" / "actually only off for fly over". During a hole's fly-over, tree crowns (broadleaf, loblolly, the Ontario pines' needle pads) are drawn full at every distance; the rest of the time crowns beyond 120 yd use the simple mesh as before. Far trunks, far azaleas and their ink cut, far bushes and the ground LOD stay simple throughout. Cost during the fly-over: Augusta 8 peaks at ~440k triangles (from ~295k), the Hunt 9 ~310k (from ~255k). true = simple always (as v446), false = full always */
 const FAR_TRUNK = true; /* Augusta 8 lightening, option 2 (preview for Neil 11-18): with "far trees: simple", trunks and branches beyond 120 yd are drawn as a 4-sided open tube (8 tris, not 28) and without their ink outline. false = as v437 */
 const AZ_INK_CUT = 200; /* option 3: the far azalea domes' ink outline is dropped beyond this many yd (0 = never, as v437) */
+const INTRO_NO_SNAP = true; /* Neil 11-23 (the intro on a slow phone): the home view's still is no longer taken in the intro's opening beat (a full draw, a read-back and a JPEG: 0.1-0.5 s on a slow phone, the rays standing still); the still is only a stand-in for a course whose first hole isn't built yet, and every course's first hole is now built under the loader, so it is taken at the fly-over's own sky dip as before. Nothing on screen changes (false = as v556) */
 const OSL_HASH_FIX = true; /* see the room-link check near the end: #osler is OslerBrook, not a room (false = as v548) */
 const WAY_UNDER = 4; /* Neil 11-22: a round 4 or more under par says "Way under par!" (0 = always "Under par!", v546) */
 const GROUND_SKIRT = false; /* Neil 11-22: where a full-detail ground tile meets a half-detail one their edges don't quite match, and a hairline crack showed what's under the ground; each tile's inner edges now carry a short skirt hanging down (its own edge's colour and light), which closes the crack. Out of sight everywhere else (false = as v546) */
@@ -6912,7 +6913,7 @@ async function runIntro() {
       await Promise.race([Promise.all(urls.map(u => { const im = new Image(); im.src = u; return (im.decode ? im.decode() : new Promise(r => { im.onload = im.onerror = r; })).catch(() => {}); })), wait(1200)]); if (stop) return; }
     if (INTRO_PRE) { el.classList.add('pre'); if (HOME_EARLY && !hyd && INTRO.onExit) { hydE = true; INTRO.onExit(); } /* HOME_EARLY */ await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await wait(120); if (stop) return; } /* INTRO_PRE: paint them all once (invisibly) first */
     if (SHADER_WARM) { shaderWarm(); await wait(0); if (stop) return; }
-    if (HOMESNAP_HIDDEN) { try { HOMESNAP.hidden(); } catch (e) {} await wait(0); if (stop) return; } /* HOMESNAP_HIDDEN: this course's home still, in the same covered beat as the shader warm-up (the board is still empty) */
+    if (HOMESNAP_HIDDEN && !INTRO_NO_SNAP) { try { HOMESNAP.hidden(); } catch (e) {} await wait(0); if (stop) return; } /* HOMESNAP_HIDDEN: this course's home still, in the same covered beat as the shader warm-up (the board is still empty) */
     INTRO.fill = true; /* INTRO_PRE: no background hole building while the squares come in */ /* SHADER_WARM: before the first square (the board is still empty), not while the squares come in: its ~200 ms set-up stuttered the last two (Neil 11-21) */
     // 1. the board fills in, square by square, round the ring
     for (const k of ring) { if (stop) return; C[k].classList.add('in'); await wait(45); }
