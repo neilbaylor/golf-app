@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v546'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v548'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1502,9 +1502,22 @@ function* terrainSteps(course) { // the painted course on the terrain, as 4x7 ti
     }
     geo.computeBoundingSphere(); yield;
     const m = new THREE.Mesh(geo, course.material); m.rotation.x = -Math.PI / 2; m.position.set(tu, 0, -tv); m.userData.courseTile = true; if (AUGD) m.renderOrder = -2; HS.add(m);
+    if (GROUND_SKIRT && GROUND_LOD) { const ed = [ti > 0, ti < TU - 1, tj > 0, tj < TV - 1]; let D = 0; /* how far a skirt must hang: the steepest step between neighbouring grid points along its edges (a bound on where the half-detail twin's edge can sit) */
+      const e1 = (i0, j0, di, dj, n) => { for (let k = 0; k <= n; k++) { const i = i0 + di * k, j = j0 + dj * k; D = Math.max(D, Math.abs(H(i + di, j + dj) - H(i, j)), Math.abs(H(i - di, j - dj) - H(i, j))); } };
+      if (ed[0]) e1(ti * su, tj * sv, 0, 1, sv); if (ed[1]) e1((ti + 1) * su, tj * sv, 0, 1, sv); if (ed[2]) e1(ti * su, tj * sv, 1, 0, su); if (ed[3]) e1(ti * su, (tj + 1) * sv, 1, 0, su);
+      const sk = skirtGeo(geo, ed, .3 + D * 1.5); if (sk) { const s = new THREE.Mesh(sk, course.material); s.userData.skirt = true; if (AUGD) s.renderOrder = -2; m.add(s); } }
     if (!half) fine = m; else { m.visible = false; (HS.ud.gtiles || (HS.ud.gtiles = [])).push({ fine, coarse: m, c: new THREE.Vector3(tu, geo.boundingSphere.center.z, -tv), r: Math.hypot(su * du, sv * dv) / 2 }); } }
   }
 }
+function skirtGeo(geo, ed, D) { /* GROUND_SKIRT: a strip hanging down from a ground tile's inner edges (ed: left, right, bottom, top), lit and coloured as the edge it hangs from */
+  const P = geo.parameters, gx = P.widthSegments, gy = P.heightSegments, pa = geo.attributes.position, uv = geo.attributes.uv, nm = geo.attributes.normal, pos = [], uvs = [], nms = [], idx = []; let n = 0;
+  const lists = [[ed[0], k => k * (gx + 1), gy, -1, 0], [ed[1], k => k * (gx + 1) + gx, gy, 1, 0], [ed[2], k => gy * (gx + 1) + k, gx, 0, -1], [ed[3], k => k, gx, 0, 1]]; /* (row 0 is the tile's top edge, +y) */
+  for (const [on, at, cnt, ox, oy] of lists) { if (!on) continue;
+    for (let k = 0; k < cnt; k++) { const a = at(k), b = at(k + 1), base = n;
+      for (const [v, dz] of [[a, 0], [b, 0], [a, -D], [b, -D]]) { pos.push(pa.getX(v), pa.getY(v), pa.getZ(v) + dz); uvs.push(uv.getX(v), uv.getY(v)); nms.push(nm.getX(v), nm.getY(v), nm.getZ(v)); n++; }
+      const bx = pa.getX(b) - pa.getX(a), by = pa.getY(b) - pa.getY(a), out = (by * -D) * ox - (bx * -D) * oy; /* (b - a) x (a' - a), against the outward side: front faces outward */
+      if (out > 0) idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2); else idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3); } }
+  if (!n) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nms, 3)); g.setIndex(idx); g.computeBoundingSphere(); return g; }
 function buildOuter() { /* the land round the painted map (per hole) */
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); const R = rng(9);
   g.fillStyle = '#5fa23d'; g.fillRect(0, 0, 256, 256);
@@ -1632,6 +1645,8 @@ function occTick() { /* a still frame: a slice of the hole's ground bounds (once
 const FAR_CROWN = 'fly'; /* Neil (11-18 18:54-18:55): "try distant tree tops off for now" / "actually only off for fly over". During a hole's fly-over, tree crowns (broadleaf, loblolly, the Ontario pines' needle pads) are drawn full at every distance; the rest of the time crowns beyond 120 yd use the simple mesh as before. Far trunks, far azaleas and their ink cut, far bushes and the ground LOD stay simple throughout. Cost during the fly-over: Augusta 8 peaks at ~440k triangles (from ~295k), the Hunt 9 ~310k (from ~255k). true = simple always (as v446), false = full always */
 const FAR_TRUNK = true; /* Augusta 8 lightening, option 2 (preview for Neil 11-18): with "far trees: simple", trunks and branches beyond 120 yd are drawn as a 4-sided open tube (8 tris, not 28) and without their ink outline. false = as v437 */
 const AZ_INK_CUT = 200; /* option 3: the far azalea domes' ink outline is dropped beyond this many yd (0 = never, as v437) */
+const WAY_UNDER = 4; /* Neil 11-22: a round 4 or more under par says "Way under par!" (0 = always "Under par!", v546) */
+const GROUND_SKIRT = false; /* Neil 11-22: where a full-detail ground tile meets a half-detail one their edges don't quite match, and a hairline crack showed what's under the ground; each tile's inner edges now carry a short skirt hanging down (its own edge's colour and light), which closes the crack. Out of sight everywhere else (false = as v546) */
 const GROUND_LOD = 120; /* option 4: course ground tiles whose nearest edge is beyond this many yd are drawn from a half-resolution twin (a quarter of the triangles). 0 = off, as v437 */
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
 const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
@@ -6757,7 +6772,7 @@ function showRoundCard() { /* after the last hole: a real scorecard (nine holes 
   const stats = [['Fairways', fwH.length ? `${fwH.filter(h => h.fw).length}/${fwH.length}` : '—'], ['Greens', has ? `${H.filter(h => h.gir).length}/${H.length}` : '—'], ['Putts', has ? sum(H, h => h.putts || 0) : '—'], ['Long drive', drv ? `${Math.round(drv)} yds` : '—']];
   $('#result').classList.add('round');
   $('#resWord').textContent = ''; $('#resSub').textContent = '';
-  $('#resCard').innerHTML = `<div class="rc"><div class="rtop"><div class="rwho"><b>${d < 0 ? 'Under par!' : d === 0 ? 'Level par!' : 'Round done!'}</b>${course} · ${who}</div><div class="rtot"><b>${tot}</b><span>${dt}</span></div></div>${rows.map(table).join('')}<div class="rst">${stats.map(([k, v]) => `<div><i>${k}</i><b>${v}</b></div>`).join('')}</div></div>`;
+  $('#resCard').innerHTML = `<div class="rc"><div class="rtop"><div class="rwho"><b>${d < 0 ? (WAY_UNDER && d <= -WAY_UNDER ? 'Crazy low!' : 'Under par!') : d === 0 ? 'Level par!' : 'Round done!'}</b>${course} · ${who}</div><div class="rtot"><b>${tot}</b><span>${dt}</span></div></div>${rows.map(table).join('')}<div class="rst">${stats.map(([k, v]) => `<div><i>${k}</i><b>${v}</b></div>`).join('')}</div></div>`;
   $('#resBtns').innerHTML = `<button class="btn quit" data-a="quit">Home</button><button class="btn go" data-a="newround">Play again</button>`;
   { const k = d < 0 ? 'roundGood' : d <= H.length ? 'roundOk' : 'roundBad'; setTimeout(() => AV.say(line(k), { mood: k === 'roundGood' ? 'happy' : k === 'roundBad' ? 'sad' : 'neutral', moodFor: 2.5 }), 700); } }
 function holeCard(L) {
