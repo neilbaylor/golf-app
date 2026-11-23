@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v566'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v568'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -750,6 +750,10 @@ function crownAt(t, u, v, y, m) { /* is (u,v,y) inside the tree's crown, grown b
   if (t.blobs) { for (const [bx, by, bv, br, bvs = 1] of t.blobs) { const dx = u - (t.u + bx), dz = v - (t.v + bv), dy = rel - by, hr = br * .97 + m, vr = br * bvs * (dy < 0 ? 1.08 : .97) + m; if ((dx * dx + dz * dz) / (hr * hr) + dy * dy / (vr * vr) < 1) return true; } return false; }
   return Math.hypot(t.u - u, t.v - v) < t.r + m && rel < t.h + m; }
 const SPLASH_PCT = true; /* see updateHUD's lie card */
+const HUNT_PIN_ROLL = true; /* PR #21: new Hunt pins every round again (BOOT_ALL had kept Hunt 1 built, so its pin seed never re-rolled) (false = as v567) */
+const DIAL_KEEP_X = true; /* PR #23: the baked swing-dial frames survive deploys (false = a cache per build) */
+const CHIP_UP = { rise: 1.2, k: .1 }; /* Neil 11-23 (uphill chips: "the caddie could aim you a bit further"): when the green sits more than 1.2 yd above the ball, the caddie's chip/pitch/splash spread check (CHIP_FIT) also counts a strike carrying 10% short; one landing on the bank below the green and rolling back costs a lot, so the caddie takes a bit more yardage (null = as v566) */
+const FULL_STRICT = { win: .0045, tempoK: 1.2 }; /* Neil 11-23: full swings (full, power, punch) a little less forgiving on distance: the pin-high power snap .45% of the meter (was .6%), and an off-perfect tempo costs 20% more carry (same worst-case cap). Perfect strikes and the short game unchanged (null = as v567) */
 const PUTT_TOUCH = { win: .017, tight: 2.75 }; /* Neil 11-23 ("putting just a touch less forgiving"): a putt's perfect-pace window 1.7% of the meter (was 2%), and its dead-straight swipe window 4.4 deg (was 4.8) (null = as v563) */
 const SG_POWER_WIN = { pitch: .02, flop: .02, sand: .02 }; /* Neil 11-23 (an ok uphill pitch on Augusta 3 came up way short): pitch, flop and greenside bunker power within 2% of the meter of the perfect power plays as perfect (was 0.6%, as full swings still are) (null = as v562) */
 const SWING_EASE2 = true; /* Neil 11-23: pitch, flop and greenside bunker swings more forgiving again (1.25x the base windows, was 1.1x), full swings a little less (0.92x, was 0.95x) (false = as v561) */
@@ -3223,7 +3227,7 @@ function* pitchFit2G(E0, fitTo, T0) { G.pfT = true; /* (the guard looks at this 
 function* chipFitG(best, fitTo, wv) { G.cfLoss = null; G.cfLong = 0; if (!best || !best.E || best.E.tree || !G.ball) return best;
   const b = G.ball, pd = Math.hypot(PIN.u - b.u, PIN.v - b.v) || 1, fu = (PIN.u - b.u) / pd, fv = (PIN.v - b.v) / pd, al = (u, v) => (u - b.u) * fu + (v - b.v) * fv, sd = (u, v) => (u - b.u) * fv - (v - b.v) * fu;
   const LI = LIES[G.lie] || {}, sand = G.mode === 'sand', rr = LI.r && !sand ? LI.r / LI.f : 0, J = (LI.f || 1) < 1 && !sand ? CF.JL : CF.J; /* (a splash's lie range is priced in: launch() divides it back out) */
-  const D0 = G.D, a0 = Math.atan2(G.dir.u, G.dir.v), dlo = dmin(), dhi = dmax(), ks = []; { const n = rr ? 6 : 3, x0 = 1 - rr - J, x1 = 1 + J; for (let k = 0; k < n; k++) ks.push(x0 + (x1 - x0) * (k + .5) / n); } /* a perfect strike's carry factors */
+  const D0 = G.D, a0 = Math.atan2(G.dir.u, G.dir.v), dlo = dmin(), dhi = dmax(), ks = []; { const up = CHIP_UP && groundHW(PIN.u, -PIN.v) - groundHW(b.u, -b.v) > CHIP_UP.rise ? CHIP_UP.k : 0; G.cfUp = up; const n = rr ? 6 : 3 + (up ? 1 : 0), x0 = 1 - rr - J - up, x1 = 1 + J; /* CHIP_UP: up to a raised green, a strike a little light is in the spread too */ for (let k = 0; k < n; k++) ks.push(x0 + (x1 - x0) * (k + .5) / n); } /* a perfect strike's carry factors */
   const lossOf = e => e.bad ? CF.BAD : e.holed ? 0 : Math.hypot(e.a - pd, e.z) + (CF.PEN[e.lie] ?? 4);
   const M = new Map(), P = [], ev = function* (x) { const k = Math.round(x * 4000); let e = M.get(k); if (e) return e; G.D = D0; G.dir = { u: Math.sin(a0), v: Math.cos(a0) }; const E = yield* caddieEndG(x); yield; /* x: the carry, as a share of the plan's */
     e = { x, bad: !!E.tree || E.lie === 'water' || E.lie === 'ob', a: al(E.u, E.v), z: sd(E.u, E.v), lie: E.lie, holed: !!E.holed }; e.L = lossOf(e); M.set(k, e); P.push(e); P.sort((p, q) => p.x - q.x); return e; };
@@ -3747,11 +3751,11 @@ let boilTimer = 0;
 if (!RM) { let sd = 0; boilTimer = setInterval(() => { boils[sd].setAttribute('visibility', 'hidden'); sd = (sd + 1) % 3; boils[sd].setAttribute('visibility', 'visible'); }, 160); }
 const DIALBAKE = { sets: {}, img: null, want: 'base', k: 0 };
 const DIAL_KEEP = true; /* ROLLBACK: false -> the dial frames are baked again on every visit */
-let _dialC = null; const dialCache = () => _dialC || (_dialC = (async () => { try { if (!window.caches) return null; const name = 'teeparty-dial-' + BUILD; for (const k of await caches.keys()) if (k.startsWith('teeparty-dial-') && k !== name) caches.delete(k); return await caches.open(name); } catch (e) { return null; } })());
+let _dialC = null; const dialCache = () => _dialC || (_dialC = (async () => { try { if (!window.caches) return null; const name = DIAL_KEEP_X ? 'teeparty-dial-k1' : 'teeparty-dial-' + BUILD; /* DIAL_KEEP_X (PR #23): one cache for every build (each frame's key is a hash of its own art, so changed art still bakes afresh); the old per-build caches are dropped below */ for (const k of await caches.keys()) if (k.startsWith('teeparty-dial-') && k !== name) caches.delete(k); return await caches.open(name); } catch (e) { return null; } })());
 const dialKind = lie => DIAL_ART(lie) ? lie : 'base';
 function bakeDialSet(kind) {
   if (DIALBAKE.sets[kind]) return DIALBAKE.sets[kind];
-  const defs = dial.querySelector('defs').outerHTML, px = Math.ceil(240 * Math.min(3, (window.devicePixelRatio || 1) * UIS.s)), /* TABLET_FILL: baked for the dial's size on screen */ shadow = `<circle cx="114" cy="116" r="107.75" fill="${INK}"/>`;
+  const defs = dial.querySelector('defs').outerHTML, px = Math.ceil(240 * Math.min(3, (window.devicePixelRatio || 1) * (UIS.sb || UIS.s))), /* TABLET_FILL: baked for the dial's size on screen */ shadow = `<circle cx="114" cy="116" r="107.75" fill="${INK}"/>`;
   const frames = [1, 2, 3].map(sd => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="${px}" height="${px}">${defs}${shadow}${boilGroup(sd, kind === 'base' ? null : kind).replace(/visibility="hidden"/, '')}</svg>`);
   const bake = (svg, C, key) => new Promise((ok, no) => { const im = new Image(); im.onload = () => { try { const c = document.createElement('canvas'); c.width = c.height = px; c.getContext('2d').drawImage(im, 0, 0, px, px); if (c.toBlob) c.toBlob(b => { if (b && C) C.put(key, new Response(b, { headers: { 'Content-Type': 'image/png' } })).catch(() => {}); b ? ok(URL.createObjectURL(b)) : ok(c.toDataURL('image/png')); }, 'image/png'); else ok(c.toDataURL('image/png')); } catch (e) { no(e); } }; im.onerror = no; im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
   return DIALBAKE.sets[kind] = (async () => { const C = DIAL_KEEP ? await dialCache() : null; /* DIAL_KEEP: the baked frames (the same pixels every visit for a build) are kept in the Cache API, so a later visit skips the feTurbulence raster */
@@ -4305,11 +4309,12 @@ function launch(sw) {
   if (G.mode === 'putt') return launchPutt(sw);
   const tight = MODES[G.mode].tight || 1, mrisk = MODES[G.mode].risk || 1, risk = mrisk * 1.1; /* 1.1: every full-swing shot punishes flaws a touch more */
   const cl = club(), F = G.Feff, D = G.D, ps = pStar(), d = G.dir, r = right(d), h = G.height;
-  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (SG_POWER_WIN && SG_POWER_WIN[G.mode] ? SG_POWER_WIN[G.mode] : (PH_RULE ? PH_RULE.win : .009) * tight)) { p = ps; pinHigh = true; } /* SG_POWER_WIN: the short game's wider window */
+  const fullSw = G.mode === 'full' || G.mode === 'power' || G.mode === 'punch';
+  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (SG_POWER_WIN && SG_POWER_WIN[G.mode] ? SG_POWER_WIN[G.mode] : (PH_RULE ? (FULL_STRICT && fullSw ? FULL_STRICT.win : PH_RULE.win) : .009) * tight)) { p = ps; pinHigh = true; } /* SG_POWER_WIN: the short game's wider window */
   let carry = dOfP(p);
   const terr = Math.abs(Math.log(sw.ratio / TEMPO)); const tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .12 * clubK() * swingEase() ? 'good' : 'off'; const quick = sw.ratio > TEMPO; /* CLUB_DIFF: the good band scales with the club too */
   const sgT = SG_TEMPO && (G.mode === 'sand' || G.mode === 'chip' || G.mode === 'flop' || (G.mode === 'pitch' && D <= 50)) ? SG_TEMPO : null; /* SG_TEMPO: around the green */
-  carry *= 1 - clamp((terr - PERFECT) * .275 * risk * (sgT ? sgT.carry : 1), 0, .155 * risk * (sgT ? sgT.carry : 1));
+  carry *= 1 - clamp((terr - PERFECT) * .275 * (FULL_STRICT && fullSw ? FULL_STRICT.tempoK : 1) * risk * (sgT ? sgT.carry : 1), 0, .155 * risk * (sgT ? sgT.carry : 1));
   { const L = LIES[G.lie]; if (L.r) { const k = SAND_CUT && G.lie === 'sand' && G.mode !== 'sand' ? clamp(.25 + .75 * (terr - PERFECT) / .2, .25, 1) : 1; G.lieRoll = 1 - Math.random() * k * L.r / L.f; carry *= G.lieRoll; } else G.lieRoll = 1; } /* SAND_CUT: out of sand the cut follows the strike (a perfect tempo loses at most a quarter of the range, the whole range is back by an off one) */ // bad lie: comes out anywhere in its range (shown number = top)
   const hs = G.lefty ? -1 : 1; let lat = 0;
   if (terr > PERFECT) lat += (quick ? -1 : 1) * hs * Math.min(1, terr - PERFECT) * .078 * risk / att('aim', 'acc') * D * (sgT ? sgT.side : 1);
@@ -4917,7 +4922,7 @@ const AIM_TILT = { near: 56, far: 42, yaw: 24 }; /* Neil (11-20, design option 3
 function frameShort() { // tilted down the line: steeper the closer you are to the green; ball just above the controls, far end just under the HUD
   const f = new THREE.Vector3(G.dir.u, 0, -G.dir.v).normalize(), far = Math.max(G.D, pinDist()) + 1.2, k = clamp(greenGap() / 30, 0, 1), phi = (AIM_TILT ? lerp(AIM_TILT.near, AIM_TILT.far, k) : lerp(80, 52, k)) * Math.PI / 180; /* AIM_TILT */
   const B = new THREE.Vector3(G.ball.u, groundHeight(G.ball.u, G.ball.v), -G.ball.v), Tf = new THREE.Vector3(G.ball.u + G.dir.u * far, 0, -(G.ball.v + G.dir.v * far)); Tf.y = groundHeight(Tf.x, -Tf.z);
-  measure(); const ar = RECT.app, Hs = ar.height, yb = 1 - 2 * clamp((RECT.ctrlT || Hs * .65) - ar.top - 54, Hs * .3, Hs * .92) / Hs, yt = 1 - 2 * clamp((RECT.hudB || 140) - ar.top + 40, Hs * .1, Hs * .45) / Hs;
+  measure(); const ar = RECT.app, Hs = ar.height, yb = 1 - 2 * clamp((RECT.ctrlT || Hs * .65) - ar.top - 54, Hs * .3, Hs * .92) / Hs - deskLift(), yt = 1 - 2 * clamp((RECT.hudB || 140) - ar.top + 40, Hs * .1, Hs * .45) / Hs - deskLift(); /* DESK_FULL */
   const yw = AIM_TILT ? AIM_TILT.yaw * Math.PI / 180 : 0, fx = f.x * Math.cos(yw) - f.z * Math.sin(yw), fz = f.x * Math.sin(yw) + f.z * Math.cos(yw); /* AIM_TILT: from a little off to the side, so the arc's height shows */
   const d = new THREE.Vector3(fx * Math.cos(phi), -Math.sin(phi), fz * Math.cos(phi));
   _fc2.fov = 52; _fc2.aspect = camera.aspect; _fc2.updateProjectionMatrix();
@@ -4940,7 +4945,7 @@ function aimPose() {
     const f = new THREE.Vector3(G.dir.u, 0, -G.dir.v).normalize(), T = targetUV(), far = Math.max(G.D, pd) + lerp(clamp(pd * .2, .45, 2), .7, kL); // room past the hole to see the run-out (less on long ones)
     const M = new THREE.Vector3(G.ball.u + G.dir.u * far * .5, 0, -(G.ball.v + G.dir.v * far * .5)); M.y = groundHeight(M.x, -M.z);
     // frame it: ball just above the controls, the far end (target or cup) just under the top HUD
-    measure(); const ar = RECT.app, Hs = ar.height, yb = 1 - 2 * clamp((RECT.ctrlT || Hs * .65) - ar.top - 42, Hs * .3, Hs * .95) / Hs, yt = 1 - 2 * clamp(lerp(RECT.hudB || 140, (RECT.distB || RECT.hudB || 140) + 4, kL) - ar.top - 6, Hs * .1, Hs * .45) / Hs; // long putts: the hole can sit up between the HUD cards
+    measure(); const ar = RECT.app, Hs = ar.height, yb = 1 - 2 * clamp((RECT.ctrlT || Hs * .65) - ar.top - 42, Hs * .3, Hs * .95) / Hs - deskLift(), yt = 1 - 2 * clamp(lerp(RECT.hudB || 140, (RECT.distB || RECT.hudB || 140) + 4, kL) - ar.top - 6, Hs * .1, Hs * .45) / Hs - deskLift(); // long putts: the hole can sit up between the HUD cards
     const tn = Math.tan(52 * Math.PI / 360); let H = Math.max(2.3, far / Math.max(.2, (yt - yb) * tn)); const B0 = new THREE.Vector3(G.ball.u, groundHeight(G.ball.u, G.ball.v), -G.ball.v);
     const look = B0.clone().addScaledVector(f, -yb * H * tn); look.y = groundHeight(look.x, -look.z);
     { // refine against a real projection (the flat-ground estimate drifts on long, sloped putts): ball on yb, far end on yt
@@ -6359,7 +6364,7 @@ const HOLESYS = (() => {
     cur = HD; jobs.delete(HD.key); setHoleVars(HD.v); scene.add(HS.group); CULL = HS.cull; _ck.fill(NaN);
     scene.userData.outer = HS.ud.outer; scene.userData.lowClouds = HS.ud.lowClouds;
     READ.use(HS.read); MINI.use(HS.mini); flag.setHole(); CRITTERS.hole(); holeUI();
-    if (old && old !== HD) { let home = false; try { home = MENU.on; } catch (e) {} if ((home || BOOT_ALL) && old.i === NINE.first(old.cid) && (old.cid !== HD.cid || BOOT_ALL) && old.v && !(BOOT_ALL && !home && HD.cid === old.cid && HD.i === old.i)) { jobs.set(old.key, old); old.ready = true; } else { const td = performance.now(); drop(old); if (SWAPP) SWAPP.drop = performance.now() - td; } TURF.wipe(); } /* a first hole switched away from on the home screen stays built, for switching back */
+    if (old && old !== HD) { let home = false; try { home = MENU.on; } catch (e) {} if ((home || BOOT_ALL) && old.i === NINE.first(old.cid) && (old.cid !== HD.cid || BOOT_ALL) && old.v && !(BOOT_ALL && !home && HD.cid === old.cid && HD.i === old.i) && !(HUNT_PIN_ROLL && BOOT_ALL && !home && HD.cid === old.cid && old.cid === 'hunt')) { jobs.set(old.key, old); old.ready = true; } /* HUNT_PIN_ROLL (PR #21): a Hunt round moving on from hole 1 lets it go, so it builds again behind the home screen afterwards and the next round gets new pins */ else { const td = performance.now(); drop(old); if (SWAPP) SWAPP.drop = performance.now() - td; } TURF.wipe(); } /* a first hole switched away from on the home screen stays built, for switching back */
     try { const hh = CID === 'hunt' && HOLE_N === 1 ? '' : '#' + holeHash(HOLE_N); if (HOLE_URL) history.replaceState(null, '', location.pathname + location.search + hh); else sessionStorage.setItem('tp_at', hh); } catch (e) {} /* a reload lands back on this hole (HOLE_URL false: kept in the tab, not the address) */
     ahead(); }
   function ahead() { /* prebuild the next AHEAD holes of this course; on the home screen instead every other course's first hole, so picking a course swaps at once (Neil); anything else prebuilt goes */
@@ -6411,7 +6416,7 @@ const HOLESYS = (() => {
 })();
 /* the small "Loading" pill (between holes, over the end-of-hole card; on the home screen when switching course): only while the hole isn't built yet */
 function tutExit() { /* TUT_INPLACE: Tee off / Skip: the tutorial's layer goes, the course they picked swaps in (built during the tutorial, so usually at once), a new round with its fly-over */
-  const c = COURSE_DEF[store.get('course', 'hunt')] ? store.get('course', 'hunt') : 'hunt', f = NINE.first(c), T = TUTOR; TUT_ON = false; TUTOR = null; window.__TUTOR = null; try { T && T.stop(); } catch (e) { console.error(e); }
+  const c = COURSE_DEF[store.get('course', 'hunt')] ? store.get('course', 'hunt') : 'hunt', f = NINE.first(c), T = TUTOR; TUT_ON = false; TUTOR = null; window.__TUTOR = null; try { T && T.stop(); } catch (e) { console.error(e); } try { $('#playBtn').textContent = 'Play'; } catch (e) {} /* (PR #22: Tee off / Skip: the home button says Play again, as QUIT.home does) */
   G.stroke = 1; G.log = []; G.gimmeAdd = 0; HOLESYS.go(c, f, [], () => { FLY.reset(); playHole(); }, { pill: true }); }
 if (TUT_INPLACE) addEventListener('load', () => (window.requestIdleCallback || setTimeout)(() => { if (!tutWanted()) return; const go = () => { if (tutDefine()) try { HOLESYS.ahead(); } catch (e) {} }; if (tutDefine()) go(); else if (window.__tutLoad) window.__tutLoad(go); }, { timeout: 2500 })); /* TUT_INPLACE: once the page is up, a first-time player's tutorial (its file in the split build) and its hole, behind the home screen */
 const PILL = (() => { const el = $('#holePill'), bar = el.querySelector('s'), hp = el.querySelector('.hpl'); let to = 0;
@@ -6436,7 +6441,8 @@ function measure() { // control rects in their RESTING place: the bottom strip m
   RECT.ctrls = ['#dialWrap', '#strike', '#strikeCap', '#clubBtn', '#mini', '#knobPick'].map(q => { const r = $(q).getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top - ty, bottom: r.bottom - ty, width: r.width, height: r.height }; });
   RECT.ctrlT = Math.min(...RECT.ctrls.slice(0, 5).filter(r => r.height > 0).map(r => r.top));
   RECT.distB = $('#dist').getBoundingClientRect().bottom; RECT.hudB = Math.max($('#tr').getBoundingClientRect().bottom, $('#dist').getBoundingClientRect().bottom, $('#player').getBoundingClientRect().top + 138 * UIS.s); if (TUT_CAM && TUT_ON && window.__TUTOR && __TUTOR.topB) { RECT.hudB = Math.max(RECT.hudB, __TUTOR.topB); RECT.distB = Math.max(RECT.distB, __TUTOR.topB); } /* TUT_CAM: the tutorial's bubble and Skip row count as top HUD, so the pitch and putt framing puts the green below them */ RECT.app = app.getBoundingClientRect(); RECT.canvas = canvas.getBoundingClientRect(); const s = app.classList.contains('swinging') ? 1.06 : 1, d = dial.getBoundingClientRect(); RECT.dialTop = d.top - ty + d.height * (1 - 1 / s) / 2; }
-function resize() { measure(); sizeTrTop(); const r = RECT.app; renderer.setSize(r.width, r.height, false); grain.size(r.width, r.height); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); sizeTrail(); }
+function resize() { measure(); sizeTrTop(); const r = RECT.app; renderer.setSize(r.width, r.height, false); grain.size(r.width, r.height); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); if (DESK_FULL) { if (DESK_FULL.on && DESK_FULL.lift) camera.setViewOffset(r.width, r.height, 0, r.height * DESK_FULL.lift, r.width, r.height); else if (camera.view && camera.view.enabled) camera.clearViewOffset(); } /* DESK_FULL: the picture drawn higher */ sizeTrail(); }
+const deskLift = () => DESK_FULL && DESK_FULL.on && DESK_FULL.lift ? 2 * DESK_FULL.lift : 0; /* DESK_FULL: how much higher (in clip space) the view offset draws everything; a framing that aims for a screen spot takes it back out */
 window.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 200)); resize();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); sizeTrTop(); });
 buildStrikeViews();
@@ -6661,7 +6667,7 @@ const HOMESNAP = (() => {
   let seen = null, at = 0, busy = false, shown = false, offAt = 0, seamAt = 0;
   const mode = () => 'i', key = (cid, i) => cid + ':' + i + ':' + mode(); /* lifelike and sketch look nothing alike: a still per draw mode */
   function get(cid, i) { const k = key(cid, i); if (mem[k]) return mem[k]; try { const o = JSON.parse(localStorage.getItem(LS + k) || 'null'); if (o && o.url) return (mem[k] = { url: o.url, ar: o.ar, old: true }); } catch (e) {} return null; }
-  function take(k) {
+  function take(k) { if (DESK_FULL && DESK_FULL.on) return; /* DESK_FULL: home stills are taken in the home screen's box */
     const el = renderer.domElement, cw = el.clientWidth, chh = el.clientHeight; if (!cw || !chh || !el.width) return; const w = Math.max(2, Math.round(cw * SCALE)), h = Math.max(2, Math.round(chh * SCALE));
     _p.copy(camera.position); _q.copy(camera.quaternion); _l.copy(camLook); const fov = camera.fov, fn = scene.fog.near, ff = scene.fog.far, bg = scene.background; let ok = false;
     try { const D = homePath.dur, kk = (T0 % D) / D, e = kk * kk * (3 - 2 * kk) * .25 + kk * .75; homePath.pos.getPointAt(e, camera.position); homePath.look.getPointAt(e, camLook);
@@ -6772,6 +6778,7 @@ function setHome(on) {
   MENU.on = on; app.classList.toggle('atHome', on); try { HOLESYS.ahead(); } catch (e) {} /* home: other courses' first holes; playing: the next hole */
   tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = !on; if (on) { straightRef.visible = false; treeMk.visible = false; try { ttx.setTransform(1, 0, 0, 1, 0, 0); ttx.clearRect(0, 0, trTop.width, trTop.height); TT.drawn = false; trTop.style.visibility = 'hidden'; } catch (e) {} } // wipe any tracer left on the overlay from the warm-up swing
   if (on) { MENU.pr = glPR; SC.pending = Math.min(glPR, HOME_PR); } else { SC.pending = MENU.pr || GLMAX; SC.hist.length = 0; tracerDirty = true; } // softer, cheaper background behind the crisp menu
+  if (DESK_FULL && DESK_FULL.play !== !on) { DESK_FULL.play = !on; try { dispatchEvent(new Event('resize')); } catch (e) {} } /* DESK_FULL: a round fills a desktop window, home goes back in its box (every resize handler re-lays out: the class flip, the canvas, the HUD rects, the pixel cap) */
 }
 // the picked golfer on the home screen blinks, glances about and chats now and then (their own lines, their own mouth shapes)
 const HOMEAV = (() => {
