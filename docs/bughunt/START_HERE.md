@@ -1,4 +1,4 @@
-# START HERE: bug/perf hunt hand-off (v496)
+# START HERE: bug/perf hunt hand-off (v496, updated for v561)
 
 This replaces #16 (closed) as the entry point for the bug, perf and memory hunt on neilbaylor/golf-app (Tee Party). Current base: `main` @ 26836c8 (v496).
 
@@ -38,10 +38,26 @@ This replaces #16 (closed) as the entry point for the bug, perf and memory hunt 
 
 **Security:** the GitHub token used to open these PRs was pasted in chat. Revoke it.
 
+
+## Round on v561 (`main` @ f44ba59)
+#19 is ported (v497, GHOST_GROW). I read v497–v561: the game bundle's changed code, `tut.js` against the old TUTOR, `index.html`, `server.js`, `sw.js` and `split_build.py`. Course data blobs were skimmed only.
+- **#21 (Medium): Hunt pins never change between rounds.** Since v541, BOOT_ALL keeps Hunt 1 built, so the per-round pin seed never re-rolls: every Hunt round in a session has identical pins (v496 rolled a new seed each round). One-condition fix. **Decision for Neil:** Hunt 1 rebuilds behind the home screen after a Hunt round, as before v541.
+- **#22 (Low): the home button still says "Tutorial" after the in-place tutorial's Tee off / Skip** (until a reload). Tapping it plays normally. One-line fix.
+- **Checked and fine:**
+  - TERRAIN_OCC really is pixel-identical: 0 pixels differ while it hides up to 106 instances, rendered with and without it in the same task (Hunt 1 and 9; `tests/occpix.js`).
+  - PROG_PIN keeps GPU programs bounded at 37 over 34 hole loads on all three courses (`tests/progs2.js`).
+  - Random play on OslerBrook (10 holes): clean.
+  - KNOB_FAST's parser falls back safely on odd markup.
+  - The boot's synchronous build can't stall on the hatch worker.
+- **Unchecked / notes:**
+  - With BOOT_ALL, osler.js is in every boot, but the service worker still skips it when pre-caching a page. Offline then relies on the HTTP cache for it.
+  - SWING_EASE and ROUGH_LIFT change outcomes, so a mixed-version MP room (during a deploy) can classify the same swing differently.
+
 ## Decisions
 
 ### Open
-- [ ] **#19 (ghost crowns):** grow the ghost mesh to fit (#19 as written, so every crown covering the tracer stays see-through), or keep a fixed budget of 64 and draw any overflow solid? Either way, crowns stop vanishing. Default: grow.
+- [ ] **#21 (Hunt pins):** OK that Hunt 1 is built again behind the home screen after each Hunt round (as before v541), so every round gets new pins?
+- [x] **#19:** ported in v497 (GHOST_GROW).
 
 ### Standing notes from earlier PRs
 - **#17 (canvases freed after upload):** if a WebGL context-restore path is ever added, it has to repaint those canvases, or set `TEX_FREE = false`.
