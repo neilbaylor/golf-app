@@ -1,4 +1,4 @@
-# START HERE: bug/perf hunt hand-off (v496, updated for v561)
+# START HERE: bug/perf hunt hand-off (v496, updated for v561 + perf round)
 
 This replaces #16 (closed) as the entry point for the bug, perf and memory hunt on neilbaylor/golf-app (Tee Party). Current base: `main` @ 26836c8 (v496).
 
@@ -52,6 +52,15 @@ This replaces #16 (closed) as the entry point for the bug, perf and memory hunt 
 - **Unchecked / notes:**
   - With BOOT_ALL, osler.js is in every boot, but the service worker still skips it when pre-caching a page. Offline then relies on the HTTP cache for it.
   - SWING_EASE and ROUGH_LIFT change outcomes, so a mixed-version MP room (during a deploy) can classify the same swing differently.
+
+
+## Perf round on v561
+- **#23 (perf): keep the baked swing-dial frames across deploys.** The cache was named per BUILD, so every deploy re-baked identical art for every returning player: about 5–7 s of CPU at boot in test. After a simulated deploy, time to home went from 19.4 s to 13.6 s, with 0 bake. One-line change.
+- **Measured and left alone:**
+  - In play, the main thread is nearly idle. Tee view, aim drag, shot flight, next-hole build and the home screen all had **0 long tasks** (>50 ms) and only a few % of JS per frame; the frame time is the GPU (SwiftShader).
+  - On the GPU side, trees (~40 ms) and ground tiles (~35 ms) dominate a ~110 ms SwiftShader frame. Cutting them means reducing graphics, which needs Neil.
+  - Cold boot (~23 s in test) is the dial bake (#11/#23 cache it), shader compiles (SHADER_WARM, by design) and BOOT_ALL's three first holes (Neil's choice). None of it is waste I could remove without changing behaviour.
+  - TERRAIN_OCC is pixel-identical, and the GPU program count stays bounded at 37 (see the v561 round above).
 
 ## Decisions
 
