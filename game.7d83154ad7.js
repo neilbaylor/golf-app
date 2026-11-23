@@ -3735,7 +3735,7 @@ let boilTimer = 0;
 if (!RM) { let sd = 0; boilTimer = setInterval(() => { boils[sd].setAttribute('visibility', 'hidden'); sd = (sd + 1) % 3; boils[sd].setAttribute('visibility', 'visible'); }, 160); }
 const DIALBAKE = { sets: {}, img: null, want: 'base', k: 0 };
 const DIAL_KEEP = true; /* ROLLBACK: false -> the dial frames are baked again on every visit */
-let _dialC = null; const dialCache = () => _dialC || (_dialC = (async () => { try { if (!window.caches) return null; const name = 'teeparty-dial-' + BUILD; for (const k of await caches.keys()) if (k.startsWith('teeparty-dial-') && k !== name) caches.delete(k); return await caches.open(name); } catch (e) { return null; } })());
+let _dialC = null; const dialCache = () => _dialC || (_dialC = (async () => { try { if (!window.caches) return null; const name = 'teeparty-dial-k1'; /* DIAL_KEEP across deploys: one cache for every build (each frame's key is a hash of its own art, so changed art still bakes afresh); the old per-build caches are dropped below */ for (const k of await caches.keys()) if (k.startsWith('teeparty-dial-') && k !== name) caches.delete(k); return await caches.open(name); } catch (e) { return null; } })());
 const dialKind = lie => DIAL_ART(lie) ? lie : 'base';
 function bakeDialSet(kind) {
   if (DIALBAKE.sets[kind]) return DIALBAKE.sets[kind];
