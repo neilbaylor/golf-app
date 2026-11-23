@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v553'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v555'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1208,8 +1208,10 @@ function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats witho
   wisps(T * T / 70 * TK, ['#c4a456', '#b8984a', '#d2b465', '#a88d43'], 7, 15, 1.25, 0);
   wisps(T * T / 150 * TK, ['#ead08a', '#f2e0a8'], 6, 12, .95, .35);
   return g.createPattern(c, 'repeat'); }
+let S4_BG = true; /* BUILD_SLICE4: set by HOLESYS before each build step: true unless the hole is being waited for (under the pill or loader, where nobody sees a long step and fewer pauses finish sooner) */
+const BUILD_SLICE4 = true; /* perf548 (Neil 11-22, Puffy lessons: one-off work in slices under ~a frame): the background hole build (next hole while you line up a shot, other courses' first holes behind the home screen) still had single steps of 30-125 ms at 4x CPU (one OB area's hatching plus all the roads, a green's whole texture, the land round the map, a fescue patch, an Augusta fairway, the pine-straw mottling). Those runs of separate draws now pause between draws, so each frame's slice stays near the build's budget. Each painting decides as it starts: only a build in the background pauses more (one being waited for runs as before, so loads don't get longer). The same draws in the same order with the same random numbers: the same pictures. false = as v548 */
 const MAP_FILL_BANDS = 4; /* perf508: the map's first paint (its base green over the whole canvas, 2-7 million pixels) was one ~13-18 ms fill inside the build's first map slice (?prof 'courseSteps (1st slice)': 46 ms on OslerBrook 2, 24 on Augusta 12 on this desktop). Now the same fill in this many bands of whole rows, a slice each: the same pixels. 1 = in one go, as v508 */
-function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0; /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
+function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0, S4 = BUILD_SLICE4 && chunk && S4_BG; /* (BUILD_SLICE4) */ /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
   let needleP = null; /* one tile per painting */
   const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined); /* COURSE_CPU */
   const R = rng(7), ppy = MAP.ppy; const X = u => (u - MAP.U0) * ppy, Y = v => (MAP.V1 - v) * ppy;
@@ -1224,13 +1226,13 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   // rough
   const AK = AUGD ? MAP.W * MAP.H / (1536 * 2752) : 1; /* Augusta's maps are bigger: the same density of marks */
   g.fillStyle = '#5c9c3a'; if (chunk && MAP_FILL_BANDS > 1) for (let k = 0; k < MAP_FILL_BANDS; k++) { const y0 = Math.floor(MAP.H * k / MAP_FILL_BANDS), y1 = Math.floor(MAP.H * (k + 1) / MAP_FILL_BANDS); g.fillRect(0, y0, MAP.W, y1 - y0); yield flushCv(cv); } else g.fillRect(0, 0, MAP.W, MAP.H); /* MAP_FILL_BANDS */
-  for (let i = 0; i < 900 * AK; i++) { g.fillStyle = R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 10 + R() * 60, 0, 7); g.fill(); if (brk(150)) yield flushCv(cv); }
+  for (let i = 0; i < 900 * AK; i++) { g.fillStyle = R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 10 + R() * 60, 0, 7); g.fill(); if (brk(S4 ? 50 : 150)) yield flushCv(cv); }
   const hatch = (n, col, lw) => { g.beginPath(); for (let i = 0; i < n; i++) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
   let async = false; if (chunk && HATCH_ASYNC && HATCHW.ok) { flushCv(cv); let turned = false; queueMicrotask(() => { turned = true; }); yield HATCH_WAIT; async = turned; } /* HATCH_ASYNC: in a build run a slice per frame (not straight through)? */
   else yield (chunk && flushCv(cv));
   if (async) { /* HATCH_ASYNC: the same strokes (the same random numbers in the same order), drawn by the worker */
     const segs = n => { const s = new Float64Array(Math.ceil(n) * 4); for (let i = 0, k = 0; i < n; i++, k += 4) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; s[k] = x; s[k + 1] = y; s[k + 2] = x + Math.cos(a) * l; s[k + 3] = y + Math.sin(a) * l; } return s; };
-    const L = [{ s: segs(16000 * AK), col: 'rgba(25,75,25,.25)', lw: 1.2 }, { s: segs(6000 * AK), col: 'rgba(180,225,110,.2)', lw: 1 }];
+    const L = [{ s: segs(16000 * AK), col: 'rgba(25,75,25,.25)', lw: 1.2 }, { s: segs(6000 * AK), col: 'rgba(180,225,110,.2)', lw: 1 }]; if (S4) yield; /* BUILD_SLICE4 */
     if (HATCH_LEAN) { const W = cv.width, H = cv.height, K = HATCH_TILES; /* band by band, one at a time; one the worker can't do is done here the same way */
       for (let k = 0; k < K; k++) { const y0 = Math.floor(H * k / K), y1 = Math.floor(H * (k + 1) / K), t0 = Math.max(0, y0 - HATCH_PAD), t1 = Math.min(H, y1 + HATCH_PAD), j = HATCHW.ok ? HATCHW.run(cv, L, { y: t0, h: t1 - t0 }) : { state: 2 };
         try { while (j.state === 0) { yield HATCH_WAIT; if (j.state === 0 && (!j.turned || performance.now() - j.t0 > 8000)) j.drop(); } } finally { if (j.state === 0) j.drop(); }
@@ -1256,12 +1258,12 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   if (FESCUE && AUGD && AUGD.fescue) { const Rf = rng(4041), tile = fescueTile(g), lx = Math.cos(-1.2), ly = Math.sin(-1.2); /* (lx, ly): the way the grass leans on the map; the waves run across it */
     for (const q of AUGD.fescue) { const P = q.P; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; P.forEach(([u, v]) => { x0 = Math.min(x0, X(u)); x1 = Math.max(x1, X(u)); y0 = Math.min(y0, Y(v)); y1 = Math.max(y1, Y(v)); });
       g.save(); g.lineJoin = 'round'; path(P); g.lineWidth = 2.2 * ppy; g.strokeStyle = 'rgba(22,62,22,.34)'; g.stroke(); g.restore(); /* the shadow of the tall edge */
-      g.save(); path(P); g.clip(); { const ox = Rf() * 384, oy = Rf() * 384; g.save(); g.translate(ox, oy); g.fillStyle = tile; g.fillRect(x0 - ox - 2, y0 - oy - 2, x1 - x0 + 4, y1 - y0 + 4); g.restore(); }
+      g.save(); path(P); g.clip(); { const ox = Rf() * 384, oy = Rf() * 384; g.save(); g.translate(ox, oy); g.fillStyle = tile; g.fillRect(x0 - ox - 2, y0 - oy - 2, x1 - x0 + 4, y1 - y0 + 4); g.restore(); } if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
       { const n = Math.ceil((x1 - x0) * (y1 - y0) / (ppy * ppy * (FESCUE_THICK ? 130 : 220))), SW = FESCUE_THICK ? 1.5 : 1; g.lineCap = 'round'; /* (FESCUE_THICK: more swaths, and stronger) */ /* wind waves: long, soft, gently wavy swaths, lighter gold and darker olive, across the lean */
         for (let i = 0; i < n; i++) { const cx = x0 + Rf() * (x1 - x0), cy = y0 + Rf() * (y1 - y0), L = (14 + Rf() * 26) * ppy, w = (2.5 + Rf() * 4.5) * ppy, ph = Rf() * 6.28, lt = Rf() < .55; g.beginPath();
           for (let k = 0; k <= 12; k++) { const s = (k / 12 - .5) * L, o = Math.sin(k / 12 * 6.28 + ph) * w * .5, px = cx + ly * -s + lx * o, py = cy + lx * s + ly * o; k ? g.lineTo(px, py) : g.moveTo(px, py); }
-          g.strokeStyle = lt ? `rgba(246,226,156,${.26 * SW})` : `rgba(84,108,44,${.22 * SW})`; g.lineWidth = w; g.stroke(); } }
-      g.restore();
+          g.strokeStyle = lt ? `rgba(246,226,156,${.26 * SW})` : `rgba(84,108,44,${.22 * SW})`; g.lineWidth = w; g.stroke(); if (S4 && brk(40)) yield flushCv(cv); } }
+      g.restore(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
       { /* the rim: a fringe of inked blades along the outline, leaning with the rest, standing over the mown grass */
         const ink = [], col = []; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], L = Math.hypot(X(b[0]) - X(a[0]), Y(b[1]) - Y(a[1])); for (let d = 0; d < L; d += .55 * ppy) { const t = d / L, px = X(a[0]) + (X(b[0]) - X(a[0])) * t + (Rf() - .5) * .5 * ppy, py = Y(a[1]) + (Y(b[1]) - Y(a[1])) * t + (Rf() - .5) * .5 * ppy, an = -1.2 + (Rf() - .5) * .6, l = (.8 + Rf() * .9) * ppy, bl = [px, py, px + Math.cos(an) * l, py + Math.sin(an) * l]; ink.push(bl); col.push(bl); } }
         const st = (L, c, w) => { g.beginPath(); L.forEach(([a, b, e, d]) => { g.moveTo(a, b); g.lineTo(e, d); }); g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'round'; g.stroke(); };
@@ -1272,12 +1274,12 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
     const area = (x1 - x0) * (y1 - y0), strokeSet = (list, col, lw) => { g.beginPath(); list.forEach(([a, b, e, d]) => { g.moveTo(a, b); g.lineTo(e, d); }); g.strokeStyle = col; g.lineWidth = lw; g.lineCap = 'round'; g.stroke(); };
     { const spill = []; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], L = Math.hypot(X(b[0]) - X(a[0]), Y(b[1]) - Y(a[1])); for (let d = 0; d < L; d += 2.2) { const t = d / L, x = X(a[0]) + (X(b[0]) - X(a[0])) * t + (R() - .5) * 1.6 * ppy, y = Y(a[1]) + (Y(b[1]) - Y(a[1])) * t + (R() - .5) * 1.6 * ppy, an = R() * 6.283, l = 3 + R() * 4; spill.push([x, y, x + Math.cos(an) * l, y + Math.sin(an) * l]); } }
       strokeSet(spill, 'rgba(210,148,78,.75)', 1.1); }
-    path(P); g.fillStyle = '#c08045'; g.fill();
+    path(P); g.fillStyle = '#c08045'; g.fill(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
     g.save(); path(P); g.clip();
-    for (let i = 0; i < area / 900; i++) { const x = x0 + R() * (x1 - x0), y = y0 + R() * (y1 - y0), r = 10 + R() * 26; g.fillStyle = R() < .55 ? 'rgba(110,60,25,.16)' : 'rgba(242,192,115,.16)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); if (brk(120)) yield flushCv(cv); }
+    for (let i = 0; i < area / 900; i++) { const x = x0 + R() * (x1 - x0), y = y0 + R() * (y1 - y0), r = 10 + R() * 26; g.fillStyle = R() < .55 ? 'rgba(110,60,25,.16)' : 'rgba(242,192,115,.16)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); if (brk(S4 ? 40 : 120)) yield flushCv(cv); }
     /* the needles: the same strokes, density and colours, painted once into a seamless tile and laid over each bed from a random offset
        (Augusta's beds run to 40,000 sq yds: stroked one by one that was millions of strokes and seconds of load) */
-    const tile = needleP || (needleP = needleTile(g)), ox = R() * 384, oy = R() * 384; g.save(); g.translate(ox, oy); g.fillStyle = tile; g.fillRect(x0 - ox - 2, y0 - oy - 2, x1 - x0 + 4, y1 - y0 + 4); g.restore();
+    const tile = needleP || (needleP = needleTile(g)), ox = R() * 384, oy = R() * 384; g.save(); g.translate(ox, oy); g.fillStyle = tile; g.fillRect(x0 - ox - 2, y0 - oy - 2, x1 - x0 + 4, y1 - y0 + 4); g.restore(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
     for (let i = 0; i < area / 2500; i++) { const x = x0 + R() * (x1 - x0), y = y0 + R() * (y1 - y0); g.save(); g.translate(x, y); g.rotate(R() * 6.28); g.fillStyle = '#6e3f1d'; g.beginPath(); g.ellipse(0, 0, 1.7, 2.7, 0, 0, 7); g.fill(); { g.strokeStyle = 'rgba(29,42,26,.8)'; g.lineWidth = .8; g.stroke(); } g.restore(); if (brk(150)) yield flushCv(cv); }
     g.restore(); sketch(P, 2, .45); yield (chunk && flushCv(cv)); }
   yield (chunk && flushCv(cv));
@@ -1299,7 +1301,7 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   g.restore(); sketch(wp, 3, .9);
   }
   else { /* Augusta: the other holes' greens, then Rae's Creek: a grassy bank, deep blue in the middle and lighter at the edges, ripples, an inked rim */
-    for (const q of AUGD.og) { g.save(); g.lineJoin = 'round'; path(q.P); g.lineWidth = 5.2 * ppy; g.strokeStyle = '#8fd255'; g.stroke(); path(q.P); g.fillStyle = '#a9ea6d'; g.fill(); g.restore(); sketch(q.P, 2, .55); }
+    for (const q of AUGD.og) { g.save(); g.lineJoin = 'round'; path(q.P); g.lineWidth = 5.2 * ppy; g.strokeStyle = '#8fd255'; g.stroke(); path(q.P); g.fillStyle = '#a9ea6d'; g.fill(); g.restore(); sketch(q.P, 2, .55); } if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
     for (const q of AUGD.water) { const P = q.P; g.save(); g.lineJoin = 'round'; path(P); g.lineWidth = 2.6 * ppy; g.strokeStyle = '#9fd36a'; g.stroke(); g.restore();
       const OSW = OSLER_DEV && AUGD.course === 'osler'; path(P); g.fillStyle = OSW ? '#1d4566' : '#3fb2e0'; g.fill(); g.save(); path(P); g.clip(); g.lineJoin = 'round';
       path(P); g.lineWidth = 3.6 * ppy; g.strokeStyle = OSW ? 'rgba(52,104,140,.8)' : 'rgba(115,211,242,.8)'; g.stroke(); path(P); g.lineWidth = 1.6 * ppy; g.strokeStyle = OSW ? '#3f7aa3' : '#73d3f2'; g.stroke();
@@ -1312,7 +1314,7 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
         g.globalAlpha = .5; g.strokeStyle = INK; g.lineWidth = 1.2; g.stroke(); g.globalAlpha = 1;
         for (const [r, w, a] of [[2.3, 2.4, .9], [3.3, 1.9, .7], [4.5, 1.5, .5]]) { g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = w;
           for (let k = 0; k < 7; k++) { const a0 = k / 7 * 6.283 + rr() * .5, a1 = a0 + .5 + rr() * .35; g.beginPath(); g.arc(fx, fy, r * ppy * (.94 + rr() * .12), a0, a1); g.stroke(); } }
-        g.restore(); } } }
+        g.restore(); } if (S4) yield flushCv(cv); } } /* BUILD_SLICE4: after each water */
   yield (chunk && flushCv(cv));
   // fairway
   if (!AUGD) {
@@ -1332,13 +1334,13 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   yield (chunk && flushCv(cv));
   if (AUGD && COURSE_DEF[CID].obGrey) for (const q of AUGD.ob) { /* out of bounds (houses, roads): a plain grey area, faintly hatched, inked round */
     path(q.P); g.fillStyle = '#bdbab3'; g.fill(); g.save(); path(q.P); g.clip(); g.beginPath(); const [u0, u1, v0, v1] = q.b;
-    for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; g.stroke(); g.restore(); sketch(q.P, 2.2, .6); }
+    for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; g.stroke(); g.restore(); sketch(q.P, 2.2, .6); if (S4) yield flushCv(cv); } /* BUILD_SLICE4: after each area */
   // the practice green (and the cart paths: out of bounds left of the main one)
   if (!AUGD) { path(PRACTICE); g.fillStyle = '#8fd255'; g.fill(); const pg = PRACTICE.map(([u, v]) => { const cx = -92, cy = 235; return [cx + (u - cx) * .9, cy + (v - cy) * .92]; });
     path(pg); g.fillStyle = '#a9ea6d'; g.fill(); sketch(PRACTICE, 2.2, .7); }
   const road = (P, w) => { g.save(); g.lineJoin = g.lineCap = 'round'; path(P, false); g.lineWidth = (w + .9) * ppy; g.strokeStyle = 'rgba(29,42,26,.85)'; g.stroke();
     path(P, false); g.lineWidth = w * ppy; g.strokeStyle = '#d9d3c4'; g.stroke(); path(P, false); g.lineWidth = w * .25 * ppy; g.strokeStyle = 'rgba(255,255,255,.35)'; g.setLineDash([3 * ppy, 4 * ppy]); g.stroke(); g.restore(); };
-  if (!AUGD) { road(PATH, 2.4); road(PATH2, 2.2); } else for (const P of AUGD.PATHS) road(P, 2.2); /* Augusta's cart paths: just paths, no out of bounds */
+  if (S4) yield flushCv(cv); /* BUILD_SLICE4 */ if (!AUGD) { road(PATH, 2.4); road(PATH2, 2.2); } else for (const P of AUGD.PATHS) road(P, 2.2); /* Augusta's cart paths: just paths, no out of bounds */
   if (AUG_PATH_BRIDGE && AUGD && AUGD.course === 'augusta' && AUGD.water.length) { /* AUG_PATH_BRIDGE: where an Augusta cart path crosses the water and no 3D bridge (AUGD.BRIDGE) carries it (OSM bridge=yes ways), the path is painted as a bridge: its shadow on the water, inked stone parapets either side, the path's own deck on top. Painted into the map: no draw calls */
     const wet = (u, v) => AUGD.water.some(q => inPB(u, v, q)), BRS = (AUGD.BRIDGE || []).map(B => [B.pts[0], B.pts[B.pts.length - 1]]);
     const nearBr = (u, v) => BRS.some(([a, b]) => { const bx = b[0] - a[0], by = b[1] - a[1], t = clamp(((u - a[0]) * bx + (v - a[1]) * by) / (bx * bx + by * by || 1), 0, 1); return Math.hypot(u - a[0] - bx * t, v - a[1] - by * t) < 3; });
@@ -1371,7 +1373,7 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
       g.fillStyle = 'rgba(29,42,26,.85)'; g.save(); g.translate(.9, 1.1); g.fill(); g.restore(); g.fillStyle = c; g.fill(); g.beginPath(); g.arc(X(u - r * .25), Y(v + r * .3), r * .38 * ppy, 0, 7); g.fillStyle = 'rgba(255,255,255,.14)'; g.fill(); };
     const cs = ['#4f8f36', '#5c9c3c', '#467f31', '#6aa846'];
     for (let i = 0; i < 520 * k; i++) { const s = R() * B.L, d = Math.pow(R(), 1.3) * 14, p = B.at(s, 1.2 + d); clump(p[0], p[1], (1 - d / 24) * (.8 + R() * 1.0), cs[(R() * cs.length) | 0]); if (brk(130)) yield flushCv(cv); } /* scrub, thickest just under the edge */
-    g.restore();
+    g.restore(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
     path(B.band(16, 23)); g.fillStyle = '#e4dccb'; g.fill(); path(B.band(21, 23)); g.fillStyle = 'rgba(79,159,208,.75)'; g.fill(); /* the beach and the wet edge of the lake */
     for (let pass = 0; pass < 2; pass++) { g.beginPath(); for (let s = 0; s <= B.L + .01; s += 2) { const p = B.at(s, .4), x = X(p[0]) + (R() - .5) * (pass ? 1.6 : .5), y = Y(p[1]); s === 0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineWidth = pass ? 1.4 : 2.6; g.strokeStyle = `rgba(29,42,26,${pass ? .38 : .85})`; g.lineJoin = 'round'; g.stroke(); } } /* the edge of the bluff */
   if (!AUGD) { const band = (a, b) => { const A = [], B = []; for (let v = -40; v <= 390; v += 2) { A.push([bluffU(v) + a, v]); B.push([bluffU(v) + b, v]); } return A.concat(B.reverse()); };
@@ -1382,7 +1384,7 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
       g.fillStyle = 'rgba(29,42,26,.85)'; g.save(); g.translate(.9, 1.1); g.fill(); g.restore(); g.fillStyle = c; g.fill(); g.beginPath(); g.arc(X(u - r * .25), Y(v + r * .3), r * .38 * ppy, 0, 7); g.fillStyle = 'rgba(255,255,255,.14)'; g.fill(); };
     const cs = ['#4f8f36', '#5c9c3c', '#467f31', '#6aa846'];
     for (let i = 0; i < 520; i++) { const v = -40 + R() * 430, d = Math.pow(R(), 1.3) * 14, u = bluffU(v) + 1.2 + d; clump(u, v, (1 - d / 24) * (.8 + R() * 1.0), cs[(R() * cs.length) | 0]); if (brk(130)) yield flushCv(cv); } // scrub, thickest just under the edge
-    g.restore();
+    g.restore(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
     path(band(16, 23)); g.fillStyle = '#e4dccb'; g.fill(); path(band(21, 23)); g.fillStyle = 'rgba(79,159,208,.75)'; g.fill(); // the beach and the wet edge of the lake
     for (let pass = 0; pass < 2; pass++) { g.beginPath(); for (let v = -40; v <= 390; v += 2) { const x = X(bluffU(v) + .4) + (R() - .5) * (pass ? 1.6 : .5), y = Y(v); v === -40 ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineWidth = pass ? 1.4 : 2.6; g.strokeStyle = `rgba(29,42,26,${pass ? .38 : .85})`; g.lineJoin = 'round'; g.stroke(); } } // the edge of the bluff (an open line: no closing stroke across the map)
   yield (chunk && flushCv(cv));
@@ -1397,13 +1399,13 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   g.save(); path(gp); g.clip(); for (let k = 9; k > 0; k--) { path(GREEN.sm ? elPts(GREEN, 64, k / 9) : elPts(Object.assign({}, GREEN, { rx: GREEN.rx * k / 9, ry: GREEN.ry * k / 9 }), 64)); g.fillStyle = k % 2 ? 'rgba(255,255,255,.07)' : 'rgba(40,120,40,.05)'; g.fill(); } g.restore(); sketch(gp, 2.6, .85);
   yield (chunk && flushCv(cv));
   // bunkers
-  BUNKERS.forEach(b => {
+  const bunk = b => { /* BUILD_SLICE4: (was BUNKERS.forEach's callback) */
     const bp = elPts(b, 180), OSB = OSLER_DEV && AUGD && AUGD.course === 'osler'; if (b.sm) { g.save(); g.lineJoin = 'round'; path(bp); g.lineWidth = (OSB ? 2.8 : 5.4) * ppy; g.strokeStyle = OSB ? 'rgba(46,96,34,.2)' : 'rgba(46,96,34,.35)'; g.stroke(); path(bp); g.lineWidth = (OSB ? 1.4 : 2.6) * ppy; g.strokeStyle = '#8fcf55'; g.stroke(); g.restore(); } else { path(elPts(b, 180, 1.3)); g.fillStyle = 'rgba(46,96,34,.35)'; g.fill(); path(elPts(b, 180, 1.14)); g.fillStyle = '#8fcf55'; g.fill(); } /* the raised grass lip, with a shadow falling off it */
     path(bp); g.fillStyle = '#f6ecd4'; g.fill(); g.save(); path(bp); g.clip();
     g.fillStyle = 'rgba(205,180,130,.45)'; for (let i = 0; i < 160; i++) { g.beginPath(); g.arc(X(b.c[0] + (R() - .5) * b.rx * 2.4), Y(b.c[1] + (R() - .5) * b.ry * 2.4), .6 + R() * .9, 0, 7); g.fill(); }
     g.lineWidth = (OSB ? 1.4 : 2.4) * ppy; g.strokeStyle = OSB ? 'rgba(176,146,96,.25)' : 'rgba(176,146,96,.42)'; g.translate(0, (OSB ? 1.2 : 2.2) * ppy); path(bp); g.stroke(); g.restore(); /* the shaded face under the far lip */
     sketch(bp, 3, .9);
-  });
+  }; if (S4) for (const b of BUNKERS) { bunk(b); if (brk(3)) yield flushCv(cv); } else BUNKERS.forEach(bunk);
   yield (chunk && flushCv(cv));
   // tree shadows (hatched)
   const sd = [0.62, -0.55];
@@ -1447,7 +1449,7 @@ function groundMat(map, scale) {
 // the green + fringe get their own hi-res painting (the course map is only ~5.5 px/yd): ~21 px/yd, drawn over the course in the ground shader
 const GREEN_STYLE = 'BC'; // A stripes · B checkerboard + sticker rim · C crown glow, mower rings, stitched fringe ('' = off)
 function greenTex() { const it = greenTexG(false); for (;;) { const r = it.next(); if (r.done) return r.value; } } /* all at once */
-function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS sets GREENTEX before the ground's material is made). BUILD_CHUNK3 (ck): rasterized and handed back a slice at a time */
+function* greenTexG(ck) { if (!GREEN_STYLE) return null; const S4 = BUILD_SLICE4 && ck && S4_BG; /* (BUILD_SLICE4) */ /* (per hole: HOLESYS sets GREENTEX before the ground's material is made). BUILD_CHUNK3 (ck): rasterized and handed back a slice at a time */
   const fp = elPts(FRINGE, 128, 1.04); let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9; for (const [u, v] of fp) { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
   const S = 1024, ppy = S / Math.max(u1 - u0, v1 - v0), cv = document.createElement('canvas'); cv.width = Math.ceil((u1 - u0) * ppy); cv.height = Math.ceil((v1 - v0) * ppy);
   const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined), R = rng(21), X = u => (u - u0) * ppy, Y = v => (v1 - v) * ppy; /* COURSE_CPU */
@@ -1456,7 +1458,7 @@ function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS s
   const FR = elPts(FRINGE, 160), GR = elPts(GREEN, 160), gc = GREEN.c, GRs = k => GREEN.sm ? elPts(GREEN, 0, k) : elPts(Object.assign({}, GREEN, { rx: GREEN.rx * k, ry: GREEN.ry * k }), 160);
   const st = GREEN_STYLE;
   // fringe collar
-  path(FR); g.fillStyle = '#8fd255'; g.fill();
+  path(FR); g.fillStyle = '#8fd255'; g.fill(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
   g.save(); path(FR); g.clip();
   if (st.includes('A')) { g.beginPath(); for (let i = 0; i < 2600; i++) { const x = R() * cv.width, y = R() * cv.height, a = -1.05 + (R() - .5) * .4, l = (.25 + R() * .3) * ppy; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(40,110,40,.22)'; g.lineWidth = .06 * ppy; g.stroke(); }
   if (st.includes('B') && !st.includes('C')) { for (let i = 0; i < 2200; i++) { g.fillStyle = R() < .5 ? 'rgba(40,110,40,.22)' : 'rgba(220,255,170,.25)'; g.beginPath(); g.arc(R() * cv.width, R() * cv.height, (.05 + R() * .07) * ppy, 0, 7); g.fill(); if (ck && i % 550 === 549) yield flushCv(cv); } }
@@ -1466,12 +1468,12 @@ function* greenTexG(ck) { if (!GREEN_STYLE) return null; /* (per hole: HOLESYS s
   // putting surface
   path(GR);
   if (st.includes('C')) { const gg = g.createRadialGradient(X(gc[0]), Y(gc[1]), 0, X(gc[0]), Y(gc[1]), GREEN.ry * 1.3 * ppy); gg.addColorStop(0, '#bdf283'); gg.addColorStop(1, '#9bdd60'); g.fillStyle = gg; } else g.fillStyle = '#a9ea6d';
-  g.fill(); g.save(); path(GR); g.clip();
+  g.fill(); g.save(); path(GR); g.clip(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
   if (st.includes('A')) { g.translate(X(gc[0]), Y(gc[1])); g.rotate(-.6); const w = 2.3 * ppy; for (let k = -20; k < 20; k++) { g.fillStyle = k % 2 ? 'rgba(255,255,255,.11)' : 'rgba(40,120,40,.07)'; g.fillRect(k * w, -60 * ppy, w, 120 * ppy); } g.setTransform(1, 0, 0, 1, 0, 0); }
-  if (st.includes('B')) { g.translate(X(gc[0]), Y(gc[1])); g.rotate(.5); const w = 2.6 * ppy; for (let a = -14; a < 14; a++) for (let b = -14; b < 14; b++) { const t = ((a + b) % 2 + 2) % 2, u = (a % 2 + 2) % 2; g.fillStyle = t ? (u ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.06)') : (u ? 'rgba(40,120,40,.06)' : 'rgba(40,120,40,.02)'); g.fillRect(a * w, b * w, w, w); } g.setTransform(1, 0, 0, 1, 0, 0); }
-  if (st.includes('C')) { for (let k = .1; k < 1; k += .085) { path(GRs(k)); g.strokeStyle = 'rgba(255,255,255,.13)'; g.lineWidth = .14 * ppy; g.stroke(); } }
+  if (S4) yield flushCv(cv); /* BUILD_SLICE4 */ if (st.includes('B')) { g.translate(X(gc[0]), Y(gc[1])); g.rotate(.5); const w = 2.6 * ppy; for (let a = -14; a < 14; a++) for (let b = -14; b < 14; b++) { const t = ((a + b) % 2 + 2) % 2, u = (a % 2 + 2) % 2; g.fillStyle = t ? (u ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.06)') : (u ? 'rgba(40,120,40,.06)' : 'rgba(40,120,40,.02)'); g.fillRect(a * w, b * w, w, w); } g.setTransform(1, 0, 0, 1, 0, 0); } /* (BUILD_SLICE4: no pause inside the turned checkerboard: one there moved two pixels by one level on OslerBrook 1's green) */
+  if (S4) yield flushCv(cv); /* BUILD_SLICE4 */ if (st.includes('C')) { for (let k = .1; k < 1; k += .085) { path(GRs(k)); g.strokeStyle = 'rgba(255,255,255,.13)'; g.lineWidth = .14 * ppy; g.stroke(); } }
   // fine grain so it never looks flat up close
-  for (let i = 0; i < 2500; i++) { g.fillStyle = R() < .5 ? 'rgba(40,120,40,.06)' : 'rgba(255,255,255,.07)'; g.fillRect(R() * cv.width, R() * cv.height, .12 * ppy, .12 * ppy); if (ck && i % 625 === 624) yield flushCv(cv); }
+  for (let i = 0; i < 2500; i++) { g.fillStyle = R() < .5 ? 'rgba(40,120,40,.06)' : 'rgba(255,255,255,.07)'; g.fillRect(R() * cv.width, R() * cv.height, .12 * ppy, .12 * ppy); if (ck && i % (S4 ? 250 : 625) === (S4 ? 249 : 624)) yield flushCv(cv); }
   g.restore();
   if (st !== 'A') { path(GRs(.965)); g.strokeStyle = 'rgba(255,252,235,.55)'; g.lineWidth = .16 * ppy; g.stroke(); } // sticker rim highlight
   if (st.includes('C')) { path(GRs(1.075)); g.setLineDash([.35 * ppy, .35 * ppy]); g.strokeStyle = 'rgba(29,42,26,.3)'; g.lineWidth = .08 * ppy; g.stroke(); g.setLineDash([]); }
@@ -1519,7 +1521,8 @@ function skirtGeo(geo, ed, D) { /* GROUND_SKIRT: a strip hanging down from a gro
       const bx = pa.getX(b) - pa.getX(a), by = pa.getY(b) - pa.getY(a), out = (by * -D) * ox - (bx * -D) * oy; /* (b - a) x (a' - a), against the outward side: front faces outward */
       if (out > 0) idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2); else idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3); } }
   if (!n) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nms, 3)); g.setIndex(idx); g.computeBoundingSphere(); return g; }
-function buildOuter() { /* the land round the painted map (per hole) */
+function buildOuter() { const it = buildOuterG(false); while (!it.next().done); } /* all at once */
+function* buildOuterG(ck) { /* the land round the painted map (per hole). BUILD_SLICE4 (ck): handed back a few rings at a time (the same numbers) */
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); const R = rng(9);
   g.fillStyle = '#5fa23d'; g.fillRect(0, 0, 256, 256);
   for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(40,110,40,${.05 + R() * .06})`; g.beginPath(); g.arc(R() * 256, R() * 256, 10 + R() * 30, 0, 7); g.fill(); }
@@ -1531,9 +1534,9 @@ function buildOuter() { /* the land round the painted map (per hole) */
     corner([u0, v0], -Math.PI); side([u0, v0], [u1, v0], [0, -1]); corner([u1, v0], -Math.PI / 2); side([u1, v0], [u1, v1], [1, 0]); corner([u1, v1], 0); side([u1, v1], [u0, v1], [0, 1]); corner([u0, v1], Math.PI / 2); side([u0, v1], [u0, v0], [-1, 0]);
     const eh = base.map(([u, v]) => groundHeight(u, v)), far = eh.slice().sort((a, b) => a - b)[eh.length >> 1]; AUGD.hFar = far;
     const K = AUGD.lake, D = K ? [0, 3, 8, 16, 28, 45, 70, 110, 150, 190, 230, 270, 310, 350, 400, 450, 520, 600, 700, 1200, 2000] /* the Hunt: closer rings out to where the land breaks off at the bluff */ : [0, 3, 8, 16, 28, 45, 70, 110, 170, 260, 420, 700, 1200, 2000], n = base.length, pos = new Float32Array(n * D.length * 3), uv = new Float32Array(n * D.length * 2), idx = []; let lo = 1e9;
-    D.forEach((d, r) => base.forEach(([u, v, nu, nv], i) => { const pu = u + nu * d, pv = v + nv * d, hl = lerp(AUGD.hAt(pu, pv), far, smooth(20, 380, d)), ks = K ? K.s(pu, pv) : -1e9, h = r ? (AUGD.bluff && AUGD.bluff.past(pu, pv) > 23 && (!K || ks > -60) ? Math.min(hl, AUGD.bluff.lakeY - .8) : LAKE_OPT === 'D' ? (ks > -12 ? lerp(hl, (AUGD.bluff ? AUGD.bluff.lakeY : K.y) - 2, Math.min(1, (ks + 12) / 60)) : hl) : ks > 0 ? lerp(hl, (AUGD.bluff ? AUGD.bluff.lakeY : K.y) - 2, Math.min(1, ks / 110)) : hl) : eh[i], /* past a bluff's beach: under the lake. The Hunt's lake line: the land falls away from the lip in a straight bank (linear in yards past the lip, so the waterline runs straight across the rings) */ y = h - .06 - Math.min(d, 6) * .01, k = r * n + i; lo = Math.min(lo, y); pos.set([pu, y, -pv], k * 3); uv.set([pu, pv], k * 2); }));
+    if (ck) yield; const ring = (d, r) => base.forEach(([u, v, nu, nv], i) => { const pu = u + nu * d, pv = v + nv * d, hl = lerp(AUGD.hAt(pu, pv), far, smooth(20, 380, d)), ks = K ? K.s(pu, pv) : -1e9, h = r ? (AUGD.bluff && AUGD.bluff.past(pu, pv) > 23 && (!K || ks > -60) ? Math.min(hl, AUGD.bluff.lakeY - .8) : LAKE_OPT === 'D' ? (ks > -12 ? lerp(hl, (AUGD.bluff ? AUGD.bluff.lakeY : K.y) - 2, Math.min(1, (ks + 12) / 60)) : hl) : ks > 0 ? lerp(hl, (AUGD.bluff ? AUGD.bluff.lakeY : K.y) - 2, Math.min(1, ks / 110)) : hl) : eh[i], /* past a bluff's beach: under the lake. The Hunt's lake line: the land falls away from the lip in a straight bank (linear in yards past the lip, so the waterline runs straight across the rings) */ y = h - .06 - Math.min(d, 6) * .01, k = r * n + i; lo = Math.min(lo, y); pos.set([pu, y, -pv], k * 3); uv.set([pu, pv], k * 2); }); if (ck) for (let r = 0; r < D.length; r++) { ring(D[r], r); if (r % 3 === 2) yield; } else D.forEach(ring); /* BUILD_SLICE4 */
     for (let r = 0; r < D.length - 1; r++) for (let i = 0; i < n; i++) { const a = r * n + i, b = r * n + (i + 1) % n, c = a + n, e = b + n; idx.push(a, e, b, a, c, e); } /* wound to face up */
-    const og = new THREE.BufferGeometry(); og.setAttribute('position', new THREE.BufferAttribute(pos, 3)); og.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); og.setIndex(idx); og.computeVertexNormals(); og.computeBoundingSphere();
+    const og = new THREE.BufferGeometry(); og.setAttribute('position', new THREE.BufferAttribute(pos, 3)); og.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); og.setIndex(idx); if (ck) yield; og.computeVertexNormals(); og.computeBoundingSphere();
     const outer = new THREE.Mesh(og, groundMat(t, 1 / 36)); if (NO_DOMES && !K) outer.material.fog = false; /* NO_DOMES: plain grass out to the horizon (the haze turned the far land into a pale band the domes used to hide) */ outer.userData.sky = { y: lo, half: 1900, x: (u0 + u1) / 2, z: -(v0 + v1) / 2 }; HS.ud.outer = outer; HS.add(outer); return; }
   const osh = new THREE.Shape(); osh.moveTo(-1900, -1900); osh.lineTo(bluffU(-40) + .5, -1900); for (let v = -40; v <= 390; v += 5) osh.lineTo(bluffU(v) + .5, v); osh.lineTo(bluffU(390) + .5, 1600); osh.lineTo(-1900, 1600); osh.closePath(); /* the land: ends at the edge of the bluff */
   const outer = new THREE.Mesh(new THREE.ShapeGeometry(osh), groundMat(t, 1 / 36)); if (NO_DOMES) outer.material.fog = false; /* (NO_DOMES, as above) */ outer.rotation.x = -Math.PI / 2; outer.position.set(0, -0.8, 0); HS.ud.outer = outer; HS.add(outer);
@@ -2410,6 +2413,7 @@ const CONFETTI = (() => {
   return { burst, update };
 })();
 const FLAG_WIND = true; /* undo switch: false = the flag always flies the same way (along +x), rippling as before */
+const FLAG_ONCE = true; /* perf548: a new hole's flag (both faces, 512x320 each) was painted and sent to the GPU, then painted and sent again as soon as its crest image reported decoded, even when the crest was already loaded and drawn the first time (every hole after the first: two needless paints and uploads as Play starts, with nothing covering it). Now the second paint happens only if the crest or the number's font wasn't ready for the first; the flag is the same. false = as v548 */
 const flag = (() => {
   const g = new THREE.Group(); g.position.copy(W(PIN.u, PIN.v, groundHeight(PIN.u, PIN.v)));
   const PH = 4.4; // a proper flagstick (scaled with the oversized ball and cup)
@@ -2452,7 +2456,7 @@ const flag = (() => {
       const k = 1 - .14 * Math.cos(ph) * Math.min(1, x * 1.4); ca[i * 3] = ca[i * 3 + 1] = ca[i * 3 + 2] = k; }
     P.needsUpdate = true; C.needsUpdate = true; }
   fo.userData.ink = true; scene.add(g);
-  function setHole() { g.position.copy(W(PIN.u, PIN.v, groundHeight(PIN.u, PIN.v))); repaint(); const im = FLAG_ART.img; if (im.decode) im.decode().then(repaint).catch(() => {}); else im.addEventListener('load', repaint); } /* a new hole: to its pin, with its number (and its course's crest) */
+  function setHole() { g.position.copy(W(PIN.u, PIN.v, groundHeight(PIN.u, PIN.v))); const im = FLAG_ART.img, ready = FLAG_ONCE && im && im.complete && im.naturalWidth > 0 && (!document.fonts || document.fonts.check('96px "Luckiest Guy"')); repaint(); if (ready) return; /* FLAG_ONCE */ if (im.decode) im.decode().then(repaint).catch(() => {}); else im.addEventListener('load', repaint); } /* a new hole: to its pin, with its number (and its course's crest) */
   return { g, fl, fo, base, jiggle: 0, wave, setHole, aim };
 })();
 
@@ -4125,6 +4129,17 @@ function morphSVG(el, html) { const T = morphSVG.t || (morphSVG.t = document.cre
     for (let i = OA.length - 1; i >= 0; i--) { const x = OA[i]; if (!n.hasAttributeNS(x.namespaceURI, x.localName)) o.removeAttributeNS(x.namespaceURI, x.localName); }
     const oc = o.childNodes, nc = n.childNodes; for (let i = 0; i < nc.length; i++) patch(oc[i], nc[i]); };
   const oc = el.childNodes, nc = T.childNodes; for (let i = 0; i < nc.length; i++) patch(oc[i], nc[i]); return true; }
+const KNOB_FAST = true; /* perf548: the knob's markup changes on most frames (a swing, and the idle sway and blinks), and KNOB_MORPH parsed all of it off-screen each time to find the one or two values that moved (~1 ms of a frame's script on this desktop). Now the markup is split into its tags' quoted attribute values and the rest (its skeleton: the same elements, attribute names and text); while the skeleton is the one on screen, only the values that differ are written onto the live attributes: the same writes KNOB_MORPH makes, the same DOM. Another skeleton, or markup with '&' or '<!', goes the KNOB_MORPH way as before. false = as v548 */
+const KF = { el: null, skel: null, nodes: null, first: null, n: 0 }, KF_TAG = /<(\/?)([^\s\/>!]+)([^>]*)>/g, KF_ATT = /([^\s="]+)\s*=\s*"([^"]*)"/g, KF_SAFE = /^[^"=]*$/;
+function kfTok(html) { if (html.indexOf('&') >= 0 || html.indexOf('<!') >= 0) return null; let skel = '', last = 0; const vals = [], at = [], names = []; /* KNOB_FAST: (skeleton, values in document order, [element index, attribute name] per value) */
+  KF_TAG.lastIndex = 0; for (let m; (m = KF_TAG.exec(html));) { skel += html.slice(last, m.index); last = KF_TAG.lastIndex; if (m[1]) { skel += m[0]; continue; } const ei = names.length; names.push(m[2].toLowerCase()); skel += '<' + m[2];
+    const a = m[3]; let la = 0; KF_ATT.lastIndex = 0; for (let q; (q = KF_ATT.exec(a));) { const gap = a.slice(la, q.index); if (!KF_SAFE.test(gap)) return null; skel += gap + q[1] + '=""'; la = KF_ATT.lastIndex; vals.push(q[2]); at.push(ei, q[1]); } if (!KF_SAFE.test(a.slice(la))) return null; skel += a.slice(la) + '>'; }
+  skel += html.slice(last); return { skel, vals, at, names }; }
+function kfBind(el, T) { KF.el = el; KF.skel = null; KF.nodes = null; if (!T) return; /* KNOB_FAST: after a full update, each value's live attribute (checked: the element's name, the attribute there, its value) */
+  const E = el.getElementsByTagName('*'); if (E.length !== T.names.length) return; for (let i = 0; i < E.length; i++) if (E[i].nodeName.toLowerCase() !== T.names[i]) return;
+  const nodes = [], seen = new Set(); for (let i = 0; i < T.vals.length; i++) { const nd = E[T.at[2 * i]].getAttributeNode(T.at[2 * i + 1]); if (!nd || nd.value !== T.vals[i] || seen.has(nd)) return; seen.add(nd); nodes.push(nd); }
+  KF.skel = T.skel; KF.nodes = nodes; KF.first = el.firstChild; KF.n = el.childNodes.length; }
+function kfPatch(el, T) { if (!T || KF.el !== el || !KF.nodes || KF.skel !== T.skel || el.firstChild !== KF.first || el.childNodes.length !== KF.n) return false; const N = KF.nodes, V = T.vals; for (let i = 0; i < V.length; i++) if (N[i].value !== V[i]) N[i].value = V[i]; return true; } /* KNOB_FAST: the same skeleton: changed values only */
 const DIAL_CHEV_KEEP = true; /* perf3: the dial's idle chevrons are three kept <path>s whose d/opacity change, not markup re-parsed every step (same drawing). false = rebuilt with innerHTML, as before */
 const DC = { knob: null, chev: null, attrs: new Map() };
 function setA(el, k, v) { let m = DC.attrs.get(el); if (!m) DC.attrs.set(el, m = {}); if (m[k] !== v) { el.setAttribute(k, v); m[k] = v; } }
@@ -4167,7 +4182,7 @@ function renderDial(dt, t) {
     else SW.head *= Math.pow(.02, dt); }
   const prog = SW.phase === 'back' ? clamp(SW.vis, 0, 1.1) : SW.phase === 'down' && SW.max > 0 ? clamp(1 - SW.vis / SW.max, 0, 1) : 0;
   const st = { head: SW.head, prog, cx: 110 + SW.tilt, cy: HOME + SW.vis * TRAVEL, pull: SW.vis, vel: SW.vel, tilt: SW.tilt, phase: SW.phase === 'release' ? 'idle' : SW.phase, rel: SW.rel, t, mood: G.mood, near: Math.abs(SW.vis - ps) < .03 && SW.max > .1 };
-  const kh = KNOBS[G.knob].draw(st); if (kh !== DC.knob) { if (!KNOB_MORPH || !morphSVG(elKnob, kh)) elKnob.innerHTML = kh; DC.knob = kh; }
+  const kh = KNOBS[G.knob].draw(st); if (kh !== DC.knob) { const KT = KNOB_FAST ? kfTok(kh) : null; if (!(KT && kfPatch(elKnob, KT))) { if (!KNOB_MORPH || !morphSVG(elKnob, kh)) elKnob.innerHTML = kh; if (KNOB_FAST) kfBind(elKnob, KT); } DC.knob = kh; } /* KNOB_FAST */
 }
 
 /* ================= PUTTING ================= */
@@ -6246,11 +6261,13 @@ function* mapStrips(t) { /* MAP_STRIPS: one big canvas texture onto the GPU a ba
   const P = renderer.properties.get(t), tex = P.__webglTexture; if (!tex) { t.needsUpdate = true; return; }
   const bind = () => { renderer.state.activeTexture(gl.TEXTURE0); renderer.state.bindTexture(gl.TEXTURE_2D, tex); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4); gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE); };
   try { bind(); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    for (let y = 0; y < h; y += MAP_STRIPS) { yield; const n = Math.min(MAP_STRIPS, h - y), d = cx.getImageData(0, y, w, n).data; bind(); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, h - y - n, w, n, gl.RGBA, gl.UNSIGNED_BYTE, d); } /* canvas row y is GL row h-1-y, as three's flipped upload */
+    const SR = BUILD_SLICE4 && S4_BG ? Math.max(32, Math.min(MAP_STRIPS, Math.floor(131072 / w))) : MAP_STRIPS; /* BUILD_SLICE4: bands of ~128k pixels (a wide map's 192 rows were one slice of up to ~50 ms at 4x CPU); the same rows, the same texture */
+    for (let y = 0; y < h; y += SR) { yield; const n = Math.min(SR, h - y), d = cx.getImageData(0, y, w, n).data; bind(); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, h - y - n, w, n, gl.RGBA, gl.UNSIGNED_BYTE, d); } /* canvas row y is GL row h-1-y, as three's flipped upload */
     yield; bind(); gl.generateMipmap(gl.TEXTURE_2D); P.__maxMipLevel = Math.log2(Math.max(w, h)); if (t.onUpdate) t.onUpdate(t); /* (TEX_FREE: the canvas goes, as after three's upload) */
   } catch (e) { console.error(e); t.needsUpdate = true; } } /* anything odd: three uploads it whole at its first use, as before */
 const PROG_PIN = true; /* perf508: three frees a shader as soon as no material uses it, so a hole that drops the last user of one (13 dropping the bridge reflection, OslerBrook 5 its reeds) made the next hole that needs it set it up again mid-round (census: Augusta 15, OslerBrook 6). Every shader the game has set up is now held for the session (a few dozen small GPU programs), so each is set up at most once. Nothing drawn differs. false = as v508 */
 function pinProgs() { for (const p of renderer.info.programs) if (!p.pin508) { p.pin508 = 1; p.usedTimes++; } } /* PROG_PIN: one extra use each: never back to 0, never destroyed */
+const PREWARM_CALM = true; /* perf548 (Neil 11-22: the golfer board's first hydration still stuttered sometimes): HOLE_PREWARM's off-screen draw of a prebuilt hole not yet drawn (a first-time player's tutorial hole, or another course's first hole that finished building after the boot rehearsal) ran on the very first frame after the intro (INTRO.on off), the frame the faces set off for the board. It now also waits out the intro's hand-off quiet time (INTRO.calm, as the background builds and the golfer's chat do); the same draw, ~1.7 s later. false = as v548 */
 const HOLESYS = (() => {
   const AHEAD = 1; /* holes prebuilt ahead of the one being played. 2 holds a third hole scene in GPU memory: try it on phones first */
   const BUDGET = { calm: BG_BUDGET || 2.5, wait: 14, home: 6 }; /* (BG_BUDGET) */ /* ms of build work per frame: in the background (calm frames only), under the pill, behind the home screen */
@@ -6264,7 +6281,7 @@ const HOLESYS = (() => {
     if (fresh && PREBUILD_OWN_HS) HS = null; if (fresh) { setCourse(HD.cid); HOLE_N = HD.i; HOLE = HOLES[HD.i - 1]; AUGD = BDH_CHUNK ? yield* holeAUGDg(CID, HOLE.n) : holeAUGD(CID, HOLE.n); yield; courseGeom(); yield; }
     HS = newHS(); holeMap(); GREENTEX = BUILD_CHUNK3 ? yield* greenTexG(true) : greenTex(); if (TEX_FREE && GREENTEX) GREENTEX.tex.onUpdate = texFree; yield;
     yield* courseSteps(); yield;
-    buildOuter(); yield; buildTrees(); yield; buildBushes(); yield; buildBridges(); buildLake(); buildFountain(); yield; if (BUILD_CHUNK2) yield* buildSceneryG(); else buildScenery(); yield; CUPMESH = buildCup(); yield;
+    if (BUILD_SLICE4 && S4_BG) yield* buildOuterG(true); else buildOuter(); yield; buildTrees(); yield; buildBushes(); yield; buildBridges(); buildLake(); buildFountain(); yield; if (BUILD_CHUNK2) yield* buildSceneryG(); else buildScenery(); yield; CUPMESH = buildCup(); yield;
     HS.read = yield* READ.make(); yield; HS.mini = BUILD_CHUNK3 ? yield* MINI.makeG(4) : MINI.make(); AUGCAM = makeAugCam(); homePath = makeHomePath(); if (F3.warm) { yield; yield* caddieWarmG(); } /* CADDIE_FAST3: the caddie's tables for this hole */
     if (fresh) yield* upload(); }
   function* upload() { /* a prebuilt hole onto the GPU before it's shown: textures one at a time, then programs, then buffers (one 1-px draw) */
@@ -6291,7 +6308,7 @@ const HOLESYS = (() => {
       for (const m of [].concat(o.material || [])) { if (M0.has(m) || SHARED.has(m)) continue; M0.add(m); for (const k in m) tex(m[k]); if (m.uniforms) for (const k in m.uniforms) tex(m.uniforms[k].value); m.dispose(); } }); }
   function drop(HD) { if (HD.it && !HD.ready) try { HD.it.return(); } catch (e) {} const hs = HD.v && HD.v.HS; if (hs) { if (hs.group.parent) hs.group.parent.remove(hs.group); dispose(hs.group); } jobs.delete(HD.key); HD.v = null; HD.dead = true; }
   function start(cid, i) { const HD = { cid, i, key: keyOf(cid, i), v: null, n: 0, ready: false }; HD.it = steps(HD, true); jobs.set(HD.key, HD); return HD; }
-  function step(HD) { const t0 = performance.now(); within(HD, () => { let r; try { r = HD.it.next(); } catch (e) { console.error(e); HD.err = e; HD.ready = true; return; } HD.idle = r.value === HATCH_WAIT; if (!HD.idle) HD.n++; if (r.done) { HD.ready = true; est = Math.max(20, HD.n); } }); /* idle: waiting on HATCHW's worker (this frame's slice ends) */
+  function step(HD) { const t0 = performance.now(); S4_BG = !(want && want.HD === HD); /* BUILD_SLICE4 */ within(HD, () => { let r; try { r = HD.it.next(); } catch (e) { console.error(e); HD.err = e; HD.ready = true; return; } HD.idle = r.value === HATCH_WAIT; if (!HD.idle) HD.n++; if (r.done) { HD.ready = true; est = Math.max(20, HD.n); } }); /* idle: waiting on HATCHW's worker (this frame's slice ends) */
     const dt = performance.now() - t0; HD.ms = (HD.ms || 0) + dt; HD.max = Math.max(HD.max || 0, dt); if (dt > 8) { HD.slow = (HD.slow || 0) + 1; (HD.slowAt = HD.slowAt || []).push([HD.n, Math.round(dt)]); } if (HD.ready) last = { key: HD.key, n: HD.n, ms: Math.round(HD.ms), max: +HD.max.toFixed(1), slow: HD.slow || 0, slowAt: HD.slowAt || [] }; } /* (timings: HOLESYS.last) */
   function use(HD) { /* make HD the hole on screen; the one it replaces is disposed */
     if (PROG_PIN) pinProgs(); const old = cur; if (old && old !== HD) { old.v = holeVars(); scene.remove(old.v.HS.group); }
@@ -6309,7 +6326,7 @@ const HOLESYS = (() => {
     if (want) need.add(want.HD.key); for (const HD of [...jobs.values()]) if (!need.has(HD.key)) drop(HD);
     for (const k of need) if (!jobs.has(k)) { const [c, i] = k.split(':'); start(c, +i); } }
   function boot() { /* the page's first hole: built at once, under the boot cover (the warm-up draw compiles and uploads it) */
-    const HD = { cid: CID, i: HOLE_N, key: keyOf(CID, HOLE_N), v: null, n: 0 }; const it = steps(HD, false); while (!it.next().done) HD.n++; HD.v = holeVars(); HD.ready = true; use(HD); if (AHEAD_DELAY) AHEAD_DELAY.at = performance.now(); /* AHEAD_DELAY: the page's first hole too (v464 log: a 600 ms freeze on a reloaded hole's first frames, with the next hole's build starting) */
+    const HD = { cid: CID, i: HOLE_N, key: keyOf(CID, HOLE_N), v: null, n: 0 }; const it = steps(HD, false); S4_BG = false; /* BUILD_SLICE4: built at once, no pauses */ try { while (!it.next().done) HD.n++; } finally { S4_BG = true; } HD.v = holeVars(); HD.ready = true; use(HD); if (AHEAD_DELAY) AHEAD_DELAY.at = performance.now(); /* AHEAD_DELAY: the page's first hole too (v464 log: a 600 ms freeze on a reloaded hole's first frames, with the next hole's build starting) */
     if (HOLE_N === NINE.first(CID)) for (const id in COURSE_DEF) if (!COURSE_DEF[id].dev && !COURSE_DEF[id].lazy) if (id !== CID && !(id === 'augusta' && typeof AUG_HOLES === 'undefined') && !(id === 'osler' && typeof OSLER_HOLES === 'undefined') /* SPLIT: data not here: left to the home screen's prebuild */ && (BOOT_FINISH || !jobs.has(keyOf(id, NINE.first(id))))) { const J = (BOOT_FINISH && jobs.get(keyOf(id, NINE.first(id)))) || start(id, NINE.first(id)); while (!J.ready && !J.err) step(J); } if (BOOT_ALL && HOLE_PREWARM && !BOOT_REHEARSE) for (const J of [...jobs.values()]) if (J.ready && !J.err && !J.warmed) warmOne(J); } /* (BOOT_REHEARSE draws them itself, more fully) */ /* BOOT_ALL: each drawn once under the boot cover too */ /* every other course's first hole too, under the same boot cover (Neil: switching course on the home screen is then just the fade; revisit if there are many courses) */
   /* "Next hole", "Play again", quitting to hole 1, another course on the home screen: swap to (cid, i) as soon as it's built. then: after the swap. pill: show the small loader while it builds */
   function go(cid, i, holes, then, { pill = true, hold = 0, fresh = false, card = false } = {}) { /* fresh: build it again even if it's built (or on screen): PINS.seed */
@@ -6327,7 +6344,7 @@ const HOLESYS = (() => {
     return !MENU.on && !INTRO.on && !FLY.on && now >= FLY_CALM_AT && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && !G.preview && Math.abs(G.aimT - G.aimGoal) < 1e-3 && !down && now - lastPtr > 400; }
   let warmUntil = 0;
   function prewarm(now) { /* HOLE_PREWARM (Neil 11-22, after Puffy's notes: prepare the likely next choice while the player is just looking): a prebuilt hole behind the home screen is drawn once, everything in it, into a 1-px corner, so the phone sets up its shaders and buffers then, and the switch to it only has to show it. Only when nobody has touched the screen for 1.5 s (or during the fly-over's own sky dip), one hole per frame, and a big one leaves the next frames free (took x 6, at most 250 ms) */
-    if (!HOLE_PREWARM || !MENU.on || INTRO.on || want || down || now < warmUntil || !(now - lastPtr > 1500 || (MENU.fade && !MENU.hold))) return false;
+    if (!HOLE_PREWARM || !MENU.on || INTRO.on || want || down || now < warmUntil || (PREWARM_CALM && now < (INTRO.calm || 0)) || !(now - lastPtr > 1500 || (MENU.fade && !MENU.hold))) return false;
     const HD = [...jobs.values()].find(j => j.ready && !j.err && !j.warmed && j !== cur && j.v && j.v.HS && j.v.HS.group); if (!HD) return false; const t0 = performance.now(); warmOne(HD);
     warmUntil = performance.now() + Math.min(250, (performance.now() - t0) * 6); return true; }
   function warmOne(HD) { if (!HD.v || !HD.v.HS || !HD.v.HS.group || HD === cur) return; HD.warmed = true; const cg = HS.group, cv = cg.visible, off = [];
@@ -6526,7 +6543,7 @@ if (PROF) try { (() => {
   P.bs = new Set(); { const mark = n => P.bs.add(n); /* which hole-build steps ran this frame (background or waited-for) */
     const stp = (n, d) => { const T = P.steps[n] || (P.steps[n] = [0, 0, 0]); T[0]++; T[1] += d; T[2] = Math.max(T[2], d); }; P.steps = {};
     const wf = (n, f) => function () { mark(n); const t0 = performance.now(), r = f.apply(this, arguments); stp(n, performance.now() - t0); if (r && typeof r.next === 'function' && typeof r[Symbol.iterator] === 'function') { const nx = r.next.bind(r); let k = 0; r.next = v => { mark(n); const t = performance.now(); try { return nx(v); } finally { const d = performance.now() - t; stp(n, d); if (k++ === 0) stp(n + ' (1st slice)', d); } }; } return r; }; /* PROF_UPLOAD: the first slice on its own too (courseSteps': the new map canvas's first paint) */ /* each build step timed (a generator: each slice; nested steps count in their caller too) */
-    for (const n of ['courseSteps', 'buildOuter', 'buildTrees', 'buildBushes', 'buildBridges', 'buildLake', 'buildFountain', 'buildSceneryG', 'buildScenery', 'buildCup', 'caddieWarmG', 'holeMap', 'greenTexG', 'greenTex', 'courseGeom', 'holeAUGDg', 'makeAugCam', 'makeHomePath']) { try { const f = eval(n); if (typeof f === 'function') eval(n + ' = wf(n, f)'); } catch (e) {} }
+    for (const n of ['courseSteps', 'buildOuter', 'buildOuterG', 'buildTrees', 'buildBushes', 'buildBridges', 'buildLake', 'buildFountain', 'buildSceneryG', 'buildScenery', 'buildCup', 'caddieWarmG', 'holeMap', 'greenTexG', 'greenTex', 'courseGeom', 'holeAUGDg', 'makeAugCam', 'makeHomePath']) { try { const f = eval(n); if (typeof f === 'function') eval(n + ' = wf(n, f)'); } catch (e) {} }
     try { READ.make = wf('READ.make', READ.make); } catch (e) {}
     { const iT = renderer.initTexture.bind(renderer), cp = renderer.compile.bind(renderer); /* PROF_UPLOAD (Neil 11-21): a prebuilt hole's trip to the GPU, named: each texture (the course map apart) and the shader compile */
       renderer.initTexture = t => { let w = 0, h = 0; try { w = t.image.width; h = t.image.height; } catch (e) {} const n = w * h > 1e6 ? `upload map texture ${w}x${h}` : 'upload small textures'; mark(n); const t0 = performance.now(); try { return iT(t); } finally { stp(n, performance.now() - t0); } };
@@ -6795,6 +6812,8 @@ function holeCard(L) {
 // ---- opening titles: a 3×3 board of golfers and course bits that pop in, glance at each other, then roll credits (tap or Skip to jump to the menu)
 const INTRO_DECODE = true; /* Neil (11-18 21:17): "Sometimes in the initial Brady Bunch screen some squares are empty, I think because the image didn't load yet": the golfers' pictures (and the course crest) are decoded before the board starts filling in, so each square comes in with its picture; it waits 1.2 s at most, then goes anyway. false = as v454 */
 const INTRO = { on: false, fill: false };
+const INTRO_WRAP = true; /* perf548 (the hand-off again): as the faces set off, each face's pictures were moved into a plain full-size wrapper (so the dimming fades them as one picture), and re-homing those SVG pictures restyled them all in that frame. The same wrapper now goes round them when the board is built (it changes nothing on screen: it fills the square exactly as they do, and they paint in the same order), so the hand-off only starts the fade. false = as v548 */
+const INTRO_RW = true; /* perf548 (Neil 11-22: the golfer board's first hydration still stuttered now and then): as the intro's faces set off for their home tiles, each face's measurements (its box, its tile's picture box, width and colour) were read between the previous face's style writes, so the browser restyled and re-laid out the whole page once per face (~150-250 ms of one frame at 4x CPU). Now all are measured first (the window's width too: reading it after a face's writes laid the page out again), then written: the same values, the same styles, one layout. false = as v548 */
 const HYD_QUIET = 1200; /* Neil 11-22 (a touch of stutter as the intro hands over to the golfer picker): the background hole build holds off for 1.2 s from that hand-off (0 = it carries on, v519) */
 const INTRO_OSL_RING = true; /* Neil 11-22: OslerBrook's crest on the intro board sits on a paper circle like Augusta's (false = the bare turtle) */
 const INTRO_PRE = true; /* Neil 11-21: see #intro.pre and INTRO.fill. false = as v488 */
@@ -6820,6 +6839,7 @@ async function runIntro() {
     : c.face ? `<div class="c face" data-k="${k}" data-who="${c.face}" style="--bd:${(1.45 + Math.random() * .6).toFixed(2)}s;--bl:-${(Math.random() * 1.5).toFixed(2)}s">${AV.homeArt(c.face).replace(/\bid="av/g, `id="i${k}av`).replace(/url\(#av/g, `url(#i${k}av`).replace(/ style="[^"]*"/g, '')}<span class="nametag">${CHARS[c.face].name}</span></div>`
     : `<div class="c prop p-${c.prop}" data-k="${k}">${PROPS[c.prop]}</div>`).join('');
   const C = [...grid.children], mid = $('#introMid'), faces = C.filter(c => c.classList.contains('face'));
+  if (INTRO_WRAP) faces.forEach(f => { const pw = document.createElement('div'); pw.style.cssText = 'position:absolute;inset:0'; [...f.querySelectorAll(':scope > svg')].forEach(v => pw.appendChild(v)); f.insertBefore(pw, f.firstChild); f._pw = pw; }); /* INTRO_WRAP */
   el.hidden = false; INTRO.on = true; try { HOLESYS.ahead(); } catch (e) {} /* start building the other course's first hole behind the intro */
   let stop = false, done; const fin = new Promise(r => done = r);
   let hyd = false; const hydrate = () => { if (hyd) return false; hyd = true; if (HYD_QUIET) INTRO.calm = Math.max(INTRO.calm || 0, performance.now() + HYD_QUIET); if (INTRO.onExit) INTRO.onExit(); return true; }; /* HYD_QUIET: no background hole building while the home screen comes up under the board */ // the home screen comes up under the board (painted, animating) before anything moves
@@ -6829,15 +6849,16 @@ async function runIntro() {
     await new Promise(r => requestAnimationFrame(r));
     const board = $('#bunch'), BR = board && board.getBoundingClientRect(), pairs = faces.map(f => [f, board && BOARD.near(f.dataset.who)]).filter(p => p[1]); /* each face flies to its copy nearest the middle of the band */
     el.classList.add('exit'); C.forEach(c => c.classList.remove('hl')); clearInterval(moodT); faces.forEach(f => face(f, 'rest'));
+    const RW = INTRO_RW ? new Map(pairs.map(([f, h]) => { h.style.transition = 'none'; h.style.opacity = '.01'; const pic = h.querySelector('.pic') || h; return [f, { pic, a: f.getBoundingClientRect(), b: pic.getBoundingClientRect(), ow: pic.offsetWidth, bg: getComputedStyle(h).backgroundColor }]; })) : null, IW = RW ? innerWidth : 0; /* INTRO_RW: every measurement first (each tile's live copy hidden as before), then the writes below */
     pairs.forEach(([f, h]) => { // land exactly on the home tile's picture (inside its ink border), matching its name tag, gaze, pose and dimming
-      h.style.transition = 'none'; h.style.opacity = '.01'; const pic = h.querySelector('.pic') || h, a = f.getBoundingClientRect(), b = pic.getBoundingClientRect(), sx = b.width / a.width, sy = b.height / a.height, sel = h.classList.contains('sel'), hs = (BOARD.dock && pic.offsetWidth && pic !== h ? b.width / pic.offsetWidth / UIS.s : 1); /* TABLET_FILL: the dock's own scale, not the --ui one */
+      const R = RW && RW.get(f); if (!R) { h.style.transition = 'none'; h.style.opacity = '.01'; } const pic = R ? R.pic : h.querySelector('.pic') || h, a = R ? R.a : f.getBoundingClientRect(), b = R ? R.b : pic.getBoundingClientRect(), sx = b.width / a.width, sy = b.height / a.height, sel = h.classList.contains('sel'), ow = R ? R.ow : 0, hs = (BOARD.dock && (R ? ow : pic.offsetWidth) && pic !== h ? b.width / (R ? ow : pic.offsetWidth) / UIS.s : 1); /* TABLET_FILL: the dock's own scale, not the --ui one */
       const hi = h.dataset.i, fk = f.dataset.k; ['avEyeL', 'avEyeR'].forEach(id => { const he = h.querySelector('#b' + hi + id), fe = f.querySelector('#i' + fk + id); if (he && fe) ['cx', 'cy', 'ry'].forEach(at => fe.setAttribute(at, he.getAttribute(at))); });
       const hd = f.querySelector('svg.avHeadL'); if (hd) { hd.style.animation = 'none'; hd.style.rotate = '0deg'; hd.style.translate = '0 0'; }
       const tg = f.querySelector('.nametag'); if (tg) Object.assign(tg.style, { fontSize: 14 / sx + 'px', lineHeight: 18 / sy + 'px', padding: `0 ${8 / sx}px`, bottom: '0px', borderWidth: 2.5 / sx + 'px', boxShadow: `${2 / sx}px ${2 / sy}px 0 var(--ink)`, background: sel ? 'var(--sun)' : '', transition: 'none' });
-      f.style.background = getComputedStyle(h).backgroundColor; f.style.boxShadow = `0 0 0 ${3 * hs / sx}px ${sel ? 'var(--pink)' : 'var(--ink)'}`; if (sel) { f.style.setProperty('--rs', (hs / sx).toFixed(4)); f.classList.add('ring'); } /* the picked golfer's pink ring comes in on the way down, so it's already there at the hand-off */
-      f.classList.add('fly'); f.style.borderRadius = 4 * hs / sx + 'px'; { const pw = document.createElement('div'); pw.style.cssText = 'position:absolute;inset:0'; [...f.querySelectorAll(':scope > svg')].forEach(v => pw.appendChild(v)); f.insertBefore(pw, f.firstChild); if (!sel) pw.animate([{ opacity: 1 }, { opacity: .8 }], { duration: 750, fill: 'forwards' }); } /* dimmed as one picture, like the home tile's .pic (each layer dimmed on its own let the sky show through the hair) */
+      f.style.background = R ? R.bg : getComputedStyle(h).backgroundColor; f.style.boxShadow = `0 0 0 ${3 * hs / sx}px ${sel ? 'var(--pink)' : 'var(--ink)'}`; if (sel) { f.style.setProperty('--rs', (hs / sx).toFixed(4)); f.classList.add('ring'); } /* the picked golfer's pink ring comes in on the way down, so it's already there at the hand-off */
+      f.classList.add('fly'); f.style.borderRadius = 4 * hs / sx + 'px'; { const pw = f._pw || document.createElement('div'); if (!f._pw) { pw.style.cssText = 'position:absolute;inset:0'; [...f.querySelectorAll(':scope > svg')].forEach(v => pw.appendChild(v)); f.insertBefore(pw, f.firstChild); } if (!sel) pw.animate([{ opacity: 1 }, { opacity: .8 }], { duration: 750, fill: 'forwards' }); } /* dimmed as one picture, like the home tile's .pic (each layer dimmed on its own let the sky show through the hair) */
       f.style.transform = `translate(${((b.left - a.left) / UIS.s).toFixed(2)}px,${((b.top - a.top) / UIS.s).toFixed(2)}px) scale(${sx.toFixed(4)},${sy.toFixed(4)})`;
-      if (BR && (b.right <= BR.left + 1 || b.left >= BR.right - 1 || ((b.left < BR.left - .5 || b.right > BR.right + .5) && (BR.left > .5 || BR.right < innerWidth - .5)))) { f.style.transition = 'transform .75s cubic-bezier(.6,0,.2,1),border-radius .75s,box-shadow .5s,opacity .45s ease-in .15s'; f.style.opacity = '0'; } }); /* its tile is off the band (or would show past a capped band's edge): it heads that way and fades out */
+      if (BR && (b.right <= BR.left + 1 || b.left >= BR.right - 1 || ((b.left < BR.left - .5 || b.right > BR.right + .5) && (BR.left > .5 || BR.right < (RW ? IW : innerWidth) - .5)))) { f.style.transition = 'transform .75s cubic-bezier(.6,0,.2,1),border-radius .75s,box-shadow .5s,opacity .45s ease-in .15s'; f.style.opacity = '0'; } }); /* its tile is off the band (or would show past a capped band's edge): it heads that way and fades out */
     await wait(pairs.length ? 560 : 200);
     pairs.forEach(([, h]) => { h.style.transition = 'none'; h.style.opacity = '1'; }); // the live tile is fully there underneath first, so the fade never shows through to the background
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); pairs.forEach(([f]) => { f.style.transition += ',opacity .2s linear'; f.style.opacity = '0'; });
