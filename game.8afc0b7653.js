@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v562'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v564'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -749,6 +749,8 @@ function crownAt(t, u, v, y, m) { /* is (u,v,y) inside the tree's crown, grown b
   if (t.blobs) { for (const [bx, by, bv, br, bvs = 1] of t.blobs) { const dx = u - (t.u + bx), dz = v - (t.v + bv), dy = rel - by, hr = br * .97 + m, vr = br * bvs * (dy < 0 ? 1.08 : .97) + m; if ((dx * dx + dz * dz) / (hr * hr) + dy * dy / (vr * vr) < 1) return true; } return false; }
   return Math.hypot(t.u - u, t.v - v) < t.r + m && rel < t.h + m; }
 const SPLASH_PCT = true; /* see updateHUD's lie card */
+const PUTT_TOUCH = { win: .017, tight: 2.75 }; /* Neil 11-23 ("putting just a touch less forgiving"): a putt's perfect-pace window 1.7% of the meter (was 2%), and its dead-straight swipe window 4.4 deg (was 4.8) (null = as v563) */
+const SG_POWER_WIN = { pitch: .02, flop: .02, sand: .02 }; /* Neil 11-23 (an ok uphill pitch on Augusta 3 came up way short): pitch, flop and greenside bunker power within 2% of the meter of the perfect power plays as perfect (was 0.6%, as full swings still are) (null = as v562) */
 const SWING_EASE2 = true; /* Neil 11-23: pitch, flop and greenside bunker swings more forgiving again (1.25x the base windows, was 1.1x), full swings a little less (0.92x, was 0.95x) (false = as v561) */
 const DRIVE_250 = true; /* Neil 11-23: a perfect driver carries 250 for a Good-power golfer (was 255) and 265 for Great (was ~269: Great's distance factor 1.055 -> 1.06, all clubs); Average follows at ~235 (was ~240) (false = as v561) */
 const LIES = {
@@ -2753,7 +2755,7 @@ const MODES = {
   chip:  { name: 'Chip',  rate: 1.35, tempo: 3.2,  perf: 0.1128 },
   flop:  { name: 'Flop',  rate: 1.45, tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* risk: swing flaws cost more, and a bad tempo blades or chunks it */
   sand:  SAND_EASY ? { name: 'Sand', rate: 1.5, tempo: 3.4, perf: 0.085, tight: .9, risk: 1.2 } : { name: 'Sand',  rate: 1.5,  tempo: 3.4,  perf: 0.066, tight: .82, risk: 1.45 }, /* the explosion: as touchy as a flop (and a mistimed one blades or chunks it). SAND_EASY: a wider window, smaller penalties */
-  putt:  { name: 'Putt',  rate: 1.25, tempo: 3.1,  perf: .6, tight: 3 } };
+  putt:  { name: 'Putt',  rate: 1.25, tempo: 3.1,  perf: .6, tight: PUTT_TOUCH ? PUTT_TOUCH.tight : 3 } };
 const SG_TEMPO_UP = { chip: 4.3, pitch: 4.3, sand: 4.5, punch: 4.25, flop: 4.3, putt: 3.3 }; /* v472 (Neil 23:06): "Make punch 4.25, pitch and flop should be 4.3. Putt 3.3" (were 4.0, 3.4, 3.4, 3.1) */ /* v471 (Neil 23:05, "What is chip? We have pitch and bunker"): there is no chip mode to pick any more (modeAllowed: chip is off), so tonight's chip changes never reached a shot: the short shot is the PITCH. It now gets the same 4.3 (was 3.4) */ /* v470 (Neil 11-18 22:52: "Speed chip and bunker tempo up even another 6%"): 4.05 -> 4.3, 4.25 -> 4.5 */ /* v468 (Neil 11-18 22:48: "I still get quick too much on them. Even faster tempo. Another 9%"): 3.7 -> 4.05, 3.9 -> 4.25 (a full swing is 4.25) */ /* v467 (Neil 11-18 22:44: "tempo is also still too slow for a good one. Speed it up"): 3.4 -> 3.7 and 3.6 -> 3.9, ~9% quicker again */ /* Neil (11-18 18:23): chips and bunker splashes "expecting too slow of a tempo, just slightly". Target ratio (backswing / downswing) chip 3.2 -> 3.4, sand 3.4 -> 3.6, about 6% quicker; window widths unchanged. null = as v444 */
 if (SG_TEMPO_UP) for (const k in SG_TEMPO_UP) MODES[k].tempo = SG_TEMPO_UP[k];
 const BLADE_EASE = { sand: .06, other: .04 }; /* Neil (11-18 22:50): "Too easy to get bladed. Just a bit": a too-quick swing blades it only once it's further off the tempo (bunker splash: .26 -> .32 past the perfect window; flop: .17 -> .21; log-ratio units, ~6% and ~4% more of a miss). Chunks (too slow) unchanged. null = as v468 */
@@ -4259,7 +4261,7 @@ function puttPace(u0, v0, a, d) { d = Math.max(.05, d); if (!PACE.on) return put
   return Math.sqrt(2 * e); }
 function launchPutt(sw) {
   const F = G.Feff, D = G.D, ps = D / F, tight = MODES.putt.tight;
-  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= .02) { p = ps; pinHigh = true; }
+  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (PUTT_TOUCH ? PUTT_TOUCH.win : .02)) { p = ps; pinHigh = true; }
   const terr = Math.abs(Math.log(sw.ratio / TEMPO)), tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .45 ? 'good' : 'off', quick = sw.ratio > TEMPO;
   let dist = F * Math.min(p, 1.15) * (1 - clamp((terr - PERFECT - .25) * .04, 0, .03)); // putting: a bad tempo takes a touch off (3% at most)...
   let th = sw.curveDeg; const pure = Math.abs(th) < 1.6 * tight; th = pure ? 0 : clamp(th - Math.sign(th) * 1.6 * tight, -25, 25);
@@ -4302,7 +4304,7 @@ function launch(sw) {
   if (G.mode === 'putt') return launchPutt(sw);
   const tight = MODES[G.mode].tight || 1, mrisk = MODES[G.mode].risk || 1, risk = mrisk * 1.1; /* 1.1: every full-swing shot punishes flaws a touch more */
   const cl = club(), F = G.Feff, D = G.D, ps = pStar(), d = G.dir, r = right(d), h = G.height;
-  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (PH_RULE ? PH_RULE.win : .009) * tight) { p = ps; pinHigh = true; }
+  let p = sw.p, pinHigh = false; if (Math.abs(p - ps) <= (SG_POWER_WIN && SG_POWER_WIN[G.mode] ? SG_POWER_WIN[G.mode] : (PH_RULE ? PH_RULE.win : .009) * tight)) { p = ps; pinHigh = true; } /* SG_POWER_WIN: the short game's wider window */
   let carry = dOfP(p);
   const terr = Math.abs(Math.log(sw.ratio / TEMPO)); const tq = terr < PERFECT ? 'perfect' : terr < PERFECT + .12 * clubK() * swingEase() ? 'good' : 'off'; const quick = sw.ratio > TEMPO; /* CLUB_DIFF: the good band scales with the club too */
   const sgT = SG_TEMPO && (G.mode === 'sand' || G.mode === 'chip' || G.mode === 'flop' || (G.mode === 'pitch' && D <= 50)) ? SG_TEMPO : null; /* SG_TEMPO: around the green */
