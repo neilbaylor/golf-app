@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v581'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v583'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -774,6 +774,7 @@ const TGT_TIP = true; /* chip575 (Neil 11-24, "chips come up short"; he OK'd a s
 const FRINGE_PUTT = { max: Infinity }; /* Neil 11-24 later ("I chip too much from fringe now... I preferred putting from fringe/fairway before"): no distance cap any more, the putter from the fringe at any length; only the clear-line rule stays (never putt across sand, rough or water). Was { max: 15 } */ /* chip575 (Neil 11-24: "only when putting is actually the better choice", cutoff 15 yd): from the fringe the caddie hands you the putter only within max yds of the hole AND with a clear line (only green, fringe or fairway between the ball and the hole: never across sand, rough or water); otherwise it plays the pitch it would from just off the green. (v575 handed over the putter from anywhere on the fringe: 20+ yds, across a bunker.) The putter is still yours to pick (canPutt). null = as v575 */
 const SAND_NO_UPAIM = true; /* chip575 (Neil 11-24): CHIP_UP's 1.5% aim past the pin is not applied to greenside bunker splashes (the green always sits above the bunker, so it fired on almost every one and a perfect splash finished ~1 yd past). CHIP_UP2's own look-aheads still run. false = as v575 */
 const SG_KNEE = { pitch: .25, flop: .25, sand: .25 }; /* chip575 (Neil 11-24, "a wider snap window or a finer short-game meter, pick the better by measurement"): the short game's meter knee moves from .6 to .25. The shortest few yards (to the shot's minimum, 5 yds for a wedge pitch) now take the bottom quarter of the meter instead of 60% of it, so the yards you actually chip with get 75% of the meter instead of 40%: 1% of the meter is ~0.7 yd on a lob-wedge pitch (was ~1.3) and a 20-yd pitch sits at ~.47 (was .71). Measured on 1,018 greenside spots, 10-30 yd, 3 courses, realistic strikes (power error sigma 3% / 5% of the meter, tempo and swipe errors): median finish 2.76 -> 2.00 yd (sigma 3%) and 4.94 -> 3.07 (5%), on the green 84 -> 90% / 74 -> 84%. A 2% wider pin-high snap (.03) did 1.96 / 4.22 yd, on 87 / 76%: about the same for tidy strikes, much worse for loose ones. Perfect strikes unchanged (0.68 -> 0.72 yd). Full swings, punches and putts keep .6. null = .6 everywhere, as v575 */
+const CUP_HOLE = true; /* Neil 11-24 ("the hole style cup is cool"): the target is a dark hole the size of the ball with a thin pink rim, so a light pull shows a dark sliver beside the ball and only a centred ball covers it (the pink ring, bigger than the ball, looked 'arrived' a few % early); it glows pink inside the perfect window (PINK_TRUE). false = the pink ring (v581) */
 const PINK_TRUE = true; /* Neil 11-24 ("when I go to the circle I come up a touch short, all shot types"): the fill turned pink within 1.5% of the meter of the target for every swing, but a full swing only snaps to perfect within ~0.45% (FULL_STRICT), so stopping at the first pink left full shots ~1.5% light; and the ball reached the cup's ring ~6% before its centre. Now the fill (and the cup, filled pink) shows 'on target' over exactly the window that snaps to perfect for the swing in hand (pitch/flop/sand 2%, putt 1.7%, full swings ~0.45%). false = as v578 */
 function powWin() { if (G.mode === 'putt') return PUTT_TOUCH ? PUTT_TOUCH.win : .02; const tight = (MODES[G.mode] && MODES[G.mode].tight) || 1, fullSw = G.mode === 'full' || G.mode === 'power' || G.mode === 'punch'; return SG_POWER_WIN && SG_POWER_WIN[G.mode] ? SG_POWER_WIN[G.mode] : (PH_RULE ? (FULL_STRICT && fullSw ? FULL_STRICT.win : PH_RULE.win) : .009) * tight; } /* PINK_TRUE: the power window launch() snaps to perfect, for the swing in hand */
 const TGT_STYLE = 'cup'; /* 'cup' (Neil 11-24, mockup E "ball tip + cup"): the power fill ends in a small golf ball riding the track (its centre = the real power) and the target is a pink cup ring on the track (its centre = the exact target): ball in the cup = on target. 'tick' = TGT_BADGE's ink tick (mockup A). Both keep TGT_BADGE's badge inside the ring */
@@ -2341,20 +2342,22 @@ function buildCup() { return (() => { /* the cup (per hole: HOLESYS keeps it in 
   g.add(hole, wall, rim); HS.add(g);
   return { g, stencil };
 })(); }
+const SQ_LIFE = true; /* ROLLBACK: false -> as v582 (3 squirrels that only sit, or hop tree to tree when one is 5-16 yd away). Neil (24 Nov): "Do the background squirrels move? ... he seemed to just be static" -> both: idle life while sitting (tail flicks, a little bob, head-down nibbles, turning about) and, with no tree close by, a hop out onto the grass to forage and back; and 5 squirrels, not 3. Two new atlas frames in the spare cells (same texture size, same one draw call) */
 const CRITTERS = (() => {
   // background life: a couple of loose flocks circling high over the course and a few squirrels hopping between trunks near the ball.
   // All of them are camera-facing stickers from one small atlas, drawn in ONE instanced draw call; the CPU work is ~12 tiny updates a frame.
   /* 128px cells (drawn at 2x on a 64-unit grid), 16 to a row: two squirrel frames, then nine per bird (an eight-step wingbeat + a glide) */
-  const FW = 128, COLS = 16, NF = 38, ROWS = Math.ceil(NF / COLS), c = document.createElement('canvas'); c.width = FW * COLS; c.height = FW * ROWS; const x = c.getContext('2d'); x.lineJoin = x.lineCap = 'round';
+  const FW = 128, COLS = 16, NF = SQ_LIFE ? 40 : 38, ROWS = Math.ceil(NF / COLS), c = document.createElement('canvas'); c.width = FW * COLS; c.height = FW * ROWS; const x = c.getContext('2d'); x.lineJoin = x.lineCap = 'round';
   const fr = (i, f) => { x.save(); x.translate((i % COLS) * FW, Math.floor(i / COLS) * FW); x.scale(FW / 64, FW / 64); f(); x.restore(); };
-  const sq = (run) => { // squirrel, facing right, feet at the bottom of the frame
+  const sq = (run, pose) => { /* squirrel; pose (SQ_LIFE): 'flick' = tail swept out behind, 'nibble' = head down over an acorn */ const fl = pose === 'flick', nb = pose === 'nibble'; //, facing right, feet at the bottom of the frame
     x.fillStyle = '#b36f3c'; x.strokeStyle = INK; x.lineWidth = 3.2;
-    x.beginPath(); if (run) { x.moveTo(14, 44); x.bezierCurveTo(2, 36, 0, 20, 12, 16); x.bezierCurveTo(22, 13, 22, 28, 16, 34); } else { x.moveTo(20, 56); x.bezierCurveTo(4, 50, 2, 24, 14, 14); x.bezierCurveTo(26, 6, 30, 26, 22, 34); } x.fill(); x.stroke(); // tail
-    x.beginPath(); if (run) x.ellipse(32, 46, 15, 9, -.15, 0, 7); else x.ellipse(30, 46, 10, 14, .1, 0, 7); x.fill(); x.stroke(); // body
-    x.beginPath(); if (run) x.ellipse(47, 39, 8, 7, 0, 0, 7); else x.ellipse(37, 29, 7.5, 7, 0, 0, 7); x.fill(); x.stroke(); // head
-    x.beginPath(); if (run) { x.moveTo(45, 32); x.lineTo(47, 26); x.lineTo(50, 32); } else { x.moveTo(34, 23); x.lineTo(36, 16); x.lineTo(39, 22); } x.fill(); x.stroke(); // ear
-    x.fillStyle = '#ecc89a'; x.beginPath(); if (run) x.ellipse(32, 50, 9, 3.5, -.1, 0, 7); else x.ellipse(32, 49, 5, 8, .1, 0, 7); x.fill(); // belly
-    x.fillStyle = INK; x.beginPath(); if (run) x.arc(50, 38, 1.6, 0, 7); else x.arc(40, 28, 1.6, 0, 7); x.fill(); // eye
+    x.beginPath(); if (run) { x.moveTo(14, 44); x.bezierCurveTo(2, 36, 0, 20, 12, 16); x.bezierCurveTo(22, 13, 22, 28, 16, 34); } else if (fl) { x.moveTo(22, 56); x.bezierCurveTo(7, 50, 6, 18, 21, 9); x.bezierCurveTo(32, 3, 35, 17, 27, 16); x.bezierCurveTo(20, 17, 20, 32, 25, 38); } else { x.moveTo(20, 56); x.bezierCurveTo(4, 50, 2, 24, 14, 14); x.bezierCurveTo(26, 6, 30, 26, 22, 34); } x.fill(); x.stroke(); // tail
+    x.beginPath(); if (run) x.ellipse(32, 46, 15, 9, -.15, 0, 7); else if (nb) x.ellipse(31, 47, 10, 13, .38, 0, 7); else x.ellipse(30, 46, 10, 14, .1, 0, 7); x.fill(); x.stroke(); // body
+    x.beginPath(); if (run) x.ellipse(47, 39, 8, 7, 0, 0, 7); else if (nb) x.ellipse(42, 38, 7.5, 7, .3, 0, 7); else x.ellipse(37, 29, 7.5, 7, 0, 0, 7); x.fill(); x.stroke(); // head
+    x.beginPath(); if (run) { x.moveTo(45, 32); x.lineTo(47, 26); x.lineTo(50, 32); } else if (nb) { x.moveTo(38, 33); x.lineTo(40, 26); x.lineTo(43, 32); } else { x.moveTo(34, 23); x.lineTo(36, 16); x.lineTo(39, 22); } x.fill(); x.stroke(); // ear
+    x.fillStyle = '#ecc89a'; x.beginPath(); if (run) x.ellipse(32, 50, 9, 3.5, -.1, 0, 7); else if (nb) x.ellipse(34, 50, 5, 7.5, .38, 0, 7); else x.ellipse(32, 49, 5, 8, .1, 0, 7); x.fill(); // belly
+    x.fillStyle = INK; x.beginPath(); if (run) x.arc(50, 38, 1.6, 0, 7); else if (nb) x.arc(45, 37, 1.6, 0, 7); else x.arc(40, 28, 1.6, 0, 7); x.fill(); // eye
+    if (nb) { x.fillStyle = '#8a5a2b'; x.strokeStyle = INK; x.lineWidth = 2; x.beginPath(); x.ellipse(47, 48, 3.4, 4, 0, 0, 7); x.fill(); x.stroke(); x.fillStyle = '#5a3a1c'; x.beginPath(); x.ellipse(47, 44.6, 3.8, 1.8, 0, 0, 7); x.fill(); x.stroke(); } /* the acorn in its paws */
     x.strokeStyle = INK; x.lineWidth = 2.6; x.beginPath(); if (run) { x.moveTo(22, 53); x.lineTo(18, 60); x.moveTo(42, 53); x.lineTo(47, 60); } else { x.moveTo(26, 59); x.lineTo(34, 59); } x.stroke(); };
   /* birds of the course, seen from below as they pass over: robin, blue jay, cardinal and a red-tailed hawk. Each gets five frames: up · half · level · down · glide */
   const SPC = [ /* wing, wing trim, body, breast, head, tail, span, chord */
@@ -2396,10 +2399,11 @@ const CRITTERS = (() => {
     if (!S.crest && !S.hawk) { x.strokeStyle = '#f4f1ea'; x.lineWidth = .8; x.beginPath(); x.arc(30.2, 27.6, 1.6, -2.6, -.6); x.stroke(); x.beginPath(); x.arc(33.8, 27.6, 1.6, -2.6, -.6); x.stroke(); } /* robin's white eye-arcs */ };
   /* the wingbeat as a smooth cycle: tips from high over the back (0) down below the body (half way) and back up */
   fr(0, () => sq(false)); fr(1, () => sq(true));
+  if (SQ_LIFE) { fr(38, () => sq(false, 'flick')); fr(39, () => sq(false, 'nibble')); }
   SPC.forEach((S, k) => { for (let j = 0; j < 8; j++) { const a = j / 8 * Math.PI * 2, cu = Math.cos(a); fr(2 + k * 9 + j, () => bird(S, 28.5 - 16.5 * cu, 2 + 8 * cu, Math.max(0, cu) * (Math.sin(a) < 0 ? 1 : .4))); } fr(2 + k * 9 + 8, () => bird(S, 30, 5)); });
   window.__critterAtlas = c;
   const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; /* mipmapped: crisp up close, no shimmer far off */
-  const NB = 16, NS = 3, N = NB + NS, base = new THREE.PlaneGeometry(1, 1); base.translate(0, .5, 0); // anchored at the feet
+  const NB = 16, NS = SQ_LIFE ? 5 : 3, N = NB + NS, base = new THREE.PlaneGeometry(1, 1); base.translate(0, .5, 0); // anchored at the feet
   const geo = new THREE.InstancedBufferGeometry(); geo.index = base.index; geo.setAttribute('position', base.attributes.position); geo.setAttribute('uv', base.attributes.uv);
   const iPos = new THREE.InstancedBufferAttribute(new Float32Array(N * 4), 4), iDat = new THREE.InstancedBufferAttribute(new Float32Array(N * 4), 4); // pos + screen roll; frame, size (signed = facing), alpha, pivot height
   iPos.setUsage(THREE.StreamDrawUsage); iDat.setUsage(THREE.StreamDrawUsage); geo.setAttribute('iPos', iPos); geo.setAttribute('iDat', iDat); geo.instanceCount = N;
@@ -2422,9 +2426,26 @@ const CRITTERS = (() => {
   const FK = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4], FSP = [[0], [1], [2], [1, 2], [3]], birds = []; for (let i = 0; i < NB; i++) birds.push({ f: flocks[FK[i]], k: FK.slice(0, i).filter(x => x === FK[i]).length, ou: (R() - .5) * 14, ov: (R() - .5) * 14, oh: (R() - .5) * 5, fl: R() * 6, rate: 6.5 + R() * 2.5, glide: R() * 8, sz: .85 + R() * .3, rot: 0, pu: NaN, pv: 0, ph2: 0 }); /* robins · jays · cardinals · jays and cardinals · hawks */
   birds.forEach((b, i) => { const L = FSP[FK[i]]; b.sp = L[b.k % L.length]; if (b.f.hawk) { b.rate = 2.6; b.ou = b.ov = b.oh = 0; b.sz = 1; } });
   // squirrels: sit by a trunk near the ball, now and then hop to a neighbouring tree
-  const sqs = []; for (let i = 0; i < NS; i++) sqs.push({ u: 1e9, v: 0, tu: 0, tv: 0, st: 'sit', t: R() * 3, face: 1, hop: 0 });
+  const sqs = []; for (let i = 0; i < NS; i++) sqs.push({ u: 1e9, v: 0, tu: 0, tv: 0, st: 'sit', t: R() * 3, face: 1, hop: 0, hu: 0, hv: 0, nx: 'sit', fid: 1 + R() * 2, fk: 0, ft: 0, fd: 1 });
   const nearTrees = (u, v, r0, r1) => TREES.filter(t => { const d = Math.hypot(t.u - u, t.v - v); return d > r0 && d < r1; });
-  const seat = (q) => { const c = nearTrees(G.ball.u, G.ball.v, 10, 55); if (!c.length) { q.u = 1e9; return; } const t = c[Math.floor(R() * c.length)], a = R() * 6.28, rr = (t.pine ? .9 : .7) + R() * .6; q.u = t.u + Math.cos(a) * rr; q.v = t.v + Math.sin(a) * rr; q.st = 'sit'; q.t = 1 + R() * 4; };
+  const seat = (q) => { const c = nearTrees(G.ball.u, G.ball.v, 10, 55); if (!c.length) { q.u = 1e9; return; } let t = c[Math.floor(R() * c.length)]; if (SQ_LIFE) for (let k = 0; k < 4 && sqs.some(o => o !== q && o.u < 1e8 && Math.hypot(o.hu - t.u, o.hv - t.v) < 3); k++) t = c[Math.floor(R() * c.length)]; const a = R() * 6.28, rr = (t.pine ? .9 : .7) + R() * .6; q.u = t.u + Math.cos(a) * rr; q.v = t.v + Math.sin(a) * rr; q.st = 'sit'; q.t = 1 + R() * 4; q.hu = q.u; q.hv = q.v; q.nx = 'sit'; q.ft = 0; };
+  /* (SQ_LIFE) one squirrel's step: idle fidgets while it sits or forages, and its hops (to a near tree, or out onto the grass and back). Writes sqF (atlas frame) and sqL (lift) */
+  const SQ_GRASS = { rough: 1, fairway: 1, deep: 1, pine: 1 }; let sqF = 0, sqL = 0;
+  const sqStep = (q, dt) => { sqF = 0; sqL = 0;
+    if (q.st === 'run') { const du = q.tu - q.u, dv = q.tv - q.v, L = Math.hypot(du, dv), sp = 4.2 * dt; sqF = 1; q.hop += dt * 5.5; sqL = Math.abs(Math.sin(q.hop * Math.PI)) * .22;
+      if (L <= sp) { q.u = q.tu; q.v = q.tv; sqL = 0; sqF = 0; q.st = q.nx; if (q.nx === 'forage') q.t = 2 + R() * 3; else { q.t = 1.5 + R() * 4; q.hu = q.u; q.hv = q.v; } q.fid = .3 + R() * .8; q.ft = 0; } else { q.u += du / L * sp; q.v += dv / L * sp; q.face = (du * _r.x - dv * _r.z) >= 0 ? 1 : -1; } return; }
+    const fo = q.st === 'forage';
+    if (q.ft > 0) { q.ft -= dt; const p = 1 - Math.max(0, q.ft) / q.fd; /* a fidget playing out */
+      if (q.fk === 0) sqF = (p * 4) % 2 < 1 ? 38 : 0; /* tail flicks: two quick twitches */
+      else if (q.fk === 1) sqL = Math.abs(Math.sin(p * Math.PI * 2)) * .1; /* two little bobs */
+      else if (q.fk === 2) { sqF = (p * 6) % 3 < 2.2 ? 39 : 0; sqL = sqF ? Math.abs(Math.sin(p * 40)) * .025 : 0; } /* head down nibbling, glancing up between bites */ }
+    else { q.fid -= dt; if (q.fid <= 0) { const r = R(); q.fk = fo ? (r < .75 ? 2 : r < .9 ? 0 : 3) : (r < .35 ? 0 : r < .6 ? 1 : r < .8 ? 2 : 3); if (q.fk === 3) { q.face *= -1; q.ft = 0; } else { q.fd = q.ft = q.fk === 0 ? .5 : q.fk === 1 ? .6 : 1.2 + R() * 1.2; } q.fid = (fo ? .4 : 1.2) + R() * (fo ? 1 : 2.5); } }
+    q.t -= dt; if (q.t > 0 || q.ft > 0) return;
+    if (fo) { q.tu = q.hu + (R() - .5) * .8; q.tv = q.hv + (R() - .5) * .8; q.st = 'run'; q.nx = 'sit'; q.hop = 0; return; } /* back to its tree */
+    const c = nearTrees(q.u, q.v, 5, 16); if (c.length && R() < .5) { const tr = c[Math.floor(R() * c.length)]; q.tu = tr.u + (R() - .5) * 1.4; q.tv = tr.v + (R() - .5) * 1.4; q.st = 'run'; q.nx = 'sit'; q.hop = 0; return; }
+    if (R() < .6) for (let k = 0; k < 4; k++) { const a = R() * 6.28, d = 3 + R() * 4, tu = q.hu + Math.cos(a) * d, tv = q.hv + Math.sin(a) * d; /* out onto the grass to forage, never near the ball */
+      if (Math.hypot(tu - G.ball.u, tv - G.ball.v) > 5 && SQ_GRASS[lieAt(tu, tv)]) { q.tu = tu; q.tv = tv; q.st = 'run'; q.nx = 'forage'; q.hop = 0; return; } }
+    q.t = 1 + R() * 3; };
   const _r = new THREE.Vector3(), _up = new THREE.Vector3(); const TAU = Math.PI * 2;
   function update(dt, t) {
     if (RM) dt *= .5;
@@ -2442,7 +2463,7 @@ const CRITTERS = (() => {
     for (let j = 0; j < NS; j++) { const q = sqs[j], i = NB + j;
       if (Math.hypot(q.u - G.ball.u, q.v - G.ball.v) > 75 || q.u > 1e8) seat(q);
       let lift = 0, frame = 0;
-      if (q.st === 'sit') { q.t -= dt; if (q.t <= 0) { const c = nearTrees(q.u, q.v, 5, 16); if (c.length && R() < .7) { const tr = c[Math.floor(R() * c.length)]; q.tu = tr.u + (R() - .5) * 1.4; q.tv = tr.v + (R() - .5) * 1.4; q.st = 'run'; q.hop = 0; } else { q.t = 1 + R() * 3; if (R() < .5) q.face *= -1; } } }
+      if (SQ_LIFE) { sqStep(q, dt); frame = sqF; lift = sqL; } else if (q.st === 'sit') { q.t -= dt; if (q.t <= 0) { const c = nearTrees(q.u, q.v, 5, 16); if (c.length && R() < .7) { const tr = c[Math.floor(R() * c.length)]; q.tu = tr.u + (R() - .5) * 1.4; q.tv = tr.v + (R() - .5) * 1.4; q.st = 'run'; q.hop = 0; } else { q.t = 1 + R() * 3; if (R() < .5) q.face *= -1; } } }
       else { const du = q.tu - q.u, dv = q.tv - q.v, L = Math.hypot(du, dv), sp = 4.2 * dt; frame = 1; q.hop += dt * 5.5; lift = Math.abs(Math.sin(q.hop * Math.PI)) * .22;
         if (L <= sp) { q.u = q.tu; q.v = q.tv; q.st = 'sit'; q.t = 1.5 + R() * 4; lift = 0; } else { q.u += du / L * sp; q.v += dv / L * sp; q.face = (du * _r.x - dv * _r.z) >= 0 ? 1 : -1; } }
       const ok = q.u < 1e8; P[i * 4] = ok ? q.u : 0; P[i * 4 + 1] = ok ? groundHeight(q.u, q.v) + lift - .02 : -50; P[i * 4 + 2] = ok ? -q.v : 0; P[i * 4 + 3] = 0; D[i * 4] = frame; D[i * 4 + 1] = .62 * q.face; D[i * 4 + 2] = ok ? 1 : 0; D[i * 4 + 3] = 0; }
@@ -3843,7 +3864,7 @@ ${[1, 2, 3].map(sd => boilGroup(sd, null)).join('')}
 <line id="tgtLine" x1="88" x2="132" y1="0" y2="0" stroke="${PINK}" stroke-width="3" stroke-dasharray="5 4" stroke-linecap="round"/>
 <g id="chev"></g>
 <g id="knob"></g>
-${!TGT_BADGE ? '' : TGT_STYLE === 'cup' ? `<g id="tgtCup" opacity="0"><circle id="tgtCupIn" r="7" fill="${PINK}" opacity="0"/><circle r="8.5" fill="none" stroke="${PINK}" stroke-width="3.5"/><circle r="8.5" fill="none" stroke="${INK}" stroke-width="1.2"/></g><circle id="tgtBall" r="5" fill="#fff" stroke="${INK}" stroke-width="2.2" opacity="0"/>` : `<line id="tgtTick" x1="0" y1="0" x2="0" y2="0" stroke="${INK}" stroke-width="${TGT_BADGE.tick}" stroke-linecap="round" opacity="0"/>`}<g id="badge"><rect x="-23" y="-12" width="46" height="24" rx="12" fill="${PINK}" stroke="${INK}" stroke-width="2.8"/><text id="badgeTxt" x="0" y="6.5" text-anchor="middle" font-family="Luckiest Guy, sans-serif" font-size="16" fill="#fff">165</text></g>
+${!TGT_BADGE ? '' : TGT_STYLE === 'cup' ? `<g id="tgtCup" opacity="0">${CUP_HOLE ? `<circle id="tgtCupIn" r="10" fill="${PINK}" opacity="0"/><circle r="7.6" fill="${PINK}" stroke="${INK}" stroke-width="1.4"/><circle r="6.2" fill="#14200f"/>` : `<circle id="tgtCupIn" r="7" fill="${PINK}" opacity="0"/><circle r="8.5" fill="none" stroke="${PINK}" stroke-width="3.5"/><circle r="8.5" fill="none" stroke="${INK}" stroke-width="1.2"/>`}</g><circle id="tgtBall" r="5" fill="#fff" stroke="${INK}" stroke-width="2.2" opacity="0"/>` : `<line id="tgtTick" x1="0" y1="0" x2="0" y2="0" stroke="${INK}" stroke-width="${TGT_BADGE.tick}" stroke-linecap="round" opacity="0"/>`}<g id="badge"><rect x="-23" y="-12" width="46" height="24" rx="12" fill="${PINK}" stroke="${INK}" stroke-width="2.8"/><text id="badgeTxt" x="0" y="6.5" text-anchor="middle" font-family="Luckiest Guy, sans-serif" font-size="16" fill="#fff">165</text></g>
 <g id="aimOv" opacity="0" pointer-events="none"><circle cx="110" cy="110" r="88" fill="rgba(29,42,26,.55)"/><text x="110" y="104" text-anchor="middle" font-family="Luckiest Guy, sans-serif" font-size="25" fill="#fff" stroke="${INK}" stroke-width="5" paint-order="stroke">Back to</text><text x="110" y="134" text-anchor="middle" font-family="Luckiest Guy, sans-serif" font-size="25" fill="#fff" stroke="${INK}" stroke-width="5" paint-order="stroke">Swing</text></g>`;
 const elTick = TGT_BADGE ? $('#tgtTick') : null, elCup = TGT_BADGE ? $('#tgtCup') : null, elBall = TGT_BADGE ? $('#tgtBall') : null; /* TGT_BADGE / TGT_STYLE */ if (elCup && elBall) $('#badge').after(elCup, elBall); /* (the cup and ball over the badge's edge) */ if (TGT_LINE_TOP) { const l = $('#tgtLine'), k = $('#knob'); if (l && k) k.after(l); } /* TGT_LINE_TOP: the target line over the knob */ const elKnob = $('#knob'), elChev = $('#chev'), elBadge = $('#badge'), elPwr = $('#pwrFill'), elTmp = $('#tmpFill'), elTgt = $('#tgtLine'), elAimOv = $('#aimOv'), boils = [...dial.querySelectorAll('.boil')];
 function applyModeTempo() {
