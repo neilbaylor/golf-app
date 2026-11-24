@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v583'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v585'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1224,8 +1224,38 @@ const HATCH_BG_PX = 1 << 19; /* (HATCH_BG: a band is at most about this many pix
 function bandHatch(g, d) { /* HATCH_BG: on g, a canvas holding the map's rows d.y .. d.y + d.h (full width): the line sets that reach rows d.fa .. d.fb, whole, with the map's line state, inside only the clip's whole-pixel box d.cb (where the map's own clip cuts lines off). The worker's code too (its source is sent) */
   const st = d.st; g.translate(0, -d.y); g.beginPath(); g.rect(d.cb[0], d.cb[1], d.cb[2] - d.cb[0], d.cb[3] - d.cb[1]); g.clip(); g.lineCap = st.cap; g.lineJoin = st.join; g.miterLimit = st.ml; g.globalAlpha = st.ga; g.globalCompositeOperation = st.gco; g.setLineDash(st.dash); g.lineDashOffset = st.doff;
   for (const l of d.L) { const s = l.s, m = l.lw / 2 + 2; g.beginPath(); for (let i = 0; i < s.length; i += 4) { const a = s[i + 1], b = s[i + 3]; if ((a > b ? a : b) + m < d.fa || (a < b ? a : b) - m > d.fb) continue; g.moveTo(s[i], a); g.lineTo(s[i + 2], b); } g.strokeStyle = l.col; g.lineWidth = l.lw; g.stroke(); } }
+/* ROUGH_WORKER (wk579, Neil: move the main-thread canvas painting off the main thread, identical pixels): a background hole build (the next hole while you play, a course's
+   first hole rebuilt behind the home screen, the tutorial's hole) paints the map's opening layers (its base green, ~900 soft blobs, both pencil hatchings, the little v marks
+   and the flower dots; 280-420 ms of main-thread work per map at 4x CPU, ~10% of a background build) as the first thing on a blank map, with no clip. Now the worker paints them:
+   their random numbers are drawn here as the build starts (rng(7)'s first draws, in the same order, so the painting goes on from the same point), the worker draws the same calls
+   on a canvas of the map's size (the hatching in HATCH_LEAN's bands, as a background build draws it: that is not quite the same as one whole-map stroke), and the map takes its rows back in HATCH_TILES copies (opaque: the same pixels). In Chrome every unclipped canvas call rasterizes identically on a
+   worker's canvas (wk579 h/rp.js: 24 kinds of call; only clip() differs, and nothing here is clipped). Proven byte-identical (map, green and mini map) on all 36 holes built in
+   the background, on the worker and on the main-thread fallback, and in the real flow (single file and split build). Measured (4x CPU, 4 alternating rounds): those layers' main-thread
+   ms per map Augusta 13 563->89, Augusta 1 334->82, Hunt 2 336->55, OslerBrook 1 299->64, plus 17-39 ms to draw the numbers as the build starts; their longest step on Augusta 13
+   156->59 ms. The worker holds one map-sized canvas while it paints (up to ~25 MB on Augusta 13). Safari's worker canvas is NOT proven here, so this is off until Neil checks it on
+   the iPhone. The boot's own builds (driven straight through), no worker or OffscreenCanvas (Safari before 16.4), or no answer in 8 s: painted here as before.
+   false = as v579 */
+const ROUGH_WORKER = !/[?&]rw=0/.test(location.search); /* ON (Neil 24 Nov on his iPhone with ?rw=1: "feels very smooth"). ?rw=0 turns it off for a session; ROLLBACK: false -> as v579 */
+let BUILD_SYNC = false; /* (ROUGH_WORKER: true while HOLESYS.boot drives builds straight through: no worker job then, its answer could never come in) */
+function roughDraw(g, P) { /* ROUGH_WORKER: the map's opening layers from P (see ROUGH.kick), as paintCourseSteps draws them. The worker's code too (its source is sent) */
+  g.fillStyle = '#5c9c3a'; if (P.B > 1) for (let k = 0; k < P.B; k++) { const y0 = Math.floor(P.H * k / P.B), y1 = Math.floor(P.H * (k + 1) / P.B); g.fillRect(0, y0, P.W, y1 - y0); } else g.fillRect(0, 0, P.W, P.H);
+  for (let i = 0; i < P.bs.length; i++) { g.fillStyle = P.bs[i]; g.beginPath(); g.arc(P.bx[i * 3], P.bx[i * 3 + 1], P.bx[i * 3 + 2], 0, 7); g.fill(); }
+  if (P.lean) { const W = g.canvas.width, H = g.canvas.height; /* HATCH_LEAN's bands, as a background build hatches: each band's rows (with HATCH_PAD rows of margin) copied out, its strokes drawn on them in the band's own frame, its own rows copied back */
+    for (let k = 0; k < P.K; k++) { const y0 = Math.floor(H * k / P.K), y1 = Math.floor(H * (k + 1) / P.K), t0 = Math.max(0, y0 - P.PAD), t1 = Math.min(H, y1 + P.PAD), bc = new OffscreenCanvas(W, t1 - t0), bg = bc.getContext('2d', { willReadFrequently: true });
+      bg.drawImage(g.canvas, 0, t0, W, t1 - t0, 0, 0, W, t1 - t0); hatchTile(bg, P.L, t0, t1 - t0); g.save(); g.imageSmoothingEnabled = false; g.drawImage(bc, 0, y0 - t0, W, y1 - y0, 0, y0, W, y1 - y0); g.restore(); } }
+  else for (const l of P.L) { const s = l.s; g.beginPath(); for (let i = 0; i < s.length; i += 4) { g.moveTo(s[i], s[i + 1]); g.lineTo(s[i + 2], s[i + 3]); } g.strokeStyle = l.col; g.lineWidth = l.lw; g.stroke(); }
+  g.beginPath(); for (let i = 0; i < P.v.length; i += 2) { const x = P.v[i], y = P.v[i + 1]; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke();
+  for (let i = 0; i < P.ds.length; i++) { g.fillStyle = P.ds[i]; g.beginPath(); g.arc(P.dx[i * 3], P.dx[i * 3 + 1], P.dx[i * 3 + 2], 0, 7); g.fill(); } }
+function* roughDrawG(g, P, cv) { /* ROUGH_WORKER: roughDraw here, a slice at a time (the worker failed after the job was set up): the same calls in the same order */
+  g.fillStyle = '#5c9c3a'; if (P.B > 1) for (let k = 0; k < P.B; k++) { const y0 = Math.floor(P.H * k / P.B), y1 = Math.floor(P.H * (k + 1) / P.B); g.fillRect(0, y0, P.W, y1 - y0); yield flushCv(cv); } else g.fillRect(0, 0, P.W, P.H);
+  for (let i = 0; i < P.bs.length; i++) { g.fillStyle = P.bs[i]; g.beginPath(); g.arc(P.bx[i * 3], P.bx[i * 3 + 1], P.bx[i * 3 + 2], 0, 7); g.fill(); if (i % 50 === 49) yield flushCv(cv); }
+  if (P.lean) { const W = cv.width, H = cv.height; for (let k = 0; k < P.K; k++) { const y0 = Math.floor(H * k / P.K), y1 = Math.floor(H * (k + 1) / P.K), t0 = Math.max(0, y0 - P.PAD), t1 = Math.min(H, y1 + P.PAD), bm = document.createElement('canvas'); bm.width = W; bm.height = t1 - t0; /* as the hatch's own fallback draws a band */
+      const tg = bm.getContext('2d'); tg.drawImage(cv, 0, t0, W, t1 - t0, 0, 0, W, t1 - t0); hatchTile(tg, P.L, t0, t1 - t0); g.save(); g.imageSmoothingEnabled = false; g.drawImage(bm, 0, y0 - t0, W, y1 - y0, 0, y0, W, y1 - y0); g.restore(); bm.width = bm.height = 0; yield flushCv(cv); } }
+  else for (const l of P.L) { const s = l.s; g.beginPath(); for (let i = 0; i < s.length; i += 4) { g.moveTo(s[i], s[i + 1]); g.lineTo(s[i + 2], s[i + 3]); } g.strokeStyle = l.col; g.lineWidth = l.lw; g.stroke(); yield flushCv(cv); }
+  g.beginPath(); for (let i = 0; i < P.v.length; i += 2) { const x = P.v[i], y = P.v[i + 1]; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke();
+  for (let i = 0; i < P.ds.length; i++) { g.fillStyle = P.ds[i]; g.beginPath(); g.arc(P.dx[i * 3], P.dx[i * 3 + 1], P.dx[i * 3 + 2], 0, 7); g.fill(); } }
 const HATCHW = (() => { let w = null, bad = !HATCH_ASYNC, seq = 0; const jobs = new Map();
-  const SRC = `const hatchTile = ${hatchTile}; const bandHatch = ${bandHatch}; onmessage = e => { const d = e.data; let bm; try { const oc = new OffscreenCanvas(d.w, d.h), g = oc.getContext('2d', { willReadFrequently: true }); g.drawImage(d.im, 0, 0); d.im.close();
+  const SRC = `const hatchTile = ${hatchTile}; const bandHatch = ${bandHatch}; ${ROUGH_WORKER ? 'const roughDraw = ' + roughDraw + ';' : ''} onmessage = e => { const d = e.data; let bm; try { ${ROUGH_WORKER ? 'if (d.rough) { const rc = new OffscreenCanvas(d.w, d.h), rg = rc.getContext("2d", { willReadFrequently: true }); roughDraw(rg, d.P); bm = rc.transferToImageBitmap(); postMessage({ id: d.id, bm }, [bm]); return; }' : ''} const oc = new OffscreenCanvas(d.w, d.h), g = oc.getContext('2d', { willReadFrequently: true }); g.drawImage(d.im, 0, 0); d.im.close();
     if (d.ch) bandHatch(g, d); else if (d.lean) hatchTile(g, d.L, d.y, d.h); else for (const l of d.L) { const s = l.s; g.beginPath(); for (let i = 0; i < s.length; i += 4) { g.moveTo(s[i], s[i + 1]); g.lineTo(s[i + 2], s[i + 3]); } g.strokeStyle = l.col; g.lineWidth = l.lw; g.stroke(); }
     bm = oc.transferToImageBitmap(); } catch (err) { postMessage({ id: d.id, err: String(err) }); return; } postMessage({ id: d.id, bm }, [bm]); };`;
   function fail() { bad = true; for (const j of jobs.values()) j.state = 2; jobs.clear(); try { if (w) w.terminate(); } catch (e) {} w = null; } /* (never tried again: the strokes are drawn here) */
@@ -1239,7 +1269,26 @@ const HATCHW = (() => { let w = null, bad = !HATCH_ASYNC, seq = 0; const jobs = 
     j.drop = () => { if (j.state === 0) { j.state = 2; jobs.delete(id); } if (j.bm) { try { j.bm.close(); } catch (e) {} j.bm = null; } };
     (band ? createImageBitmap(cv, 0, band.y, cv.width, band.h) : createImageBitmap(cv)).then(im => { if (j.state !== 0) { im.close(); return; } try { wk.postMessage(band && band.ch ? Object.assign({ id, im, w: cv.width }, band) : band ? { id, w: cv.width, h: band.h, y: band.y, lean: 1, im, L } : { id, w: cv.width, h: cv.height, im, L }, [im]); } catch (e) { im.close(); fail(); } }, () => j.drop());
     return j; } /* (HATCH_BG: band.ch, a band job: { ch: 1, y, h, fa, fb, L, st }, see bandHatch) */
-  return { run, get ok() { return !bad; } }; })();
+  function rough(P, w, h) { /* ROUGH_WORKER: a job: a w x h canvas with roughDraw(P) on it. state 0: waiting, 1: done (bm), 2: draw it here instead */
+    const j = { state: 0, bm: null, turned: false, t0: performance.now() }, wk = get(); if (!wk) { j.state = 2; j.drop = () => {}; return j; }
+    const id = ++seq; jobs.set(id, j); queueMicrotask(() => { j.turned = true; });
+    j.drop = () => { if (j.state === 0) { j.state = 2; jobs.delete(id); } if (j.bm) { try { j.bm.close(); } catch (e) {} j.bm = null; } };
+    try { wk.postMessage({ id, rough: 1, w, h, P }); } catch (e) { fail(); } return j; }
+  return { run, rough, avail: () => !!get(), get ok() { return !bad; } }; })();
+const ROUGH = (() => { const M = new WeakMap(); /* ROUGH_WORKER: per map (the hole's MAP object): { R, P, j } */
+  function kick() { /* as a background build sets up its map (MAP known): its opening layers' numbers, and the worker job that paints them */
+    if (!ROUGH_WORKER || BUILD_SYNC || !HATCH_ASYNC || !HATCHW.ok || M.has(MAP) || !HATCHW.avail()) return; /* (avail: the worker made, or never: no OffscreenCanvas / Worker / createImageBitmap) */
+    const R = rng(7), AK = AUGD ? MAP.W * MAP.H / (1536 * 2752) : 1, bs = [], bx = [], v = [], ds = [], dx = []; /* the same draws, in the same order, as paintCourseSteps' rough */
+    for (let i = 0; i < 900 * AK; i++) { bs.push(R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`); bx.push(R() * MAP.W, R() * MAP.H, 10 + R() * 60); }
+    const segs = n => { const s = new Float64Array(Math.ceil(n) * 4); for (let i = 0, k = 0; i < n; i++, k += 4) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; s[k] = x; s[k + 1] = y; s[k + 2] = x + Math.cos(a) * l; s[k + 3] = y + Math.sin(a) * l; } return s; };
+    const L = [{ s: segs(16000 * AK), col: 'rgba(25,75,25,.25)', lw: 1.2 }, { s: segs(6000 * AK), col: 'rgba(180,225,110,.2)', lw: 1 }];
+    for (let i = 0; i < 1800 * AK; i++) v.push(R() * MAP.W, R() * MAP.H);
+    for (let i = 0; i < 380 * AK; i++) { ds.push(R() < .5 ? 'rgba(255,250,240,.85)' : 'rgba(255,214,70,.9)'); dx.push(R() * MAP.W, R() * MAP.H, 1.3 + R()); }
+    const P = { W: MAP.W, H: MAP.H, B: MAP_FILL_BANDS > 1 ? MAP_FILL_BANDS : 1, lean: HATCH_LEAN, K: HATCH_TILES, PAD: HATCH_PAD, bs, bx: Float64Array.from(bx), L, v: Float64Array.from(v), ds, dx: Float64Array.from(dx) };
+    M.set(MAP, { R, P, j: HATCHW.rough(P, Math.floor(MAP.W), Math.floor(MAP.H)) }); }
+  function end(g, P) { /* the context's state as the rough's own drawing leaves it */
+    g.fillStyle = P.ds.length ? P.ds[P.ds.length - 1] : P.bs.length ? P.bs[P.bs.length - 1] : '#5c9c3a'; g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.beginPath(); if (P.ds.length) { const i = (P.ds.length - 1) * 3; g.arc(P.dx[i], P.dx[i + 1], P.dx[i + 2], 0, 7); } }
+  return { kick, end, get: m => M.get(m) || null, free: m => { const e = M.get(m); if (e) { M.delete(m); e.j.drop(); } } }; })();
 const FESCUE_TILE = {}; /* FESCUE: the fescue tile is the same on every hole (its own seed): painted once per session and kind */
 function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats without seams: green showing low down, golden-straw wisps all leaning one way, pale seed heads, a few inked blades */
   const had = FESCUE_TILE.t; if (had && !(had.x.isContextLost && had.x.isContextLost())) return g.createPattern(had.c, 'repeat');
@@ -1264,7 +1313,7 @@ const MAP_FILL_BANDS = 4; /* perf508: the map's first paint (its base green over
 function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0, S4 = BUILD_SLICE4 && chunk && S4_BG; /* (BUILD_SLICE4) */ /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
   let needleP = null; /* one tile per painting */
   const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined); /* COURSE_CPU */
-  const R = rng(7), ppy = MAP.ppy; const X = u => (u - MAP.U0) * ppy, Y = v => (MAP.V1 - v) * ppy;
+  const RJ = ROUGH_WORKER && chunk ? ROUGH.get(MAP) : null; /* ROUGH_WORKER */ const R = RJ ? RJ.R : rng(7), ppy = MAP.ppy; const X = u => (u - MAP.U0) * ppy, Y = v => (MAP.V1 - v) * ppy;
   const path = (pts, close = true) => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); if (close) g.closePath(); };
   const sketch = (pts, lw = 2.6, a = .85) => {
     for (let pass = 0; pass < 2; pass++) {
@@ -1294,10 +1343,17 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
       if (k < K - 1) yield flushCv(cv); } }
   // rough
   const AK = AUGD ? MAP.W * MAP.H / (1536 * 2752) : 1; /* Augusta's maps are bigger: the same density of marks */
+  let RJD = false, async = false; if (RJ) { /* ROUGH_WORKER: the opening layers from the worker (RJ.P: R's first draws), copied in by bands; the same drawing here if it couldn't */
+    const j = RJ.j; let turned = false; queueMicrotask(() => { turned = true; }); yield HATCH_WAIT;
+    async = turned; if (turned) { try { while (j.state === 0) { yield HATCH_WAIT; if (j.state === 0 && (!j.turned || performance.now() - j.t0 > 8000)) j.drop(); } } finally { if (j.state === 0) j.drop(); } } else j.drop();
+    if (j.state === 1) { const W = cv.width, H = cv.height, K = HATCH_TILES; g.save(); g.imageSmoothingEnabled = false; g.drawImage(j.bm, 0, 0, 1, 1, 0, 0, 1, 1); g.restore(); yield flushCv(cv); /* (a 1-px draw first, its own slice: the first draw of a worker's bitmap on this canvas carries a one-off cost, ~30-50 ms at 4x CPU; band 0 covers the pixel) */ for (let k = 0; k < K; k++) { const y0 = Math.floor(H * k / K), y1 = Math.floor(H * (k + 1) / K); g.save(); g.imageSmoothingEnabled = false; g.drawImage(j.bm, 0, y0, W, y1 - y0, 0, y0, W, y1 - y0); g.restore(); if (k < K - 1) yield flushCv(cv); } }
+    else yield* roughDrawG(g, RJ.P, cv);
+    ROUGH.free(MAP); ROUGH.end(g, RJ.P); brkN += RJ.P.bs.length; RJD = true; } /* (brkN: the blobs' slice count, as their loop leaves it) */
+  if (!RJD) {
   g.fillStyle = '#5c9c3a'; if (chunk && MAP_FILL_BANDS > 1) for (let k = 0; k < MAP_FILL_BANDS; k++) { const y0 = Math.floor(MAP.H * k / MAP_FILL_BANDS), y1 = Math.floor(MAP.H * (k + 1) / MAP_FILL_BANDS); g.fillRect(0, y0, MAP.W, y1 - y0); yield flushCv(cv); } else g.fillRect(0, 0, MAP.W, MAP.H); /* MAP_FILL_BANDS */
   for (let i = 0; i < 900 * AK; i++) { g.fillStyle = R() < .5 ? `rgba(40,110,40,${.05 + R() * .07})` : `rgba(150,200,80,${.04 + R() * .06})`; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 10 + R() * 60, 0, 7); g.fill(); if (brk(S4 ? 50 : 150)) yield flushCv(cv); }
   const hatch = (n, col, lw) => { g.beginPath(); for (let i = 0; i < n; i++) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = col; g.lineWidth = lw; g.stroke(); };
-  let async = false; if (chunk && HATCH_ASYNC && HATCHW.ok) { flushCv(cv); let turned = false; queueMicrotask(() => { turned = true; }); yield HATCH_WAIT; async = turned; } /* HATCH_ASYNC: in a build run a slice per frame (not straight through)? */
+  async = false; /* (ROUGH_WORKER: declared above) */ if (chunk && HATCH_ASYNC && HATCHW.ok) { flushCv(cv); let turned = false; queueMicrotask(() => { turned = true; }); yield HATCH_WAIT; async = turned; } /* HATCH_ASYNC: in a build run a slice per frame (not straight through)? */
   else yield (chunk && flushCv(cv));
   if (async) { /* HATCH_ASYNC: the same strokes (the same random numbers in the same order), drawn by the worker */
     const segs = n => { const s = new Float64Array(Math.ceil(n) * 4); for (let i = 0, k = 0; i < n; i++, k += 4) { const x = R() * MAP.W, y = R() * MAP.H, a = -1.05 + (R() - .5) * .35, l = 4 + R() * 6; s[k] = x; s[k + 1] = y; s[k + 2] = x + Math.cos(a) * l; s[k + 3] = y + Math.sin(a) * l; } return s; };
@@ -1315,6 +1371,7 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
   else { hatch(16000 * AK, 'rgba(25,75,25,.25)', 1.2); yield (chunk && flushCv(cv)); hatch(6000 * AK, 'rgba(180,225,110,.2)', 1); }
   yield (chunk && flushCv(cv)); { g.beginPath(); for (let i = 0; i < 1800 * AK; i++) { const x = R() * MAP.W, y = R() * MAP.H; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke(); }
   for (let i = 0; i < 380 * AK; i++) { g.fillStyle = R() < .5 ? 'rgba(255,250,240,.85)' : 'rgba(255,214,70,.9)'; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 1.3 + R(), 0, 7); g.fill(); }
+  } /* (ROUGH_WORKER: !RJD) */
   yield (chunk && flushCv(cv));
   // deep rough: darker, longer grass well off the fairway (the Hunt's; Augusta's second cut is short)
   if (!AUGD) { const HB = hb(); let DR = null; /* HATCH_BG */ g.save(); { const pts = []; for (let v = -40; v <= 390; v += 4) pts.push([pathU(v), v]); for (let v = 390; v >= -40; v -= 4) pts.push([bluffU(v), v]); path(pts); g.clip(); if (HB) DR = { c1: [pxs(pts)], c2: [] }; }
@@ -6458,7 +6515,7 @@ const HOLESYS = (() => {
   const PREBUILD_OWN_HS = true; /* a fresh prebuild holds no scene group of its own until its HS = newHS() step: until then it holds none (null), not the hole on screen's, so dropping it early (home screen mid-round) can't remove and dispose the hole on screen. Undo switch: false keeps the on-screen hole's HS in those first steps, as before */
   function* steps(HD, fresh) {
     if (fresh && PREBUILD_OWN_HS) HS = null; if (fresh) { setCourse(HD.cid); HOLE_N = HD.i; HOLE = HOLES[HD.i - 1]; AUGD = BDH_CHUNK ? yield* holeAUGDg(CID, HOLE.n) : holeAUGD(CID, HOLE.n); yield; courseGeom(); yield; }
-    HS = newHS(); holeMap(); GREENTEX = BUILD_CHUNK3 ? yield* greenTexG(true) : greenTex(); if (TEX_FREE && GREENTEX) GREENTEX.tex.onUpdate = texFree; yield;
+    HS = newHS(); holeMap(); if (ROUGH_WORKER) ROUGH.kick(); /* ROUGH_WORKER */ GREENTEX = BUILD_CHUNK3 ? yield* greenTexG(true) : greenTex(); if (TEX_FREE && GREENTEX) GREENTEX.tex.onUpdate = texFree; yield;
     yield* courseSteps(); yield;
     if (BUILD_SLICE4 && S4_BG) yield* buildOuterG(true); else buildOuter(); yield; buildTrees(); yield; if (BUSH_SLICE && fresh && BUSHES.length && !BUSHTEX.f) { yield* bushTexG(); yield; } buildBushes(); yield; buildBridges(); buildLake(); buildFountain(); yield; if (BUILD_CHUNK2) yield* buildSceneryG(); else buildScenery(); yield; CUPMESH = buildCup(); yield;
     HS.read = yield* READ.make(); yield; HS.mini = BUILD_CHUNK3 ? yield* MINI.makeG(4) : MINI.make(); AUGCAM = makeAugCam(); homePath = makeHomePath(); if (F3.warm) { yield; yield* caddieWarmG(); } /* CADDIE_FAST3: the caddie's tables for this hole */
@@ -6485,7 +6542,7 @@ const HOLESYS = (() => {
     const G0 = new Set(), M0 = new Set(), T0 = new Set(), tex = t => { if (t && t.isTexture && !SHARED.has(t) && !T0.has(t)) { T0.add(t); t.dispose(); } };
     grp.traverse(o => { if (o.geometry && !G0.has(o.geometry)) { G0.add(o.geometry); o.geometry.dispose(); } if (o.isInstancedMesh && o.dispose) o.dispose();
       for (const m of [].concat(o.material || [])) { if (M0.has(m) || SHARED.has(m)) continue; M0.add(m); for (const k in m) tex(m[k]); if (m.uniforms) for (const k in m.uniforms) tex(m.uniforms[k].value); m.dispose(); } }); }
-  function drop(HD) { if (HD.it && !HD.ready) try { HD.it.return(); } catch (e) {} const hs = HD.v && HD.v.HS; if (hs) { if (hs.group.parent) hs.group.parent.remove(hs.group); dispose(hs.group); } jobs.delete(HD.key); HD.v = null; HD.dead = true; }
+  function drop(HD) { if (ROUGH_WORKER && HD.v && HD.v.MAP) ROUGH.free(HD.v.MAP); /* ROUGH_WORKER */ if (HD.it && !HD.ready) try { HD.it.return(); } catch (e) {} const hs = HD.v && HD.v.HS; if (hs) { if (hs.group.parent) hs.group.parent.remove(hs.group); dispose(hs.group); } jobs.delete(HD.key); HD.v = null; HD.dead = true; }
   function start(cid, i) { const HD = { cid, i, key: keyOf(cid, i), v: null, n: 0, ready: false }; HD.it = steps(HD, true); jobs.set(HD.key, HD); return HD; }
   function step(HD) { const t0 = performance.now(); S4_BG = !(want && want.HD === HD); /* BUILD_SLICE4 */ within(HD, () => { let r; try { r = HD.it.next(); } catch (e) { console.error(e); HD.err = e; HD.ready = true; return; } HD.idle = r.value === HATCH_WAIT; if (!HD.idle) HD.n++; if (r.done) { HD.ready = true; est = Math.max(20, HD.n); } }); /* idle: waiting on HATCHW's worker (this frame's slice ends) */
     const dt = performance.now() - t0; HD.ms = (HD.ms || 0) + dt; HD.max = Math.max(HD.max || 0, dt); if (dt > 8) { HD.slow = (HD.slow || 0) + 1; (HD.slowAt = HD.slowAt || []).push([HD.n, Math.round(dt)]); } if (HD.ready) last = { key: HD.key, n: HD.n, ms: Math.round(HD.ms), max: +HD.max.toFixed(1), slow: HD.slow || 0, slowAt: HD.slowAt || [] }; } /* (timings: HOLESYS.last) */
@@ -6504,7 +6561,8 @@ const HOLESYS = (() => {
     if (TUT_INPLACE && COURSE_DEF.tut) { if (home && !TUT_ON && tutWanted()) need.add(keyOf('tut', 1)); else if (!home && CID === 'tut') { const c = store.get('course', 'hunt'); if (COURSE_DEF[c]) need.add(keyOf(c, NINE.first(c))); } } /* TUT_INPLACE: a first-time player's tutorial hole behind the home screen; during the tutorial, the hole its Tee off goes to */
     if (want) need.add(want.HD.key); for (const HD of [...jobs.values()]) if (!need.has(HD.key)) drop(HD);
     for (const k of need) if (!jobs.has(k)) { const [c, i] = k.split(':'); start(c, +i); } }
-  function boot() { /* the page's first hole: built at once, under the boot cover (the warm-up draw compiles and uploads it) */
+  function boot() { if (!ROUGH_WORKER) return boot0(); BUILD_SYNC = true; try { return boot0(); } finally { BUILD_SYNC = false; } } /* ROUGH_WORKER: BUILD_SYNC while the boot drives builds straight through */
+  function boot0() { /* the page's first hole: built at once, under the boot cover (the warm-up draw compiles and uploads it) */
     const HD = { cid: CID, i: HOLE_N, key: keyOf(CID, HOLE_N), v: null, n: 0 }; const it = steps(HD, false); S4_BG = false; /* BUILD_SLICE4: built at once, no pauses */ try { while (!it.next().done) HD.n++; } finally { S4_BG = true; } HD.v = holeVars(); HD.ready = true; use(HD); if (AHEAD_DELAY) AHEAD_DELAY.at = performance.now(); /* AHEAD_DELAY: the page's first hole too (v464 log: a 600 ms freeze on a reloaded hole's first frames, with the next hole's build starting) */
     if (HOLE_N === NINE.first(CID)) for (const id in COURSE_DEF) if (!COURSE_DEF[id].dev && !COURSE_DEF[id].lazy) if (id !== CID && !(id === 'augusta' && typeof AUG_HOLES === 'undefined') && !(id === 'osler' && typeof OSLER_HOLES === 'undefined') /* SPLIT: data not here: left to the home screen's prebuild */ && (BOOT_FINISH || !jobs.has(keyOf(id, NINE.first(id))))) { const J = (BOOT_FINISH && jobs.get(keyOf(id, NINE.first(id)))) || start(id, NINE.first(id)); while (!J.ready && !J.err) step(J); } if (BOOT_ALL && HOLE_PREWARM && !BOOT_REHEARSE) for (const J of [...jobs.values()]) if (J.ready && !J.err && !J.warmed) warmOne(J); } /* (BOOT_REHEARSE draws them itself, more fully) */ /* BOOT_ALL: each drawn once under the boot cover too */ /* every other course's first hole too, under the same boot cover (Neil: switching course on the home screen is then just the fade; revisit if there are many courses) */
   /* "Next hole", "Play again", quitting to hole 1, another course on the home screen: swap to (cid, i) as soon as it's built. then: after the swap. pill: show the small loader while it builds */
