@@ -78,6 +78,10 @@ const MP = (() => {
     AIM_MAX: 1024,         // MP_AIMCAP: bytes per aim message (a real one is ~150): bigger ones are dropped, not relayed to three phones 20 times a second
     BP_SOFT: 65536,         // MP_BP: a socket with this much unsent: aim updates to it are skipped (the next one supersedes them anyway)
     BP_HARD: 1048576,       // MP_BP: ...and with this much it is cut (a phone that hasn't read 1 MB isn't reading): it reconnects and resyncs from the welcome
+    FLY_EST: 10000,         // MP_GONE_NEXT: a shot's flight + roll when the phone didn't say (an older phone sends no dur)
+    GONE_CARD: 4500,        // MP_GONE_NEXT: ...plus its result card (2.75 s) and some slack: then the others move on without the shooter's report
+    GONE_MIN: 3000,         // MP_GONE_NEXT: never sooner than this after the shooter went (a blip reconnects and resends its report in well under that)
+    TAKE_MIN: 3000,         // TAKE_BACK: a seat gone this long (or left with Quit) can be taken back by its golfer from a new page
   };
   const MP_BP = true;       /* ROLLBACK: false -> every message is queued for every socket however far behind it is (before perf2) */
   const MP_RESTORE = true;  /* ROLLBACK: false -> a server restart (every deploy) loses every room: a phone coming back gets a new, empty lobby under the same code (before perf2).
@@ -88,6 +92,22 @@ const MP = (() => {
     ROLLBACK: false -> the clock starts at the 'next' (an early one would start it up to 2.75 s before the turn shows). An old phone sends no hold: as before */
   const FLY_FF_ALL = true; /* the fly-over's fast-forward relayed (on / off, this hole). ROLLBACK: false -> not relayed */
   const FLY_SKIP_ALL = true; /* Neil (11-16): a Skip on the hole's fly-over on any phone skips it for everyone: its 'flyskip' (for this hole) is relayed once per hole to the others; a second press anywhere is dropped. ROLLBACK: false -> not relayed (each phone's own fly-over) */
+  const MP_GONE_NEXT = true; /* mp575: the shooter's phone gone (socket closed) or put away ('vis' off: locked, app switched) with their ball in the air: the others got the whole flight and
+    result card, then waited NEXT_WAIT (45 s) for a report that can't come. Now the shot's own result (the fallback, as after 45 s) is used once the flight (the shot's dur, else FLY_EST) and its card
+    are over, at least GONE_MIN after they went; back in time, their own report counts as before. The 45 s is also timed from the shot now: anyone else's drop / rejoin re-armed it (it could be put off forever).
+    ROLLBACK: false -> NEXT_WAIT from the last timers() call, as before. An older phone sends no dur / vis: only a closed socket counts, with FLY_EST */
+  const TEE_CHECK = true;   /* mp575: TEE OFF racing a course (or nine) change: the TEE OFF's pars were the old course's, the room the new one (Hunt's 18 pars on 9-hole OslerBrook: hole 10 doesn't exist).
+    A new phone's teeoff says which course and nine its pars are for; a mismatch is refused ('stale', its phone shows the message and the lobby has the new course). Pars longer than the course are refused too
+    (an older phone's race). ROLLBACK: false -> any pars, as before */
+  const COURSE_N = { hunt: 18, augusta: 18, osler: 9 }; /* TEE_CHECK: holes per course, checked only for an older phone's TEE OFF (a new one names its course): OslerBrook is 9 today, raise it here when it grows. Unknown: 18 */
+  const SHOT_CATCH = true;  /* mp575: a phone back (reconnect) while someone's ball is in the air never saw that shot (it was sent to the dead socket): the ball just jumped at the next turn. A new phone's hello
+    says the last shot it has (shotSeen); if the one in the air is newer it is sent again (re:1) after the welcome. Never to the phone that played it. ROLLBACK: false -> not resent. An older phone sends no shotSeen: as before */
+  const TAKE_BACK = true;   /* mp575: a golfer who tapped Quit mid-round (their page forgets the room) and comes back with the code or link, same golfer, was told "That golfer is taken" by their own empty seat
+    (another golfer: a second, late-joining seat, and the old one held up every turn until removed). Now a disconnected seat (left with Quit, or gone over TAKE_MIN) is given back to whoever asks for
+    that golfer. A connected one is still taken; a blip reconnects with its own sid long before TAKE_MIN. ROLLBACK: false -> "taken", as before */
+  const REJOIN_GONE = true; /* mp575: a page reload that quietly rejoins its room from sessionStorage (a refresh, or Safari reloading a tab it had put away) says rejoin:1; if this server has no seat for it
+    (the room is gone or the seat isn't theirs) it gets err 'gone' instead of a fresh lobby under that code, or a late joiner's seat in whoever's round now has the code (and a round with nobody
+    connected isn't ended by it). ROLLBACK: false -> seated as any newcomer, as before. An older phone never sends rejoin */
   const MP_AIMCAP = true;   /* ROLLBACK: false -> aim messages of any size up to FRAME_MAX are relayed (before perf2) */
   for (const k in T) if (process.env['MP_' + k]) T[k] = +process.env['MP_' + k]; /* e.g. MP_IDLE=3000 for quick tests */
   const EMO = ['❤️', '😂', '🔥', '👏', '😮', '🙈'];
@@ -179,9 +199,11 @@ const MP = (() => {
     const code = String(m.code || '').toUpperCase(); if (!/^[A-Z0-9]{1,10}$/.test(code)) return send(c, { t: 'err', code: 'code', msg: 'Room codes are 1 to 10 letters or numbers' });
     if (c.room && c.room.code === code) leave(c, true); /* the same room again: a plain rejoin */
     let R0 = rooms.get(code); const seat = R => (m.sid && R.players.some(q => q.sid === String(m.sid))) || (MP_RESTORE && typeof m.you === 'string' && R.players.some(q => q.sid === null && q.id === m.you));
+    if (REJOIN_GONE && m.rejoin && !m.snap && !(R0 && seat(R0))) return send(c, T.EMPTY_END && wasEnded(code, m) ? { t: 'ended', msg: 'This round ended' } : { t: 'err', code: 'gone', msg: '' }); /* REJOIN_GONE: nothing here is theirs any more */
     if (T.EMPTY_END && R0 && (R0.phase === 'play' || R0.phase === 'hole') && !R0.players.some(q => q.c) && !seat(R0)) { endRoom(R0); R0 = null; } /* MP_EMPTY_END: a newcomer to a round nobody is in: it ends, a fresh lobby under the code */
     if (!R0 && MP_RESTORE && !(T.EMPTY_END && wasEnded(code, m))) R0 = restore(code, m); /* (never rebuild a round that ended for want of players) */
-    const want = /^[a-z]{2,16}$/.test(m.who || '') ? m.who : 'neil', p0 = R0 && ((m.sid && R0.players.find(q => q.sid === String(m.sid))) || (MP_RESTORE && typeof m.you === 'string' && R0.players.find(q => q.sid === null && q.id === m.you)));
+    const want = /^[a-z]{2,16}$/.test(m.who || '') ? m.who : 'neil'; let p0 = R0 && ((m.sid && R0.players.find(q => q.sid === String(m.sid))) || (MP_RESTORE && typeof m.you === 'string' && R0.players.find(q => q.sid === null && q.id === m.you)));
+    if (TAKE_BACK && R0 && !p0 && !m.rejoin) { const t = R0.players.find(q => q.who === want && !q.out && !q.c); if (t && (t.left || (t.discAt && now() - t.discAt > T.TAKE_MIN))) { p0 = t; t.sid = m.sid ? String(m.sid).slice(0, 32) : rid(16); t.left = false; if (t.ball && t.ball.left) delete t.ball.left; } } /* TAKE_BACK: their own empty seat */
     if (T.EMPTY_END && !p0 && wasEnded(code, m)) return send(c, { t: 'ended', msg: 'This round ended' }); /* one of the ended round's phones, back */
     if (p0 && p0.sid === null) p0.sid = m.sid ? String(m.sid).slice(0, 32) : rid(16); /* MP_RESTORE: a seat from a rebuilt room, taken back by its own player */
     if (R0 && !p0) { const t = R0.players.find(q => q.who === want && !q.out); if (t) return send(c, { t: 'err', code: 'taken', who: want, by: t.name, taken: R0.players.map(q => ({ who: q.who, name: q.name })), msg: 'That golfer is taken' }); } /* golfers are unique per room: first come, first served */
@@ -203,18 +225,20 @@ const MP = (() => {
     }
     if (R.players.length === 1 && R.phase === 'lobby' && COURSES[m.course]) R.course = m.course; /* a new room starts on the course its first golfer had picked */
     if (!R.players.some(q => q !== p && q.who === want && !q.out)) { p.who = want; p.name = nameFor(R, p, p.who, m.name); p.lefty = !!m.lefty; } else if (!p.name) p.name = nameFor(R, p, p.who, m.name); /* a rejoin keeps its golfer if the one asked for is now someone else's */
-    p.c = c; p.discAt = null; c.room = R; c.pid = p.id;
+    p.c = c; p.discAt = null; c.room = R; c.pid = p.id; if (TAKE_BACK) p.left = false; /* (back by any route: not a Quit's empty seat any more) */
     if (T.KICK) back(R, p, true); /* MP_KICK: a reconnect is coming back */
     if (p.pu && R.phase === 'play') { p.pu = false; if (p.ball && p.ball.done && p.ball.puNow) joinHole(R, p); } /* back from a drop: in from the next turn */
     send(c, { t: 'welcome', you: p.id, sid: p.sid, room: pubN(R), T: { IDLE: T.IDLE, RING: T.RING, HOLD_CAP: T.HOLD_CAP, RECONNECT: T.RECONNECT, CHAT_MAX: T.CHAT_MAX, CARD_AUTO: T.CARD_AUTO } });
-    sync(R); if (R.phase === 'play' && (R.turn === p.id || (MP_RESTORE && R.restored && !R.timers.auto && !R.timers.ring && !R.timers.idle))) timers(R);
+    if (MP_GONE_NEXT) p.hid = false; /* (a new page / socket: on screen) */
+    if (SHOT_CATCH && R.phase === 'play' && R.tstate === 'flight' && R.shot && R.shotMsg && R.shotMsg.n === R.shotN && R.shot.by !== p.id && typeof m.shotSeen === 'number' && m.shotSeen < R.shotN) setTimeout(() => { if (p.c === c && R.tstate === 'flight' && R.shotMsg && R.shotMsg.n === R.shotN) send(c, { ...R.shotMsg, re: 1 }); }, 0); /* SHOT_CATCH: after the welcome and room */
+    sync(R); if (R.phase === 'play' && (R.turn === p.id || (MP_GONE_NEXT && R.tstate === 'flight' && R.shot && R.shot.by === p.id) || (MP_RESTORE && R.restored && !R.timers.auto && !R.timers.ring && !R.timers.idle))) timers(R);
   }
   function joinHole(R, p) { p.ball = { u: 0, v: 0, lie: 'tee', stroke: 1, toPin: 1e4, done: false, holed: false }; const sc = p.scores[R.hole - 1]; if (sc && sc.pu) p.scores.length = R.hole - 1; }
   function leave(c, quiet) { const R = c.room; if (!R) return; const p = P(R, c.pid); c.room = null; c.pid = null; if (!p) return;
-    if (R.phase === 'lobby' || R.phase === 'done') R.players = R.players.filter(q => q !== p); else { p.c = null; p.discAt = now(); if (p.ball) p.ball.left = true; }
+    if (R.phase === 'lobby' || R.phase === 'done') R.players = R.players.filter(q => q !== p); else { p.c = null; p.discAt = now(); if (p.ball) p.ball.left = true; if (TAKE_BACK) p.left = true; }
     if (!quiet) send(c, { t: 'left' }); after(R); }
   function gone(c) { socks.delete(c); if (c.closed !== true) c.closed = true; const R = c.room; if (!R) return; const p = P(R, c.pid); c.room = null; if (!p || p.c !== c) return;
-    p.c = null; p.discAt = now(); if (R.phase === 'lobby' || R.phase === 'done') setT(R, 'drop:' + p.id, T.LOBBY_DROP, () => { if (!p.c) { R.players = R.players.filter(q => q !== p); after(R); } }); after(R); }
+    p.c = null; p.discAt = now(); if (MP_GONE_NEXT) p.goneAt = now(); if (R.phase === 'lobby' || R.phase === 'done') setT(R, 'drop:' + p.id, T.LOBBY_DROP, () => { if (!p.c) { R.players = R.players.filter(q => q !== p); after(R); } }); after(R); }
   function after(R) { /* someone left or dropped */
     if (!R.players.some(p => p.c)) { setT(R, 'empty', T.EMPTY_GRACE, () => { for (const k in R.timers) clearT(R, k); rooms.delete(R.code); });
       if (T.EMPTY_END && (R.phase === 'play' || R.phase === 'hole')) setT(R, 'end', T.EMPTY_END, () => { if (!R.players.some(p => p.c) && rooms.get(R.code) === R) endRoom(R); }); } /* MP_EMPTY_END: nobody left in the round */
@@ -245,7 +269,10 @@ const MP = (() => {
   function timers(R) { /* the active golfer's clock: idle ring, auto-hit, or a dropped golfer's reconnect wait */
     clearT(R, 'idle'); clearT(R, 'ring'); clearT(R, 'auto'); clearT(R, 'nudge');
     const p = P(R, R.turn); if (!p || R.phase !== 'play') return;
-    if (R.tstate === 'flight') { setT(R, 'next', T.NEXT_WAIT, () => fallbackNext(R)); return; }
+    if (R.tstate === 'flight') { if (!MP_GONE_NEXT) { setT(R, 'next', T.NEXT_WAIT, () => fallbackNext(R)); return; }
+      const S = R.shot, by = S && P(R, S.by), at = S && S.at || now(); let due = at + T.NEXT_WAIT; /* MP_GONE_NEXT: from the shot, not from this call */
+      if (by && (!by.c || by.hid)) due = Math.min(due, Math.max(at + (S.dur || T.FLY_EST) + T.GONE_CARD, (by.goneAt || now()) + T.GONE_MIN)); /* the shooter's phone is gone or put away */
+      setT(R, 'next', due - now(), () => fallbackNext(R)); return; }
     if (T.KICK && !p.c) { broadcast(R, { t: 'timer', pid: p.id, ms: null }); const I = R.idle || {}; setT(R, 'away', Math.max(0, Math.max(I.start || 0, p.discAt || now()) + T.IDLE - now()), () => away(R, p)); return; } /* MP_KICK: gone on their turn: no auto-play; away after IDLE */
     if (!p.c) { const wait = Math.max(1500, (p.discAt || now()) + T.RECONNECT - now()); broadcast(R, { t: 'timer', pid: p.id, ms: wait, total: T.RECONNECT, why: 'reconnect' }); setT(R, 'auto', wait, () => autoHit(R, true)); return; }
     const I = R.idle; if (I.holdAt) { const cap = Math.max(0, T.HOLD_CAP - (now() - I.holdAt)); setT(R, 'idle', cap, () => { I.held += now() - I.holdAt; I.holdAt = null; I.capped = true; timers(R); }); broadcast(R, { t: 'timer', pid: p.id, ms: null }); return; }
@@ -280,8 +307,8 @@ const MP = (() => {
     const as = m.as || p.id; if (R.phase !== 'play' || R.tstate !== 'aim' || R.turn !== as) return;
     if (as !== p.id && !(R.autoFor && R.autoFor.pid === as && (R.autoFor.by === p.id || (R.autoFor.bys || []).includes(p.id)))) return; /* (MP_KICK: any phone that tapped PLAY FOR this turn) */
     const r = m.res || {}; if (!num(r.u, -2000, 2000) || !num(r.v, -2000, 2000)) return;
-    R.tstate = 'flight'; R.shot = { by: p.id, as, res: { u: r.u, v: r.v, lie: String(r.lie || 'rough').slice(0, 12), holed: !!r.holed, water: !!r.water, toPin: num(r.toPin, 0, 5000) ? r.toPin : 999 } };
-    broadcast(R, { t: 'shot', from: as, by: p.id, n: R.shotN, auto: !!m.auto, d: m.d }, p); timers(R); }
+    R.tstate = 'flight'; R.shot = { by: p.id, as, ...(MP_GONE_NEXT ? { at: now(), dur: num(m.dur, 0, 60000) ? m.dur : 0 } : {}), res: { u: r.u, v: r.v, lie: String(r.lie || 'rough').slice(0, 12), holed: !!r.holed, water: !!r.water, toPin: num(r.toPin, 0, 5000) ? r.toPin : 999 } };
+    const o = { t: 'shot', from: as, by: p.id, n: R.shotN, auto: !!m.auto, d: m.d }; if (SHOT_CATCH) R.shotMsg = o; broadcast(R, o, p); timers(R); }
   function next(R, p, m) { const as = m.as || p.id, q = P(R, as); if (!q || R.turn !== as || R.tstate !== 'flight' || !R.shot || R.shot.by !== p.id) return; /* only from the phone that played the shot */
     if (!num(m.stroke, 1, 40)) return; const b = m.ball || {}; if (!num(b.u, -2000, 2000) || !num(b.v, -2000, 2000)) return;
     if (NEXT_HOLD) { R.hold = num(m.hold, 0, T.HOLD_MAX) ? m.hold : 0; R.go = R.hold ? { by: p.id, n: R.shotN } : null; } /* NEXT_HOLD: the result card is still up for this long on the phones: the next golfer's idle clock starts after it (or at the hitter's 'go') */
@@ -315,10 +342,13 @@ const MP = (() => {
         p.who = m.who; p.name = nameFor(R, p, m.who, m.name); p.lefty = !!m.lefty; sync(R); } return;
       case 'course': if (COURSES[m.id] && (R.phase === 'lobby' || R.phase === 'done')) { R.course = m.id; if (R.phase === 'done') { R.phase = 'lobby'; unout(R); } sync(R); } return;
       case 'lobby': if (R.phase === 'done') { R.phase = 'lobby'; unout(R); sync(R); } return;
-      case 'teeoff': if (R.players.filter(q => !q.out).length < T.MIN_PLAYERS && (R.phase === 'lobby' || R.phase === 'done')) return send(c, { t: 'err', code: 'min2', msg: 'Waiting for a friend to join' }); /* MP_MIN2 (an older phone just sees the message) */ return teeoff(R, m);
+      case 'teeoff': if (R.players.filter(q => !q.out).length < T.MIN_PLAYERS && (R.phase === 'lobby' || R.phase === 'done')) return send(c, { t: 'err', code: 'min2', msg: 'Waiting for a friend to join' }); /* MP_MIN2 (an older phone just sees the message) */
+        if (TEE_CHECK && (R.phase === 'lobby' || R.phase === 'done') && (m.course != null ? m.course !== R.course || (NINES_PICK && m.nine != null && m.nine !== (R.nine || '18')) : Array.isArray(m.pars) && m.pars.length > (COURSE_N[R.course] || 18))) { sync(R); return send(c, { t: 'err', code: 'stale', msg: 'The course just changed. Tap Tee off again' }); } /* TEE_CHECK */
+        return teeoff(R, m);
       case 'nexthole': if (R.phase === 'hole') startHole(R, R.hole + 1); return;
       case 'aim': if (R.turn === p.id && R.tstate === 'aim' && m.d && typeof m.d === 'object' && (!MP_AIMCAP || data.length <= T.AIM_MAX)) { broadcast(R, { t: 'aim', from: p.id, n: R.shotN, d: m.d }, p); if (R.idle && !R.idle.holdAt && (!T.KICK || m.in)) { R.idle.start = now(); if (R.idle.ring) timers(R); } } return; /* aiming is input: it holds off the idle clock (MP_KICK: only the player's own aim, in:1; wind updates don't) */
       case 'act': return act(R, p, m);
+      case 'vis': if (MP_GONE_NEXT) { const h = m.on === false; if (h !== !!p.hid) { p.hid = h; if (p.goneAt == null || h) p.goneAt = now(); if (R.phase === 'play' && R.tstate === 'flight' && R.shot && R.shot.by === p.id) timers(R); } } return; /* MP_GONE_NEXT: this phone was put away (on:false) or is back */
       case 'flyff': if (FLY_FF_ALL && R.phase === 'play' && m.hole === R.hole) broadcast(R, { t: 'flyff', hole: R.hole, from: p.id, on: !!m.on }, p); return; /* FLY_FF_ALL (Neil 11-18): holding fast-forward on the hole's fly-over: everyone's runs at 3x */
       case 'flyskip': if (FLY_SKIP_ALL && R.phase === 'play' && m.hole === R.hole && R.flyskip !== R.hole) { R.flyskip = R.hole; broadcast(R, { t: 'flyskip', hole: R.hole, from: p.id }, p); } return; /* FLY_SKIP_ALL: once per hole */
       case 'go': if (NEXT_HOLD && R.go && R.go.by === p.id && m.n === R.go.n) { R.go = null; broadcast(R, { t: 'go', n: m.n, from: p.id }, p); if (R.phase === 'play' && R.tstate === 'aim' && R.idle && R.idle.start > now()) { R.idle.start = now(); timers(R); } } return; /* NEXT_HOLD: the hitter tapped their result card away early (only that phone, once): the others may move on after 1.7 s, and the next golfer's clock starts now, as when that tap sent 'next' */
