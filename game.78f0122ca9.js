@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v570'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v572'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -6487,6 +6487,27 @@ function skyHidden() { /* every view ray lands on the outer ground plane before 
    frame still runs (camera, critters, culling). The canvas keeps its last picture under the cover, and the frame the cover starts to go (the dip's class off, the
    lobby hidden) draws as before, so it always fades off a current picture. Only when the cover and #boot are at full opacity (no fade running) and the cover's
    box holds the canvas's. false = the fly-over is always drawn, as v516 */
+/* ANIM_PARK (perf569, Neil 11-23: the golfer picker choppy to swipe and the titles choppy on a slow phone): CSS animations nobody can see still cost a slow phone every frame.
+   Chrome won't hand an animation on an off-screen or hidden element to the compositor ("no visible change"), so it runs on the main thread, and while any such animation runs
+   the page does a whole style / layer / paint pass every frame. On the home screen (and behind the titles) that was: the picked golfer's head bob on his copies in the board's
+   laps out of view (4 of 5 on a phone, more on a wide screen), the boot loader's ball and shadow (always transparent: #boot.slow is never set) and the HUD's two pin rings
+   (hidden while at home). Each is paused while it can't be seen and put back on its own clock (its original start time, so it is exactly where it would have been) before it
+   can be seen: a copy as it comes within a view's width of the board's window, the rings as the round starts. Visible animations are never touched.
+   Measured (4x CPU, swiftshader, 3D draw stubbed to isolate the page): home idle frame gap 33.3 -> 16.7 ms (every frame made it); picker drag main-thread CPU per frame
+   median 24-27 -> 17-20 ms. false = as v569 */
+const ANIM_PARK = true;
+const PARK = { m: new Map(), hud: false, ldr: false, menu: false, gen: 0,
+  park(el) { let ok = true; for (const a of el.getAnimations()) { if (a.playState !== 'running') continue; if (a.startTime === null) { ok = false; continue; } this.m.set(a, a.startTime); a.pause(); } return ok; }, /* false: one not started yet (try again next frame) */
+  wake(el) { for (const a of el.getAnimations()) { if (!this.m.has(a)) continue; const s = this.m.get(a); this.m.delete(a); a.startTime = s; } }, /* on its own clock again: the same frame it would have shown */
+  prune() { for (const a of [...this.m.keys()]) if (a.playState === 'idle') this.m.delete(a); } };
+function animPark() { /* ANIM_PARK: once a frame, before anything is drawn */
+  const B = _cov.b || (_cov.b = document.getElementById('boot')); if (!B) return; const slow = B.classList.contains('slow');
+  if (!PARK.ldr && !slow) { const l = PARK.l || (PARK.l = B.querySelector('.ldr')); if (l && getComputedStyle(l).opacity === '0') { let ok = true; l.querySelectorAll('.ball,.sh').forEach(e => { if (!PARK.park(e)) ok = false; }); PARK.ldr = ok; } } /* only once it has faded right out */
+  else if (PARK.ldr && slow) { B.querySelectorAll('.ldr .ball,.ldr .sh').forEach(e => PARK.wake(e)); PARK.ldr = false; } /* (the loader shows on #boot.slow, a slow boot's "Warming up", and fades out after) */
+  if (!MENU.on) { PARK.menu = false; return; } if (!PARK.menu) { PARK.menu = true; PARK.prune(); PARK.gen++; PARK.ldr = false; } /* back home: forget animations that have since ended, and look again at what's running now */
+  if (!PARK.hud) { let ok = true; document.querySelectorAll('#pinMk .ring').forEach(e => { if (!PARK.park(e)) ok = false; }); PARK.hud = ok; } /* #app.atHome hides the HUD while MENU.on */
+  if (!INTRO.on && !B.classList.contains('calm')) BOARD.park(); } /* (the head bob is held by CSS through the titles' hand-off, #boot.calm: those animations are left to CSS) */
+function animWakeHud() { if (!ANIM_PARK || !PARK.hud) return; document.querySelectorAll('#pinMk .ring').forEach(e => PARK.wake(e)); PARK.hud = false; } /* ANIM_PARK: the round starts: the pin rings on their own clock */
 const COVER_SKIP = true; const _cov = {};
 function glCovered() {
   const B = _cov.b || (_cov.b = document.getElementById('boot')); if (!B || B.hidden || B.classList.contains('done')) return false;
@@ -6495,6 +6516,7 @@ function glCovered() {
   const r = c.getBoundingClientRect(), q = canvas.getBoundingClientRect(); return r.width > 0 && r.left <= q.left && r.top <= q.top && r.right >= q.right && r.bottom >= q.bottom; }
 function frame(now) {
   if (MPX && MP_BUBBLE_RECT) MPX.pre(); /* MP_BUBBLE_RECT: the chat bubbles' anchors read first, while the layout is clean */
+  if (ANIM_PARK) try { animPark(); } catch (e) {} /* ANIM_PARK */
   const rawDt = Math.max(0, (now - last) / 1000), dt = clamp(rawDt, 0, .05) || 0; last = now; HOLESYS.tick(now); if (TUT_ON && window.__TUTOR) __TUTOR.tick(now); /* TUT_PLAY */ if (CJ.g) caddieStep(CADDIE_BG_SLICE && FLY.on ? 2.5 : 6); /* CADDIE_SLICE (CADDIE_BG_SLICE: 2.5 ms a frame under the hole's fly-over) */ renderer.info.reset(); applyPendingPR(); /* a slice of any hole being built, first (before this frame's draw) */
   if (INTRO.on) { requestAnimationFrame(frame); return; } // the titles cover the screen: draw nothing behind them
   if (!isFinite(SW.vis) || !isFinite(SW.visV)) { SW.vis = 0; SW.visV = 0; } if (!isFinite(camera.fov)) camera.fov = 52; if (!isFinite(G.aimT)) G.aimT = G.aimGoal; const t = now / 1000; FOUNT_T.value = t; /* the pond fountain's spray (one uniform) */ if (FESCUE && G.wind) { if (FESCUE_THICK && G.ball) FESCUE_U.b.value.set(G.ball.u, -G.ball.v, camera.position.x, camera.position.z); FESCUE_U.t.value = RM ? 0 : t; const fk = .06 + .012 * Math.min(25, G.wind.mph || 0); FESCUE_U.w.value.set(Math.cos(G.wind.ang || 0) * fk, -Math.sin(G.wind.ang || 0) * fk); } /* FESCUE: the tufts lean and sway downwind */
@@ -6775,7 +6797,7 @@ let TUTOR = TUT_M && TUTOR_MK ? TUTOR_MK() : null;
 window.__TUTOR = TUTOR;
 function setHome(on) {
   if (!on && BOARD_LAZYPICK) PICKQ.flush(); /* BOARD_LAZYPICK: a golfer picked on the home board is set up for play as the round starts (Play, MP tee-off) */
-  MENU.on = on; app.classList.toggle('atHome', on); try { HOLESYS.ahead(); } catch (e) {} /* home: other courses' first holes; playing: the next hole */
+  MENU.on = on; app.classList.toggle('atHome', on); if (!on) animWakeHud(); /* ANIM_PARK */ try { HOLESYS.ahead(); } catch (e) {} /* home: other courses' first holes; playing: the next hole */
   tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = !on; if (on) { straightRef.visible = false; treeMk.visible = false; try { ttx.setTransform(1, 0, 0, 1, 0, 0); ttx.clearRect(0, 0, trTop.width, trTop.height); TT.drawn = false; trTop.style.visibility = 'hidden'; } catch (e) {} } // wipe any tracer left on the overlay from the warm-up swing
   if (on) { MENU.pr = glPR; SC.pending = Math.min(glPR, HOME_PR); } else { SC.pending = MENU.pr || GLMAX; SC.hist.length = 0; tracerDirty = true; } // softer, cheaper background behind the crisp menu
   if (DESK_FULL && DESK_FULL.play !== !on) { DESK_FULL.play = !on; try { dispatchEvent(new Event('resize')); } catch (e) {} } /* DESK_FULL: a round fills a desktop window, home goes back in its box (every resize handler re-lays out: the class flip, the canvas, the HUD rects, the pixel cap) */
@@ -7090,7 +7112,11 @@ const BOARD = (() => {
   function dock(x, R) { const C = centres(), p = P / n, c = x + cw / 2, i = Math.round((c - C[0][0]) / p), lo = Math.max(0, i - R), hi = Math.min(C.length - 1, i + R), gp = p - dkS; DV.length = 0; DW.length = 0; let X = 0; /* where each tile round the middle is drawn: sizes from the curve, laid edge to edge with the even gap, then placed so the tiles far off either side are pushed out by the same amount */
     for (let j = lo; j <= hi; j++) { const w = dkS + dkE * DF(Math.abs((C[j][0] - c) / p)); if (j > lo) X += (DW[DW.length - 1] + w) / 2 + gp; DV.push(X); DW.push(w); }
     const m = DV.length - 1, dl = -((DV[m] - (C[hi][0] - c)) + (DV[0] - (C[lo][0] - c))) / 2; for (let k = 0; k <= m; k++) DV[k] += dl; return lo; } /* DV: drawn centres (px from the middle), DW: drawn widths */
-  function mag(force) { if (!BOARD_DOCK || !n) return; const b = bd(); if (!b) return; const x = rsl(b); if (x === mgX && !force) return; mgX = x; const C = centres(); if (!C.length || !cw || !P) return; /* the dock: once per frame at most (only when the row has moved), transforms only */
+  let pkKey = ''; /* ANIM_PARK: which tiles were the pick when the copies were last sorted */
+  function bob(x) { /* ANIM_PARK: the pick's copies more than a view's width beyond the board's window stop bobbing; each one bobs again, on its own clock, before it can come into view (laps, flings and glides move a tile far less than that between two checks; every scroll the board makes runs this before the frame is drawn) */
+    if (!ANIM_PARK || !n || !MENU.on || INTRO.on || $('#boot').classList.contains('calm')) return; const b = bd(); if (!b) return; const S = b.getElementsByClassName('sel'); if (!S.length) return; if (!cx) centres(); const M = cw + 240; let key = PARK.gen + ':'; for (const t of S) key += t.dataset.i + ','; if (key !== pkKey) { pkKey = key; for (const t of S) t._pk = undefined; }
+    for (const t of S) { const c = t._c; if (c === undefined) continue; const far = c < x - M || c > x + cw + M; if (t._pk === far) continue; const s = t._sv || (t._sv = t.querySelector('svg.avHeadL')); if (!s) continue; if (far) { if (PARK.park(s)) t._pk = true; } else { PARK.wake(s); t._pk = false; } } }
+  function mag(force) { if (!BOARD_DOCK || !n) return; const b = bd(); if (!b) return; const x = rsl(b); bob(x); if (x === mgX && !force) return; mgX = x; const C = centres(); if (!C.length || !cw || !P) return; /* the dock: once per frame at most (only when the row has moved), transforms only */
     const p = P / n, c = x + cw / 2, lo = dock(x, Math.ceil(cw / 2 / p) + 2);
     for (let k = 0; k < DV.length; k++) { const t = C[lo + k][1], s = DW[k] / dkS, f = s > 1.00001, dx = DV[k] - (C[lo + k][0] - c), k2 = f ? `translate(${dx.toFixed(2)}px) scale(${s.toFixed(4)})` : `translate(${dx.toFixed(2)}px)`;
       if (t._dk === k2) continue; t._dk = k2; t._ds = s; t.style.transform = k2; const g = t._tg || (t._tg = t.querySelector('.nametag')); if (g) { const q = 1 / s; g.style.scale = f ? q.toFixed(4) : ''; g.style.translate = f ? `${((q - 1) * 50).toFixed(2)}% ${((1 - q) * 50).toFixed(2)}%` : ''; } } } /* the name tag keeps its size, sat on the tile's bottom edge */
@@ -7145,7 +7171,7 @@ const BOARD = (() => {
     b.addEventListener('wheel', wheel, { passive: false });
     b.addEventListener('click', e => { if (eat) { eat = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true); /* a drag, or a touch that grabbed the spinning wheel, isn't a tap on a tile */
     window.addEventListener('resize', () => { halt(); unshrink(); measure(); home(); HOMEAV.track(true); }); }
-  return { build, wire, near, home, slide, get still() { return !touching && !spin && !gl && !co && performance.now() > busyTo; }, get laps() { return K; }, get lap() { return P; }, get ticks() { return ticks; }, get lean() { return swA; }, rise, get dock() { return BOARD_DOCK; }, get sl() { return rsl(bd()); }, get cw() { if (!cx) centres(); return cw; }, cOf(t) { if (!cx) centres(); return t._c; } };
+  return { build, wire, near, home, slide, park() { const b = bd(); if (b && n) bob(rsl(b)); }, get still() { return !touching && !spin && !gl && !co && performance.now() > busyTo; }, get laps() { return K; }, get lap() { return P; }, get ticks() { return ticks; }, get lean() { return swA; }, rise, get dock() { return BOARD_DOCK; }, get sl() { return rsl(bd()); }, get cw() { if (!cx) centres(); return cw; }, cOf(t) { if (!cx) centres(); return t._c; } };
 })();
 (async function boot() { // warm everything the first swing touches, behind the cover, then lift it
   const el = $('#boot');
