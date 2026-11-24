@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v579'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v581'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -811,6 +811,7 @@ const CUP = { R: .16, tf: .18 };
 const CUP_OFF = true; /* rollback flag: false = off-green shots use the putt-style cup (v327) */
 const CHIP_EASIER = true; /* Neil 17 Nov 12:05 (v412): "we made it harder to chip in, which is good, but now it's too hard": the off-green cup goes about halfway back toward the old putt-style one: a rolling ball drops at a bit more pace (tf .4 -> .3), can come in nearer the edge (core .5 -> .65) and at more pace before an edge-clip lips out (crawl .45 -> .6); on the fly it drops landing within .75 of the radius (was .6) and a little firmer (3.2, was 2.5). false = v411 */
 const CUP_SHOT = CHIP_EASIER ? { tf: .3, core: .65, crawl: .6, land: .75, landV: 3.2 } : { tf: .4, core: .5, crawl: .45, land: .6, landV: 2.5 };
+const POWER_COPY = 'DIALED IN'; /* (Neil 11-24: 'PERFECT POWER' clashed with the big PERFECT stamp and PERFECT TEMPO; he picked DIALED IN) */ /* Neil 11-24 (got 'PIN HIGH' and still came up short of the green): the call is made at the swing and only means the power snapped to the exact number; tempo, the lie, a chunk, wind or a slope can still cost distance, so it now says what it knows. null = 'PIN HIGH' / 'ON THE NUMBER' as v579 */
 const PH_RULE = { win: .006, pinYd: 5 }; /* rollback (Neil): full-swing 'pin high' power window tightened from .009 to .006 of the meter; it is only called PIN HIGH when the target is within pinYd of the pin, otherwise ON THE NUMBER. null = v342 behaviour */
 const HBUB_TAIL = -20; /* rollback (Neil): px the home speech bubble's tail sits left of the golfer's centre, so it doesn't line up exactly with the flapper. 0 = centred (v348) */
 const BUB_FIT = true; /* undo switch (Neil 11-15: a short line like "Yay" had its tail oddly near the bubble's corner): the home bubble slides so its tail lands HBUB_TAIL off the face while staying >= 14 px clear of the rounded corners (centred on a bubble too short for that), short bubbles get a min width; false = v353 placement */ if (BUB_FIT) document.getElementById('app').classList.add('bubFit');
@@ -4476,7 +4477,7 @@ function launch(sw) {
   G.prev = { u: G.ball.u, v: G.ball.v, lie: G.lie, club: G.club, mode: G.mode, dir: { ...G.dir }, D: G.D, curve: G.curve, spinX: G.spinX, height: G.height };
   G.shot = { fl: { sp: speedA, yc: yawc, ws }, sinkT, P, holed: !!gnd.holed, tEnd: 1, dur, t: 0, phase: 'air', land, rd, roll: rollY, end, endLie, lieLand, hitT: hitI >= 0 ? 1 : null, apex, carry: carryY, B, tq, ratio: sw.ratio, pinHigh, pure, th, puffAcc: 0, rollT: 0, gnd, ev: 0, spin: Math.round(spin), axis: fl.axis, q, shape: shapeName(), lieLoss: G.mode === 'sand' ? 0 : Math.round(carry / (G.lieRoll || 1) - carry), air };
   G.shot.fromTop = G.aimT > .5; /* struck from the overhead view */ G.view = 'flight'; G.aimGoal = 0; G.aimT = 0; aimFrame = null; aimDrag = null; app.classList.add('flying'); peg.visible = false; tracer.visible = tracerInk.visible = trShadow.visible = false; rings.visible = false;
-  const msgs = []; if (pinHigh) msgs.push(!PH_RULE || Math.hypot(B.u + d.u * D - PIN.u, B.v + d.v * D - PIN.v) <= PH_RULE.pinYd ? 'PIN HIGH' : 'ON THE NUMBER'); if (tq === 'perfect') msgs.push('PERFECT TEMPO'); if (pure) msgs.push('PURE');
+  const msgs = []; if (pinHigh) msgs.push(POWER_COPY || (!PH_RULE || Math.hypot(B.u + d.u * D - PIN.u, B.v + d.v * D - PIN.v) <= PH_RULE.pinYd ? 'PIN HIGH' : 'ON THE NUMBER')); if (tq === 'perfect') msgs.push('PERFECT TEMPO'); if (pure) msgs.push('PURE');
   G.mood = (tq === 'perfect' && (pure || pinHigh)) ? 'perfect' : (tq === 'off' || Math.abs(th) > 10) ? 'bad' : null; G.moodT = 2.4;
   if (G.mood === 'perfect') AV.setMood('proud', 1.6); else if (G.mood === 'bad') AV.setMood('oops', 1.6);
   if (SZ.start(G.shot, !flub && p <= 1 && G.mood === 'perfect', msgs)) { /* a PERFECT strike past SZ_YD: the sizzle sticker stands in for the stamp */ }
