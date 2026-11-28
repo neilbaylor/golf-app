@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v616'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v618'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5430,6 +5430,7 @@ function updateCamera(dt) {
     pos.lerp(P.pos, w); look.lerp(P.look, w); if (P.t >= P.r + P.h + P.f || w < .002 && (P.cancel || P.t > P.r)) G.preview = null;
     const pv = !!G.preview && !P.cancel && P.t < P.r + P.h + P.f * .35; if (pv !== G._pv) { app.classList.toggle('previewing', pv); G._pv = pv; } }
   else if (G._pv) { app.classList.remove('previewing'); G._pv = false; }
+  if (FLY_FOV_MATCH && FLY.on) FLY_FOVR = 52 + 13 * Math.max(0, SP.z || 0) * (1 - e); /* (the shot view's resting zoom, as fovT below) */
   if (FLY.on) FLY.step(dt * (FLY_FF && (G.ff || G.ffFlyR) ? 3 : 1), pos, look); /* the hole's opening fly-over drives the camera */
   camera.position.copy(pos); camLook.copy(look);
   const fovT = 52 + 13 * Math.max(0, SP.z || 0) * (1 - e) - (SW.phase === 'back' || SW.phase === 'down' ? clamp(SW.vis, 0, 1.1) * 8.2 : 0) * (1 - e); /* backswing push-in */
@@ -7180,7 +7181,8 @@ const HOMESNAP = (() => {
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
 const TRACER_DRAWON = null; /* (Neil 11-28 03:11: 'shot line drawing looks weird, doesn't perform great: roll it back': back to TRACER_FADE's fade; was { ms: 420 }) */ /* (checked: started at a tee it draws a short stub from the ball and grows; in the fly-over flow it starts as the camera lands) */ /* Neil 11-27 ('try draw on'): after the fly-over lands, instead of the whole line fading in (TRACER_FADE), it draws itself out from the ball to the landing spot (fast at first, easing in at the end) and the landing rings come in over the last part. null = TRACER_FADE's fade, as v607 */
 const TRACER_FADE_CLEAN = true; /* Neil 11-28 (the fade 'still isn't perfect'; 'tweak the fade'): the shot line is a yellow tube with a dark ink tube behind it (its outline). Mid-fade both were see-through, so the dark ink showed through the yellow: the line came in dark and muddy, turning yellow only at the end. Now, while it fades, the yellow is drawn first and hides the ink behind it, so only the outline rim shows: the line fades in as itself. Once the fade ends the order is as before (same picture). false = as v613 */
-const TRACER_FADE = { ms: 450, lead: 0 }; /* (lead .15 tried in v606, Neil 11-27 23:56: 'remove that 150ms change') */ /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
+const FLY_FOV_MATCH = true; let FLY_FOVR = 52; /* Neil 11-28 08:22 ('just as the HUD fades in there's a tiny stutter in the camera where it goes up and then down to settle'): the trip home eased the zoom to 52, but the shot view rests at 52 + 13 x the club's pull-back (~65 with the driver), so after landing the view kept widening (and the look rising with it) for another ~1.5 s. Now the trip home eases straight to the shot view's own resting zoom: it lands settled. false = as v617 */
+const TRACER_FADE = { ms: 550, lead: .6 }; /* (Neil 11-28 08:16: 'the swing controls and the HUD fade back a bit sooner than the tracer, looks a bit off': the controls come back FLY_RETURN.hud = .6 s before the camera lands (#top fades .3 s, #bottom slides up .55 s), the line only started at the landing. Now the line starts with them (lead .6, the same moment) and takes as long as the controls' slide (.55 s). Was { ms: 450, lead: 0 }) */ /* (lead .15 tried in v606, Neil 11-27 23:56: 'remove that 150ms change') */ /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
 const TRF = { t0: 0 };
 function trDraw() { /* TRACER_DRAWON: the shot line draws itself out from the ball to where it lands; the rings come in as it arrives */
   const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_DRAWON.ms), f = 1 - Math.pow(1 - k, 3), n = Math.max(1, Math.ceil(f * TR.segs)), top = document.getElementById('trTop');
@@ -7228,7 +7230,7 @@ const FLY = (() => {
       B.P[3].copy(pos); const [P0, P1, P2, P3] = B.P, u = 1 - sp; _p.set(0, 0, 0).addScaledVector(P0, u * u * u).addScaledVector(P1, 3 * u * u * sp).addScaledVector(P2, 3 * u * sp * sp).addScaledVector(P3, sp * sp * sp);
       const d1 = _o.copy(look).sub(pos), L1 = d1.length(); d1.normalize(); const kr = smoother(Math.min(1, x / .9)); /* the camera turns evenly from where the drone looked to the shot line, done just before it lands */
       B.q.setFromUnitVectors(B.d0, d1); const qi = new THREE.Quaternion().slerp(B.q, kr); _l.copy(B.d0).applyQuaternion(qi).multiplyScalar(lerp(B.L0, L1, kr)).add(_p);
-      pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, smoother(x));
+      pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, FLY_FOV_MATCH ? FLY_FOVR : 52, smoother(x));
       if (!B.hud && T - B.t <= FLY_RETURN.hud) { B.hud = true; app.classList.remove('droning'); }
       if (TRACER_FADE && TRACER_FADE.lead && !B.tr && T - B.t <= TRACER_FADE.lead) { B.tr = true; tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; TRF.t0 = performance.now(); } /* (Neil 11-27: the line came in ~150 ms late: it now starts fading in this long before the camera lands) */ /* the shot's controls come in over the last stretch, landing with the camera */
       if (B.t >= T) { if (!B.hud) app.classList.remove('droning'); done(); } return; }
