@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v594'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v596'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1569,10 +1569,10 @@ function detailTex() {
 const DETAIL = detailTex(); SHARED.add(DETAIL);
 function groundMat(map, scale) {
   const m = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null }, detail: { value: null }, uvScale: { value: new THREE.Vector2(1, 1) }, gmap: { value: null }, gbox: { value: new THREE.Vector4(0, 0, 0, 0) } }]),
-    vertexShader: `uniform vec2 uvScale; varying vec2 vUv; varying vec2 vW; varying float vD;
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { morph: { value: 1 }, map: { value: null }, detail: { value: null }, uvScale: { value: new THREE.Vector2(1, 1) }, gmap: { value: null }, gbox: { value: new THREE.Vector4(0, 0, 0, 0) } }]),
+    vertexShader: `uniform vec2 uvScale; uniform float morph; attribute float hc; varying vec2 vUv; varying vec2 vW; varying float vD;
       #include <fog_pars_vertex>
-      void main(){ vUv=uv*uvScale; vec4 wp=modelMatrix*vec4(position,1.0); vW=wp.xz; vec4 mvPosition=viewMatrix*wp; vD=-mvPosition.z; gl_Position=projectionMatrix*mvPosition;
+      void main(){ vUv=uv*uvScale; vec3 p0=position; if(morph<0.9999) p0.z=mix(hc,position.z,morph); vec4 wp=modelMatrix*vec4(p0,1.0); vW=wp.xz; vec4 mvPosition=viewMatrix*wp; vD=-mvPosition.z; gl_Position=projectionMatrix*mvPosition;
       #include <fog_vertex>
       }`,
     fragmentShader: `uniform sampler2D map; uniform sampler2D detail; uniform sampler2D gmap; uniform vec4 gbox; varying vec2 vUv; varying vec2 vW; varying float vD;
@@ -1664,7 +1664,15 @@ function* terrainSteps(course) { // the painted course on the terrain, as 4x7 ti
       const e1 = (i0, j0, di, dj, n) => { for (let k = 0; k <= n; k++) { const i = i0 + di * k, j = j0 + dj * k; D = Math.max(D, Math.abs(H(i + di, j + dj) - H(i, j)), Math.abs(H(i - di, j - dj) - H(i, j))); } };
       if (ed[0]) e1(ti * su, tj * sv, 0, 1, sv); if (ed[1]) e1((ti + 1) * su, tj * sv, 0, 1, sv); if (ed[2]) e1(ti * su, tj * sv, 1, 0, su); if (ed[3]) e1(ti * su, (tj + 1) * sv, 1, 0, su);
       const sk = skirtGeo(geo, ed, .3 + D * 1.5); if (sk) { const s = new THREE.Mesh(sk, course.material); s.userData.skirt = true; if (AUGD) s.renderOrder = -2; m.add(s); } }
-    if (!half) fine = m; else { m.visible = false; (HS.ud.gtiles || (HS.ud.gtiles = [])).push({ fine, coarse: m, c: new THREE.Vector3(tu, geo.boundingSphere.center.z, -tv), r: Math.hypot(su * du, sv * dv) / 2 }); } }
+    if (!half) fine = m; else { m.visible = false; const GT = { fine, coarse: m, c: new THREE.Vector3(tu, geo.boundingSphere.center.z, -tv), r: Math.hypot(su * du, sv * dv) / 2, m: 1, set: false }; (HS.ud.gtiles || (HS.ud.gtiles = [])).push(GT);
+      if (GROUND_MORPH) { /* GROUND_MORPH: each full-detail vertex also carries the height the half-detail twin's surface has under it (its triangle, interpolated), so the full tile can start out exactly the twin's shape and ease into its own */
+        const fg = fine.geometry, fp = fg.attributes.position, cq = geo.attributes.position, P = geo.parameters, gx = P.widthSegments, gy = P.heightSegments, W = P.width, Hh = P.height, sw = W / gx, sh = Hh / gy, g1 = gx + 1, hcA = new Float32Array(fp.count);
+        for (let k = 0; k < fp.count; k++) { const fx = (fp.getX(k) + W / 2) / sw, fy = (Hh / 2 - fp.getY(k)) / sh, ix = Math.min(gx - 1, Math.max(0, Math.floor(fx))), iy = Math.min(gy - 1, Math.max(0, Math.floor(fy))), sx = fx - ix, ty = fy - iy;
+          const ha = cq.getZ(ix + g1 * iy), hb = cq.getZ(ix + g1 * (iy + 1)), hq = cq.getZ(ix + 1 + g1 * (iy + 1)), hd = cq.getZ(ix + 1 + g1 * iy); /* (PlaneGeometry's cell: faces a-b-d and b-c-d) */
+          hcA[k] = sx + ty <= 1 ? ha + sx * (hd - ha) + ty * (hb - ha) : hq + (1 - sx) * (hb - hq) + (1 - ty) * (hd - hq); if (BUILD_CHUNK2 && k % 4096 === 4095) yield; }
+        fg.setAttribute('hc', new THREE.BufferAttribute(hcA, 1));
+        fine.onBeforeRender = (r, sc, ca, g, mat) => { if (GT.m < 1 && mat.uniforms && mat.uniforms.morph) { mat.uniforms.morph.value = GT.m; mat.uniformsNeedUpdate = true; GT.set = true; } };
+        fine.onAfterRender = (r, sc, ca, g, mat) => { if (GT.set) { mat.uniforms.morph.value = 1; mat.uniformsNeedUpdate = true; GT.set = false; } }; } } }
   }
 }
 function skirtGeo(geo, ed, D) { /* GROUND_SKIRT: a strip hanging down from a ground tile's inner edges (ed: left, right, bottom, top), lit and coloured as the edge it hangs from */
@@ -1809,6 +1817,7 @@ const HOME_PR = 1; /* Neil 11-23 (swiping the golfer picker choppy on a slow pho
 const OSL_HASH_FIX = true; /* see the room-link check near the end: #osler is OslerBrook, not a room (false = as v548) */
 const WAY_UNDER = 4; /* Neil 11-22: a round 4 or more under par says "Way under par!" (0 = always "Under par!", v546) */
 const GROUND_SKIRT = false; /* Neil 11-22: where a full-detail ground tile meets a half-detail one their edges don't quite match, and a hairline crack showed what's under the ground; each tile's inner edges now carry a short skirt hanging down (its own edge's colour and light), which closes the crack. Out of sight everywhere else (false = as v546) */
+const GROUND_MORPH = { band: 20 }; /* Neil 11-25 ('in the Augusta 1 flyover, about 10-15% in, a bit of the fairway line shifts left; happens in the home screen background too'): that was a ground tile swapping from its half-detail twin to full detail (GROUND_LOD) as the camera came within 120 yd: the twin's flatter in-between heights put the painted fairway edge a touch elsewhere, so it jumped. Now the swap happens at 140 yd with the full tile shaped exactly like its twin (each vertex at the twin's height under it), and it eases into its own heights as the camera comes from 140 to 120 yd: no jump, and full detail from 120 yd in, as before (a few more full tiles drawn between 120 and 140 yd). null = as v594 */
 const GROUND_LOD = 120; /* option 4: course ground tiles whose nearest edge is beyond this many yd are drawn from a half-resolution twin (a quarter of the triangles). 0 = off, as v437 */
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
 const AZALEA_FAR = true; /* Neil (11-17 07:08): "Azaleas yes, same as trees" (perf3): with "far trees: simple" on (the default), flowering bushes beyond the same 120 yd are drawn with a 72-tri dome instead of 210 (mound, blossom cap and ink). false = every bush at full detail, as before */
@@ -1827,7 +1836,7 @@ const GHOST_LINE = { near: 45 }; const _gho = new Set(); const GHOST_MAT = new T
 const GHOST_GROW = true; /* PR #19 (bug hunt): a ghost crown mesh grows to fit (it had 64 slots, and ghosted crowns past the 64th weren't drawn at all); the shared geometry and material stay, only the instance buffer is remade. false = fixed 64, as v496 */
 const FLY_NO_HIDE = true; /* the same report: during the hole's fly-over no tree steps aside for the line to the ball on the tee (the drone isn't looking at it; on its way back trees ahead of it were vanishing and reappearing). Only a crown the camera is actually inside still steps aside. false = as v435 */
 function updateCull() {
-  if (GROUND_LOD && HS && HS.ud && HS.ud.gtiles) { const cp = camera.position; for (const T of HS.ud.gtiles) { const far = cp.distanceTo(T.c) - T.r > GROUND_LOD; if (T.coarse.visible !== far) { T.coarse.visible = far; T.fine.visible = !far; } } } /* GROUND_LOD */
+  if (GROUND_LOD && HS && HS.ud && HS.ud.gtiles) { const cp = camera.position; for (const T of HS.ud.gtiles) { const d = cp.distanceTo(T.c) - T.r, far = d > GROUND_LOD + (GROUND_MORPH ? GROUND_MORPH.band : 0); if (T.coarse.visible !== far) { T.coarse.visible = far; T.fine.visible = !far; } if (GROUND_MORPH) T.m = far ? 0 : clamp((GROUND_LOD + GROUND_MORPH.band - d) / GROUND_MORPH.band, 0, 1); } } /* GROUND_LOD (GROUND_MORPH: the swap happens band yd further out, where the full tile is still exactly its twin's shape, and it eases into full detail by GROUND_LOD yd, the old swap distance) */
   { const fk = FLY_FAR > 1 && FLY.on ? FLY_FAR : 1; if (FADE_K.value !== fk) FADE_K.value = fk; } /* FLY_FAR: the shader fade too (the cards fade out by distance in the shader, under their draw limit) */
   camera.updateMatrixWorld(); const e = camera.matrixWorld.elements; let same = true;
   for (let i = 0; i < 16; i++) if (_ck[i] !== e[i]) { same = false; _ck[i] = e[i]; }
@@ -5874,7 +5883,7 @@ canvas.addEventListener('pointerdown', e => {
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (G.view === 'swing' && G.aimGoal === 0) { // any touch on the course = aim mode, but never from the control strip at the bottom
     if (e.clientY > (RECT.ctrlT || 1e9) - 16 || (RECT.ctrls || []).some(r => e.clientX > r.left - 22 && e.clientX < r.right + 22 && e.clientY > r.top - 22 && e.clientY < r.bottom + 22)) { ptrs.delete(e.pointerId); return; } // the whole control strip (and near-misses) never opens aim view
-    tap = null; audioInit(); { const g = groundAt(e.clientX, e.clientY); if (g) { const du = g.u - G.ball.u, dv = g.v - G.ball.v, L = Math.hypot(du, dv); const tu = G.ball.u + G.dir.u * G.D, tv = G.ball.v + G.dir.v * G.D, off = Math.hypot(g.u - tu, g.v - tv); if (L > 3 && (du * G.dir.u + dv * G.dir.v) / L > .35 && off > Math.max(6, G.D * .18) && !(TUT_AIM_KEEP && TUT_ON && CID === 'tut')) dragTarget(e); } } /* the tap that opens aim view only re-aims when it lands somewhere clearly away from the current target (ahead of the ball): a tap on or near the usual spot just opens aim view (Neil) */ enterAim(); ptrs.clear(); return; }
+    tap = null; audioInit(); { const g = groundAt(e.clientX, e.clientY); if (g) { const du = g.u - G.ball.u, dv = g.v - G.ball.v, L = Math.hypot(du, dv); const tu = G.ball.u + G.dir.u * G.D, tv = G.ball.v + G.dir.v * G.D, off = Math.hypot(g.u - tu, g.v - tv); if (L > 3 && (du * G.dir.u + dv * G.dir.v) / L > .35 && off > Math.max(6, G.D * (TAP_REAIM || .18)) && !(TUT_AIM_KEEP && TUT_ON && CID === 'tut')) dragTarget(e); } } /* the tap that opens aim view only re-aims when it lands somewhere clearly away from the current target (ahead of the ball): a tap on or near the usual spot just opens aim view (Neil) */ enterAim(); ptrs.clear(); return; }
   if (G.view === 'aim' && G.aimT > .9) {
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     if (ptrs.size >= 2) { startPinch(); return; }
@@ -7121,6 +7130,7 @@ const INTRO_WRAP = true; /* perf548 (the hand-off again): as the faces set off, 
 const INTRO_RW = true; /* perf548 (Neil 11-22: the golfer board's first hydration still stuttered now and then): as the intro's faces set off for their home tiles, each face's measurements (its box, its tile's picture box, width and colour) were read between the previous face's style writes, so the browser restyled and re-laid out the whole page once per face (~150-250 ms of one frame at 4x CPU). Now all are measured first (the window's width too: reading it after a face's writes laid the page out again), then written: the same values, the same styles, one layout. false = as v548 */
 const HOME_EARLY = true; /* perf555 (proposal 1, Neil 11-23 'try all 3 and measure them'): the home screen's hydration under the intro (#boot.home: its whole restyle, 28-100 ms at 4x CPU) was applied in the same frame as the intro board's light sweep starts, so that sweep's first frame came late. Now the class goes on in the intro's covered opening beat (with INTRO_PRE's invisible paint, before the first square comes in), while the board is still empty; the background-build quiet time (HYD_QUIET) still starts at the sweep as before. On screen: the home title's letter hop and the picked golfer's bob start that much earlier, so they are at a different point of their loop when the intro hands over. false = as v555 */ const HYD_QUIET = 1200; /* Neil 11-22 (a touch of stutter as the intro hands over to the golfer picker): the background hole build holds off for 1.2 s from that hand-off (0 = it carries on, v519) */
 const INTRO_OSL_RING = true; /* Neil 11-22: OslerBrook's crest on the intro board sits on a paper circle like Augusta's (false = the bare turtle) */
+const TAP_REAIM = .33; /* Neil 11-27: the tap from the shot view that opens aim view re-aims at the tap only when it lands further than this share of the shot's distance (or 6 yd, whichever is more) from the current target: 18% -> 33% (300 yd drive: 54 -> 99 yd), so a tap near the line just opens aim view. null = .18, as v595 */
 const TAP_FF = { s: .25 }; /* Neil 11-25: a tap while the camera is still gliding back down to the shot view (after the post-shot card, a drop, a mulligan...) opened aim view mid-glide and often left the shot mis-aimed; it was really a tap to skip the glide. Now that tap fast-forwards the glide (the rest of it plays in .25 s) and does nothing else; a tap once the camera has settled opens aim view as before. null = as v592 */
 const DROP_VIEW = { zoom: 1.18 }; /* Neil 11-25, the take-a-drop screen: no tracer shadow on the ground (the tracer itself was already hidden there), the wind holds still while you pick your spot (no drift or gusts until you drop), and the overhead sits 18% higher (zoomed out a touch). null = as v591 */
 const MP_BANNER_LOW = true; /* Neil 11-24: the pink "HENRY IS AIMING" / "HENRY'S DRIVE" banner sat at the top-middle, in the way of the shot; now it sits just above the group/chat card at the bottom (phone layout). false = as v590 */
