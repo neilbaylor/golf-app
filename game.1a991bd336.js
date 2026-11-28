@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v602'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v604'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5788,7 +5788,7 @@ function updateTracer() {
   // radius = distance-to-camera × an on-screen width, so the line never pops thin/fat while the camera flies
   trInk = lerp(.38, .62, e); const wantMap = e > .5 ? solidTex : dashTex; if (tracer.material.map !== wantMap) { tracer.material.map = wantMap; tracer.material.needsUpdate = true; }
   buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(lerp(.0075, .0012, Math.sqrt(t)), .0046, e) * (TR_ATTACH ? lerp(lerp(TR_ATTACH.ramp, 1, Math.min(1, i / 6)), 1, TR_ATTACH.aim ? 0 : e) : 1), Math.max(4, D / 7)); TT.e = e; TT.dashes = Math.max(4, D / 7);
-  buildShadow(s => camera.position.distanceTo(shPts[s]) * lerp(.004, .0042, e)); trShadow.visible = !G.preview && !(DROP_VIEW && G.drop); trShadow.material.opacity = lerp(.2, .3, e); /* no ground shadow in the post-shot zoom on the green */
+  buildShadow(s => camera.position.distanceTo(shPts[s]) * lerp(.004, .0042, e)); trShadow.visible = !G.preview && !(DROP_VIEW && G.drop); trShadow.material.opacity = trShadow.userData.op = lerp(.2, .3, e); /* no ground shadow in the post-shot zoom on the green */
   MINI.draw(plan);
   const tg = targetUV(); rings.position.set(tg.u, groundHeight(tg.u, tg.v), -tg.v);
   if (treeMk.userData.at) { treeMk.position.copy(treeMk.userData.at); treeMk.scale.setScalar(camera.position.distanceTo(treeMk.userData.at) * lerp(.075, .06, e)); }
@@ -6817,7 +6817,7 @@ function frame(now) {
   if (ghostRing.visible && G.view !== 'flight') ghostRing.visible = false; if (ballMark.visible && G.view !== 'flight') ballMark.visible = false; /* the tower's ghost ring goes with the flight */
   flag.wave(t);
   for (const p of puffs) { if (!p.s.visible) continue; p.life += dt; const k = p.life / p.max; if (k >= 1) { p.s.visible = false; continue; } if (p.vel) { p.s.position.addScaledVector(p.vel, dt); p.vel.y -= 6 * dt; } p.s.scale.setScalar(p.size * (.4 + k * .9)); p.s.material.opacity = (1 - k) * p.op * smooth(p.s.scale.x * .6, p.s.scale.x * 2.2, camera.position.distanceTo(p.s.position)); }
-  TURF.update(dt); SZ.update(dt); CONFETTI.update(dt); CRITTERS.update(dt, t); if (G.view !== 'flight' && !(DROP_VIEW && G.drop)) WIND.update(dt); renderDial(dt, t); /* the wind holds while the ball flies: its flight was set at the strike */ drawTrail(dt); drawStrikeDot(dt); AV.update(dt, t);
+  TURF.update(dt); SZ.update(dt); CONFETTI.update(dt); CRITTERS.update(dt, t); if (G.view !== 'flight' && !(DROP_VIEW && G.drop)) WIND.update(dt); renderDial(dt, t); if (TRACER_FADE && TRF.t0) trFade(); /* the wind holds while the ball flies: its flight was set at the strike */ drawTrail(dt); drawStrikeDot(dt); AV.update(dt, t);
   if (MPX) MPX.frame(dt, now); /* MP hook: watched aim, the turn queue, chat bubbles */
   { // slope arrows: while aiming the short game, and whenever the ball is on the green (a putt rolling, an approach that has landed on it, or resting there)
     let onG = G.lie === 'green';
@@ -6994,8 +6994,14 @@ const HOMESNAP = (() => {
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
-const FLY_RETURN = null && { full: [1.8, 2.6, 500], skip: [1.3, 1.7, 900], hud: .6 }; /* (held off until its camera path is checked: remove 'null &&') */ /* Neil 11-27 ('the transition back to the tee after the flyover, on skip and after watching it all: a bit more elegant and smooth'): the trip home was 1.2 s (0.9 s on Skip) whatever the distance, started from a standstill (or reversed the drone dead on Skip), swung its view by blending two ground points, and brought the controls in at once. Now:
-   - its length goes with the distance: 1.8-2.6 s after the whole fly-over (full: [min s, max s, yd per extra s]), 1.3-1.7 s on Skip;
+const TRACER_FADE = { ms: 450 }; /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
+const TRF = { t0: 0 };
+function trFade() { const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_FADE.ms), f = k * k * k * (k * (k * 6 - 15) + 10), top = document.getElementById('trTop');
+  tracer.material.opacity = .96 * f; tracerInk.material.opacity = .9 * f; trShadow.material.opacity = (trShadow.userData.op != null ? trShadow.userData.op : .25) * f;
+  for (const m of rings.children) { if (m.userData.op == null) m.userData.op = m.material.opacity; m.material.opacity = m.userData.op * f; } if (top) top.style.opacity = k < 1 ? f.toFixed(3) : '';
+  if (k >= 1) TRF.t0 = 0; } /* (at k = 1 every opacity is back to its own value exactly) */
+const FLY_RETURN = { full: [2, 2.8, 450], skip: [1.3, 1.7, 900], hud: .6 }; /* (camera path checked, Augusta 1: full return 2.7 s, eases out of rest, peak 275 yd/s (was ~520 over 1.2 s), lands at rest; Skip 1.4 s, leaves at the drone's speed; no frame-to-frame jumps) */ /* Neil 11-27 ('the transition back to the tee after the flyover, on skip and after watching it all: a bit more elegant and smooth'): the trip home was 1.2 s (0.9 s on Skip) whatever the distance, started from a standstill (or reversed the drone dead on Skip), swung its view by blending two ground points, and brought the controls in at once. Now:
+   - its length goes with the distance: 2-2.8 s after the whole fly-over (full: [min s, max s, yd per extra s]), 1.3-1.7 s on Skip;
    - one smooth curve: it leaves at the drone's own speed and heading (Skip), rises in an arc over the hole, and settles in from ahead and above along the shot line, coming to rest;
    - the orbit over the green now eases to a stop before its beat (it braked from speed);
    - the camera turns evenly (a rotation, not a blend of two look points) and is done turning just before it lands; the view eases out with the move;
@@ -7024,9 +7030,9 @@ const FLY = (() => {
     if (S.back && FLY_RETURN) { const B = S.back; B.t += dt; /* FLY_RETURN: one continuous flight home (see the flag) */
       if (!B.P) { const P3 = pos.clone(), fw = _o.copy(look).sub(pos); fw.y = 0; if (fw.lengthSq() < 1e-6) fw.set(0, 0, -1); fw.normalize(); const d = B.pos.distanceTo(P3), F = FLY_RETURN;
         B.dur = B.skip ? clamp(F.skip[0] + d / F.skip[2], F.skip[0], F.skip[1]) : clamp(F.full[0] + d / F.full[2], F.full[0], F.full[1]); const T = B.dur, hA = clamp(d * .1, 6, 35);
-        B.P = [B.pos.clone(), B.pos.clone().addScaledVector(B.v, T / 3).add(new THREE.Vector3(0, hA, 0)), P3.clone().addScaledVector(fw, clamp(d * .18, 10, 60)).add(new THREE.Vector3(0, hA * .6 + clamp(d * .06, 4, 20), 0)), P3];
+        B.P = [B.pos.clone(), B.pos.clone().addScaledVector(B.v, T / 3), P3.clone().addScaledVector(fw, clamp(d * .18, 10, 60)).add(new THREE.Vector3(0, hA + clamp(d * .06, 4, 20), 0)), P3]; B.sg = B.v.lengthSq() > 1 ? 1 : 0; /* (the rise is all in the far handle: the start keeps the drone's own velocity, or rest) */
         B.d0 = B.look.clone().sub(B.pos); B.L0 = B.d0.length(); B.d0.normalize(); B.q = new THREE.Quaternion(); B.hud = false; }
-      const T = B.dur, x = Math.min(1, B.t / T), sp = x + x * x - x * x * x; /* time along the curve: leaves at the drone's own speed (slope 1), comes to rest at the end (slope 0) */
+      const T = B.dur, x = Math.min(1, B.t / T), sp = B.sg ? x + x * x - x * x * x : .5 - .5 * Math.cos(Math.PI * x); /* time along the curve: on Skip it leaves at the drone's own speed (slope 1), after the whole fly-over it eases out of rest; either way it comes to rest at the end */
       B.P[3].copy(pos); const [P0, P1, P2, P3] = B.P, u = 1 - sp; _p.set(0, 0, 0).addScaledVector(P0, u * u * u).addScaledVector(P1, 3 * u * u * sp).addScaledVector(P2, 3 * u * sp * sp).addScaledVector(P3, sp * sp * sp);
       const d1 = _o.copy(look).sub(pos), L1 = d1.length(); d1.normalize(); const kr = smoother(Math.min(1, x / .9)); /* the camera turns evenly from where the drone looked to the shot line, done just before it lands */
       B.q.setFromUnitVectors(B.d0, d1); const qi = new THREE.Quaternion().slerp(B.q, kr); _l.copy(B.d0).applyQuaternion(qi).multiplyScalar(lerp(B.L0, L1, kr)).add(_p);
@@ -7055,7 +7061,7 @@ const FLY = (() => {
     if (!S || S.back) return; S.back = { dur: skip ? .9 : T_BACK, t: 0, pos: camera.position.clone(), look: camLook.clone(), fov: camera.fov, arc: Math.min(26, camera.position.distanceTo(ball.position) * .08), skip: !!skip, v: FLY_RETURN && skip && S.vel ? S.vel.clone() : new THREE.Vector3() };
     if (!FLY_RETURN) app.classList.remove('droning'); $('#flyUI').hidden = true; clearTimeout(settleTips.to); app.classList.add('settling');
   }
-  function done() { if (FLY_SETTLE) FLY_CALM_AT = performance.now() + FLY_SETTLE_MS; S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
+  function done() { if (TRACER_FADE) TRF.t0 = performance.now(); if (FLY_SETTLE) FLY_CALM_AT = performance.now() + FLY_SETTLE_MS; S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
   function stop() { if (!S) return; S = null; after = null; app.classList.remove('droning', 'settling'); $('#flyUI').hidden = true; } /* quitting mid fly-over */
   $('#flyUI .fskip').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); end(true); });
   return { start, step, end, stop, reset() { seen.clear(); }, get on() { return !!S; }, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
