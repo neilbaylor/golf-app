@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v590'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v592'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5085,7 +5085,7 @@ const DROP = (() => {
     startCamTween(1.1, DROP_CAM); updateHUD(); tracerDirty = true; puttView();
   }
   function frame() { // straight down over the drop zone, hole up-screen; the line runs back down toward the card
-    const { X, f } = st, fw = new THREE.Vector3(f.u, 0, -f.v), far = st.d1 != null && st.d1 > 9 ? st.d1 + 4 : 0, H = far ? clamp(far * 1.15 + 14, 36, 110) : 36, M = new THREE.Vector3(X.u, gy(X.u, X.v), -X.v).addScaledVector(fw, far ? -far * .55 : -6.5);
+    const { X, f } = st, fw = new THREE.Vector3(f.u, 0, -f.v), far = st.d1 != null && st.d1 > 9 ? st.d1 + 4 : 0, H = (far ? clamp(far * 1.15 + 14, 36, 110) : 36) * (DROP_VIEW ? DROP_VIEW.zoom : 1), M = new THREE.Vector3(X.u, gy(X.u, X.v), -X.v).addScaledVector(fw, far ? -far * .55 : -6.5);
     return { bpos: M.clone().addScaledVector(fw, -H * .18).setY(M.y + H), blook: M, pos: new THREE.Vector3(), look: new THREE.Vector3(), zoom: 1, pan: new THREE.Vector3(), F: 110 };
   }
   const _q = new THREE.Vector3();
@@ -5743,7 +5743,7 @@ function updateTracer() {
   // radius = distance-to-camera × an on-screen width, so the line never pops thin/fat while the camera flies
   trInk = lerp(.38, .62, e); const wantMap = e > .5 ? solidTex : dashTex; if (tracer.material.map !== wantMap) { tracer.material.map = wantMap; tracer.material.needsUpdate = true; }
   buildTube(trPts, (t, i) => camera.position.distanceTo(trPts[i]) * lerp(lerp(.0075, .0012, Math.sqrt(t)), .0046, e) * (TR_ATTACH ? lerp(lerp(TR_ATTACH.ramp, 1, Math.min(1, i / 6)), 1, TR_ATTACH.aim ? 0 : e) : 1), Math.max(4, D / 7)); TT.e = e; TT.dashes = Math.max(4, D / 7);
-  buildShadow(s => camera.position.distanceTo(shPts[s]) * lerp(.004, .0042, e)); trShadow.visible = !G.preview; trShadow.material.opacity = lerp(.2, .3, e); /* no ground shadow in the post-shot zoom on the green */
+  buildShadow(s => camera.position.distanceTo(shPts[s]) * lerp(.004, .0042, e)); trShadow.visible = !G.preview && !(DROP_VIEW && G.drop); trShadow.material.opacity = lerp(.2, .3, e); /* no ground shadow in the post-shot zoom on the green */
   MINI.draw(plan);
   const tg = targetUV(); rings.position.set(tg.u, groundHeight(tg.u, tg.v), -tg.v);
   if (treeMk.userData.at) { treeMk.position.copy(treeMk.userData.at); treeMk.scale.setScalar(camera.position.distanceTo(treeMk.userData.at) * lerp(.075, .06, e)); }
@@ -6770,7 +6770,7 @@ function frame(now) {
   if (ghostRing.visible && G.view !== 'flight') ghostRing.visible = false; if (ballMark.visible && G.view !== 'flight') ballMark.visible = false; /* the tower's ghost ring goes with the flight */
   flag.wave(t);
   for (const p of puffs) { if (!p.s.visible) continue; p.life += dt; const k = p.life / p.max; if (k >= 1) { p.s.visible = false; continue; } if (p.vel) { p.s.position.addScaledVector(p.vel, dt); p.vel.y -= 6 * dt; } p.s.scale.setScalar(p.size * (.4 + k * .9)); p.s.material.opacity = (1 - k) * p.op * smooth(p.s.scale.x * .6, p.s.scale.x * 2.2, camera.position.distanceTo(p.s.position)); }
-  TURF.update(dt); SZ.update(dt); CONFETTI.update(dt); CRITTERS.update(dt, t); if (G.view !== 'flight') WIND.update(dt); renderDial(dt, t); /* the wind holds while the ball flies: its flight was set at the strike */ drawTrail(dt); drawStrikeDot(dt); AV.update(dt, t);
+  TURF.update(dt); SZ.update(dt); CONFETTI.update(dt); CRITTERS.update(dt, t); if (G.view !== 'flight' && !(DROP_VIEW && G.drop)) WIND.update(dt); renderDial(dt, t); /* the wind holds while the ball flies: its flight was set at the strike */ drawTrail(dt); drawStrikeDot(dt); AV.update(dt, t);
   if (MPX) MPX.frame(dt, now); /* MP hook: watched aim, the turn queue, chat bubbles */
   { // slope arrows: while aiming the short game, and whenever the ball is on the green (a putt rolling, an approach that has landed on it, or resting there)
     let onG = G.lie === 'green';
@@ -7116,6 +7116,8 @@ const INTRO_WRAP = true; /* perf548 (the hand-off again): as the faces set off, 
 const INTRO_RW = true; /* perf548 (Neil 11-22: the golfer board's first hydration still stuttered now and then): as the intro's faces set off for their home tiles, each face's measurements (its box, its tile's picture box, width and colour) were read between the previous face's style writes, so the browser restyled and re-laid out the whole page once per face (~150-250 ms of one frame at 4x CPU). Now all are measured first (the window's width too: reading it after a face's writes laid the page out again), then written: the same values, the same styles, one layout. false = as v548 */
 const HOME_EARLY = true; /* perf555 (proposal 1, Neil 11-23 'try all 3 and measure them'): the home screen's hydration under the intro (#boot.home: its whole restyle, 28-100 ms at 4x CPU) was applied in the same frame as the intro board's light sweep starts, so that sweep's first frame came late. Now the class goes on in the intro's covered opening beat (with INTRO_PRE's invisible paint, before the first square comes in), while the board is still empty; the background-build quiet time (HYD_QUIET) still starts at the sweep as before. On screen: the home title's letter hop and the picked golfer's bob start that much earlier, so they are at a different point of their loop when the intro hands over. false = as v555 */ const HYD_QUIET = 1200; /* Neil 11-22 (a touch of stutter as the intro hands over to the golfer picker): the background hole build holds off for 1.2 s from that hand-off (0 = it carries on, v519) */
 const INTRO_OSL_RING = true; /* Neil 11-22: OslerBrook's crest on the intro board sits on a paper circle like Augusta's (false = the bare turtle) */
+const DROP_VIEW = { zoom: 1.18 }; /* Neil 11-25, the take-a-drop screen: no tracer shadow on the ground (the tracer itself was already hidden there), the wind holds still while you pick your spot (no drift or gusts until you drop), and the overhead sits 18% higher (zoomed out a touch). null = as v591 */
+const MP_BANNER_LOW = true; /* Neil 11-24: the pink "HENRY IS AIMING" / "HENRY'S DRIVE" banner sat at the top-middle, in the way of the shot; now it sits just above the group/chat card at the bottom (phone layout). false = as v590 */
 const ACE_WORD = true; /* Neil 11-24: a hole-in-one said just 'EAGLE!' (or 'ALBATROSS!' on a par 4). Now the hole-out banner says HOLE IN ONE! and the score name leads the small line under it ('Eagle · Toronto Hunt · Hole 4 · Par 3'). The scorecard is unchanged. false = as v586 */
 const HANDOFF_LAND = false; /* OFF (Neil 11-24 16:51: 'not better... now i see a small bug sometimes where the faces disappear for a moment'). Neil 11-24 (a 'hitch' as the intro's faces hand over to the home tiles, even on a fast laptop: 'maybe the cards dont quite reach the destination'). Right: a face flies for .75 s (cubic-bezier(.6,0,.2,1)), but its live home tile was shown under it at 560 ms + 2 frames, when the face had only covered ~96% of the way (up to ~20 px short and a touch big on the far tiles), and then it faded out over 200 ms while still sliding in: a double image that snaps. Now the hand-off waits for the faces to land (760 ms), so the cross-fade is a pure dissolve in place. The intro ends ~0.2 s later. false = as v585 */
 const INTRO_PRE = true; /* Neil 11-21: see #intro.pre and INTRO.fill. false = as v488 */
@@ -7850,7 +7852,10 @@ if (MULTI) try { MPX = (() => {
   const BANNER = { set() { const b = el('mpBanner'); if (!b) return; const p = pl(S.turn), fl = G.view === 'flight' && G.shot;
     const struck = MP_AIM_TAG_LIVE && S.hitN === S.curN, show = S.inRound && p && !S.mine && !FLY.on && (fl || (!struck && (G.view === 'swing' || G.view === 'aim'))); /* MP_AIM_TAG_LIVE: after the shot lands, no "IS AIMING" for the hitter */
     b.hidden = !show; if (!show) return; const n = nm(p).toUpperCase();
-    b.textContent = fl ? `${n}'S ${G.shot.putt ? 'PUTT' : G.stroke === 1 && HOLE.par > 3 && G.club === 0 ? 'DRIVE' : 'SHOT'}` : `${n} IS AIMING`; } };
+    b.textContent = fl ? `${n}'S ${G.shot.putt ? 'PUTT' : G.stroke === 1 && HOLE.par > 3 && G.club === 0 ? 'DRIVE' : 'SHOT'}` : `${n} IS AIMING`; if (MP_BANNER_LOW) BANNER.low(); },
+    low() { /* MP_BANNER_LOW: sit 16 px above the group/chat card when it spans the bottom of the screen (phone layout); a side-docked card (desktop) keeps the old spot */ const b = el('mpBanner'), P = el('mpPanel'); if (!b || b.hidden || !P) return; const A = app.getBoundingClientRect(), r = P.getBoundingClientRect(), dock = r.height > 0 && r.bottom > A.bottom - 60 && r.width > A.width * .6;
+      if (dock) { b.style.top = 'auto'; b.style.bottom = Math.round(A.bottom - r.top + 16) + 'px'; } else { b.style.top = ''; b.style.bottom = ''; } } };
+  if (MP_BANNER_LOW) window.addEventListener('resize', () => BANNER.low());
 
   /* MP_SIDE_UP: the WATCHING column starts 14 px under the top HUD's right-hand column (lie / wind / style), whatever its height and the UI scale */
   function sayReach() { const sy = el('say'); if (!sy) return 0; const A = app.getBoundingClientRect(); /* MP_SIDE_LEFT: the bottom of the say bubble at its tallest (2 lines), wherever the HUD puts it (hasMode, UI scale) */
