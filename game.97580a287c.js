@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v599'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v601'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -5238,6 +5238,7 @@ function startPreview() {
   G.preview = { t: 0, r: 1.4, h: 1.05, f: 1.3, w: 0, pos, look };
 }
 function previewRetarget() { const P = G.preview; if (!PREVIEW_AIM || !P || P.cancel || pinDist() <= 30) return; P.to = previewPose(G.dir); } /* PREVIEW_AIM: the caddie's aim is in: ease the look-out round onto it */
+function camFF() { if (!TAP_FF || !G.camTween || G.camTween.t >= 1) return false; const T = G.camTween, left = (1 - T.t) * T.dur; if (left > TAP_FF.s) T.dur = TAP_FF.s / (1 - T.t); return true; } /* TAP_FF: the camera's glide plays out in TAP_FF.s */
 function startCamTween(dur, noHop) { G.camTween = { from: camera.position.clone(), fromLook: camLook.clone(), t: 0, dur, noHop: !!noHop }; }
 function enterAim() { if (TUT_PLAY && TUT_ON && CID === 'tut' && window.__TUTOR && !__TUTOR.aimOK) return; /* TUT_PLAY: aim view only when the tutorial says so */ caddieSync(); if (G.view !== 'swing') return; measure(); aimFrame = null; G.view = 'aim'; G.aimGoal = 1; sfx('pop'); $('#coach').classList.add('off'); if (!G.aimed) { G.aimed = true; store.set('aimed', true); } }
 function exitAim() { G.aimGoal = 0; G.view = 'swing'; sfx('pop'); }
@@ -5885,7 +5886,8 @@ const FF_UNSTICK = true; /* Neil (11-17 21:37): "Now sometimes 3x stays on the s
 const FFP = new Set(); window.addEventListener('pointerdown', e => FFP.add(e.pointerId), true); window.addEventListener('pointerup', e => FFP.delete(e.pointerId), true); window.addEventListener('pointercancel', e => FFP.delete(e.pointerId), true); window.addEventListener('blur', () => FFP.clear()); ['touchstart', 'touchend', 'touchcancel'].forEach(k => window.addEventListener(k, e => { if (!e.touches.length) FFP.clear(); }, { capture: true, passive: true })); /* (iOS: a touch taken over by a system gesture can end with no pointerup or pointercancel at all; the touch list is the truth: no touches, no fingers down) */ document.addEventListener('visibilitychange', () => { if (document.hidden) FFP.clear(); });
 canvas.addEventListener('pointerdown', e => {
   if (!$('#result').hidden) return;
-  if (TAP_FF && G.view === 'swing' && G.aimGoal === 0 && G.camTween && G.camTween.t < 1) { const T = G.camTween, left = (1 - T.t) * T.dur; if (left > TAP_FF.s) T.dur = TAP_FF.s / (1 - T.t); return; } /* TAP_FF */
+  if (MP_GLIDE_HOLD && app.classList.contains('mp') && G.view === 'swing' && G.aimGoal === 0 && G.camTween && G.camTween.t < 1) return; /* MP_GLIDE_HOLD (Neil 11-27 22:43: 'no skipping the glide at all in multiplayer for now'): in a multiplayer round a tap during the camera's glide does nothing (no skip, and no aim view opened mid-glide); tap again once it has landed */
+  if (G.view === 'swing' && G.aimGoal === 0 && camFF()) { if (window.__mpCamFF) window.__mpCamFF(); return; } /* TAP_FF (MP_TAP_FF: the hitter's skip goes to everyone) */
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (G.view === 'swing' && G.aimGoal === 0) { // any touch on the course = aim mode, but never from the control strip at the bottom
     if (e.clientY > (RECT.ctrlT || 1e9) - 16 || (RECT.ctrls || []).some(r => e.clientX > r.left - 22 && e.clientX < r.right + 22 && e.clientY > r.top - 22 && e.clientY < r.bottom + 22)) { ptrs.delete(e.pointerId); return; } // the whole control strip (and near-misses) never opens aim view
@@ -6967,6 +6969,13 @@ const HOMESNAP = (() => {
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
+const FLY_RETURN = null && { full: [1.8, 2.6, 500], skip: [1.3, 1.7, 900], hud: .6 }; /* (held off until its camera path is checked: remove 'null &&') */ /* Neil 11-27 ('the transition back to the tee after the flyover, on skip and after watching it all: a bit more elegant and smooth'): the trip home was 1.2 s (0.9 s on Skip) whatever the distance, started from a standstill (or reversed the drone dead on Skip), swung its view by blending two ground points, and brought the controls in at once. Now:
+   - its length goes with the distance: 1.8-2.6 s after the whole fly-over (full: [min s, max s, yd per extra s]), 1.3-1.7 s on Skip;
+   - one smooth curve: it leaves at the drone's own speed and heading (Skip), rises in an arc over the hole, and settles in from ahead and above along the shot line, coming to rest;
+   - the orbit over the green now eases to a stop before its beat (it braked from speed);
+   - the camera turns evenly (a rotation, not a blend of two look points) and is done turning just before it lands; the view eases out with the move;
+   - the shot's controls come in over the last `hud` seconds, landing with the camera.
+   null = as v599 */
 const FLY = (() => {
   const seen = new Set(), tRun = () => AUGCAM ? 8.6 * clamp(Math.sqrt(AUGCAM.L / 297), .8, 1.25) : 8.6, /* Augusta: a little quicker down 12, a little longer down 13 */ T_PAUSE = 0, T_ORB = 5.2, T_BACK = 1.2; let S = null, after = null, T_RUN = 8.6; /* (per hole: set as each fly-over starts) */
   const _p = new THREE.Vector3(), _l = new THREE.Vector3(), _o = new THREE.Vector3(), gp = (u, v, h) => new THREE.Vector3(u, groundHeight(u, v) + h, -v);
@@ -6982,11 +6991,23 @@ const FLY = (() => {
       L = cv([[cu(55), 55, 0], [cu(125), 125, 0], [cu(195), 195, 0], [cu(250), 250, 0], [C.u, C.v - 22, 0], [C.u, C.v, 0]]); }
     const E = P.getPointAt(1), gy0 = groundHeight(C.u, C.v);
     let Ho; if (AUGCAM) { const a0 = Math.atan2(E.x - C.u, -E.z - C.v), R0 = Math.hypot(E.x - C.u, -E.z - C.v); Ho = 42; for (let i = 0; i <= 16; i++) { const k = i / 16, a = a0 - 1.1 * k, R = lerp(R0, 46, k); Ho = Math.max(Ho, AUGCAM.clear(C.u + Math.sin(a) * R, C.v + Math.cos(a) * R, 10) - gy0 + 8); } } /* the turn over the green stays above the trees round it */
-    S = { t: 0, P, L, C, gy0, Ho, a0: Math.atan2(E.x - C.u, -E.z - C.v), R0: Math.hypot(E.x - C.u, -E.z - C.v), H0: E.y - gy0, from: camera.position.clone(), fromLook: camLook.clone(), fov: 52 };
+    S = { t: 0, P, L, C, gy0, Ho, a0: Math.atan2(E.x - C.u, -E.z - C.v), R0: Math.hypot(E.x - C.u, -E.z - C.v), H0: E.y - gy0, from: camera.position.clone(), fromLook: camLook.clone(), fov: 52, vel: new THREE.Vector3() };
     app.classList.toggle('flyHud', FLY_HUD && (HOLE_N !== NINE.first(CID) || (MP_FLY_HUD1 && app.classList.contains('mp')))); /* MP_FLY_HUD1 */ app.classList.add('notrans', 'droning'); requestAnimationFrame(() => requestAnimationFrame(() => app.classList.remove('notrans'))); $('#flyUI .flogo').src = COURSE_LOGO; $('#flyUI .flogo').classList.toggle('thin', CID === 'augusta'); $('#flyUI .fcl').classList.toggle('noglint', CID === 'augusta'); $('#flyUI .fpin').classList.remove('out'); $('#flyUI').hidden = false; tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = false; straightRef.visible = false; treeMk.visible = false;
     return true;
   }
   function step(dt, pos, look) {
+    if (S.back && FLY_RETURN) { const B = S.back; B.t += dt; /* FLY_RETURN: one continuous flight home (see the flag) */
+      if (!B.P) { const P3 = pos.clone(), fw = _o.copy(look).sub(pos); fw.y = 0; if (fw.lengthSq() < 1e-6) fw.set(0, 0, -1); fw.normalize(); const d = B.pos.distanceTo(P3), F = FLY_RETURN;
+        B.dur = B.skip ? clamp(F.skip[0] + d / F.skip[2], F.skip[0], F.skip[1]) : clamp(F.full[0] + d / F.full[2], F.full[0], F.full[1]); const T = B.dur, hA = clamp(d * .1, 6, 35);
+        B.P = [B.pos.clone(), B.pos.clone().addScaledVector(B.v, T / 3).add(new THREE.Vector3(0, hA, 0)), P3.clone().addScaledVector(fw, clamp(d * .18, 10, 60)).add(new THREE.Vector3(0, hA * .6 + clamp(d * .06, 4, 20), 0)), P3];
+        B.d0 = B.look.clone().sub(B.pos); B.L0 = B.d0.length(); B.d0.normalize(); B.q = new THREE.Quaternion(); B.hud = false; }
+      const T = B.dur, x = Math.min(1, B.t / T), sp = x + x * x - x * x * x; /* time along the curve: leaves at the drone's own speed (slope 1), comes to rest at the end (slope 0) */
+      B.P[3].copy(pos); const [P0, P1, P2, P3] = B.P, u = 1 - sp; _p.set(0, 0, 0).addScaledVector(P0, u * u * u).addScaledVector(P1, 3 * u * u * sp).addScaledVector(P2, 3 * u * sp * sp).addScaledVector(P3, sp * sp * sp);
+      const d1 = _o.copy(look).sub(pos), L1 = d1.length(); d1.normalize(); const kr = smoother(Math.min(1, x / .9)); /* the camera turns evenly from where the drone looked to the shot line, done just before it lands */
+      B.q.setFromUnitVectors(B.d0, d1); const qi = new THREE.Quaternion().slerp(B.q, kr); _l.copy(B.d0).applyQuaternion(qi).multiplyScalar(lerp(B.L0, L1, kr)).add(_p);
+      pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, smoother(x));
+      if (!B.hud && T - B.t <= FLY_RETURN.hud) { B.hud = true; app.classList.remove('droning'); } /* the shot's controls come in over the last stretch, landing with the camera */
+      if (B.t >= T) { if (!B.hud) app.classList.remove('droning'); done(); } return; }
     if (S.back) { /* back to the tee on our own arc: rises a little, glides down into the shot view, zoom easing out on the way */
       const B = S.back; B.t += dt; const x = Math.min(1, B.t / B.dur), k = .5 - .5 * Math.cos(Math.PI * x), m = 1 - k; /* sine ease: gentler peak speed than smootherstep */
       const d = B.pos.distanceTo(pos), cy = Math.max(B.pos.y, pos.y) + Math.min(40, d * .12); /* glide back high over the hole... */
@@ -6997,16 +7018,17 @@ const FLY = (() => {
     S.t += dt; const t = S.t, { C } = S;
     const O = 2.6, t0 = T_RUN - O; /* the turn starts while the drone is still flying in, and takes over smoothly: no stop, no pause */
     { const r = Math.min(1, t / T_RUN), e = r * r * (3 - 2 * r) * .6 + r * .4; S.P.getPointAt(e, _p); S.L.getPointAt(e, _l); S.fov = 52; }
-    if (t > t0) { const xo = clamp((t - t0) / T_ORB, 0, 1), k = .4 * xo + .6 * (.5 - .5 * Math.cos(Math.PI * xo)); /* already moving as it starts, easing out at the end */
+    if (t > t0) { const xo = clamp((t - t0) / T_ORB, 0, 1), k = FLY_RETURN ? xo * (.4 + xo * (2.2 - 1.6 * xo)) : .4 * xo + .6 * (.5 - .5 * Math.cos(Math.PI * xo)); /* FLY_RETURN: the same start, but the turn now comes to rest instead of stopping dead at the end */ /* already moving as it starts, easing out at the end */
       const a = S.a0 - 1.1 * k, R = lerp(S.R0, 46, k), H = lerp(S.H0, S.Ho ?? 42, k), w = smoother(Math.min(1, (t - t0) / O)); /* turn right: round over the lake side, looking back across the green */
       _p.lerp(_o.set(C.u + Math.sin(a) * R, S.gy0 + H, -(C.v + Math.cos(a) * R)), w); _l.lerp(_o.set(C.u, S.gy0, -C.v), w); S.fov = 52 - 8 * k * w; }
     pos.copy(_p); look.copy(_l); /* starts already up high behind the tee: no climb from the menu camera */
+    if (FLY_RETURN) { if (S.pp && dt > 0) { _o.copy(_p).sub(S.pp).divideScalar(dt); S.vel.lerp(_o, .5); } (S.pp || (S.pp = new THREE.Vector3())).copy(_p); } /* (the drone's speed, for a seamless start home on Skip) */
     if (t >= t0 + T_ORB - .2) $('#flyUI .fpin').classList.add('out'); /* PIN_LABEL: fades out as the fly-over winds up */
     if (t >= t0 + T_ORB + .4) end(); /* a beat on the green, then back to the tee */
   }
   function end(skip) { /* finished or skipped: head back to the tee (snappier when you skipped) */
-    if (!S || S.back) return; S.back = { dur: skip ? .9 : T_BACK, t: 0, pos: camera.position.clone(), look: camLook.clone(), fov: camera.fov, arc: Math.min(26, camera.position.distanceTo(ball.position) * .08) };
-    app.classList.remove('droning'); $('#flyUI').hidden = true; clearTimeout(settleTips.to); app.classList.add('settling');
+    if (!S || S.back) return; S.back = { dur: skip ? .9 : T_BACK, t: 0, pos: camera.position.clone(), look: camLook.clone(), fov: camera.fov, arc: Math.min(26, camera.position.distanceTo(ball.position) * .08), skip: !!skip, v: FLY_RETURN && skip && S.vel ? S.vel.clone() : new THREE.Vector3() };
+    if (!FLY_RETURN) app.classList.remove('droning'); $('#flyUI').hidden = true; clearTimeout(settleTips.to); app.classList.add('settling');
   }
   function done() { if (FLY_SETTLE) FLY_CALM_AT = performance.now() + FLY_SETTLE_MS; S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
   function stop() { if (!S) return; S = null; after = null; app.classList.remove('droning', 'settling'); $('#flyUI').hidden = true; } /* quitting mid fly-over */
@@ -7136,6 +7158,8 @@ const INTRO_WRAP = true; /* perf548 (the hand-off again): as the faces set off, 
 const INTRO_RW = true; /* perf548 (Neil 11-22: the golfer board's first hydration still stuttered now and then): as the intro's faces set off for their home tiles, each face's measurements (its box, its tile's picture box, width and colour) were read between the previous face's style writes, so the browser restyled and re-laid out the whole page once per face (~150-250 ms of one frame at 4x CPU). Now all are measured first (the window's width too: reading it after a face's writes laid the page out again), then written: the same values, the same styles, one layout. false = as v548 */
 const HOME_EARLY = true; /* perf555 (proposal 1, Neil 11-23 'try all 3 and measure them'): the home screen's hydration under the intro (#boot.home: its whole restyle, 28-100 ms at 4x CPU) was applied in the same frame as the intro board's light sweep starts, so that sweep's first frame came late. Now the class goes on in the intro's covered opening beat (with INTRO_PRE's invisible paint, before the first square comes in), while the board is still empty; the background-build quiet time (HYD_QUIET) still starts at the sweep as before. On screen: the home title's letter hop and the picked golfer's bob start that much earlier, so they are at a different point of their loop when the intro hands over. false = as v555 */ const HYD_QUIET = 1200; /* Neil 11-22 (a touch of stutter as the intro hands over to the golfer picker): the background hole build holds off for 1.2 s from that hand-off (0 = it carries on, v519) */
 const INTRO_OSL_RING = true; /* Neil 11-22: OslerBrook's crest on the intro board sits on a paper circle like Augusta's (false = the bare turtle) */
+const MP_GLIDE_HOLD = true; /* see the canvas tap (false = as v600) */
+const MP_TAP_FF = false; /* OFF (Neil 11-27 22:43, see MP_GLIDE_HOLD). see gate() (false = as v599: in a multiplayer round only the player whose turn it is could skip the glide, and only on their own phone) */
 const TAP_REAIM = false; /* OFF (Neil 11-27 22:04: 'Let's just turn that feature off. When you go to aim mode we start you on just where you were aimed in shot mode'): the tap that opens aim view never re-aims. A number (.33, .18) brings the tap re-aim back at that share. Was: Neil 11-27: the tap from the shot view that opens aim view re-aims at the tap only when it lands further than this share of the shot's distance (or 6 yd, whichever is more) from the current target: 18% -> 33% (300 yd drive: 54 -> 99 yd), so a tap near the line just opens aim view. null = .18, as v595 */
 const TAP_FF = { s: .25 }; /* Neil 11-25: a tap while the camera is still gliding back down to the shot view (after the post-shot card, a drop, a mulligan...) opened aim view mid-glide and often left the shot mis-aimed; it was really a tap to skip the glide. Now that tap fast-forwards the glide (the rest of it plays in .25 s) and does nothing else; a tap once the camera has settled opens aim view as before. null = as v592 */
 const DROP_VIEW = { zoom: 1.18 }; /* Neil 11-25, the take-a-drop screen: no tracer shadow on the ground (the tracer itself was already hidden there), the wind holds still while you pick your spot (no drift or gusts until you drop), and the overhead sits 18% higher (zoomed out a touch). null = as v591 */
@@ -7664,7 +7688,8 @@ if (MULTI) try { MPX = (() => {
       case 'go': if (MP_EARLY_NEXT) { S.goSeen = m.n; if (S.resN === m.n && !$('#result').hidden) S.resHold = Math.min(S.resHold || 0, S.resAt + K.CARD_HOLD); } break; /* MP_EARLY_NEXT: the hitter tapped their card away: here the next turn may now take this card down after 1.7 s (CARD_HOLD), as before when that tap sent 'next' */
       case 'chat': if (!CHAT.echo('m', m.from, m.text)) { CHAT.msg(m.from, m.text); CHAT.log(m.from, m.text); } break; /* (MP_OPT_CHAT: my own was shown when I sent it) */
       case 'typing': CHAT.typing(m.from, m.on); break;
-      case 'ff': if (MP_FF_SHARE) S.ffR = { n: m.n, from: m.from, on: !!m.on }; break; /* MP_FF_SHARE: the shooter is holding fast-forward on this shot */
+      case 'camff': if (MP_TAP_FF && G.view === 'swing' && G.aimGoal === 0) camFF(); break; /* MP_TAP_FF: the hitter skipped the glide */
+        case 'ff': if (MP_FF_SHARE) S.ffR = { n: m.n, from: m.from, on: !!m.on }; break; /* MP_FF_SHARE: the shooter is holding fast-forward on this shot */
       case 'react': if (!CHAT.echo('r', m.from, m.e)) CHAT.react(m.from, m.e); break;
       case 'err': log('err', m.code, m.msg); if (MP_QUIET_REJOIN && S.rejoin && /^(taken|full|code|gone)$/.test(m.code)) { const q = S.rejoin, code = S.code; S.rejoin = null; if (m.code === 'gone' && q.you && !q.again) { joinDone(); S.want = false; const ws = S.ws; S.ws = null; S.welcomed = false; try { ws && ws.close(); } catch (e) {} S.code = ''; S.status = 'idle'; setTimeout(() => { if (!S.code && !S.room) { S.again = true; join(code, true); } }, 3000); break; } quietOut(); break; } /* a quiet rejoin refused: nothing on screen (gone: once more in 3 s, quietly: a server just restarted is given its rooms back by the other phones within a second or so) */
         if (S.joining && /^(taken|full|code)$/.test(m.code)) joinDone(); /* MP_CONNECT_FIRST: refused: the modal shows why (below) */
@@ -7785,7 +7810,7 @@ if (MULTI) try { MPX = (() => {
     if (MP_SHOT_CATCH) S.shotSeen = Math.max(S.shotSeen || 0, S.curN);
     sendR({ t: 'shot', as: as !== S.you ? as : undefined, auto: !!S.autoNow, d, ...(MP_GONE_NEXT ? { dur: flightMs(R) } : {}), res: { u: R.end.u, v: R.end.v, lie: R.endLie, holed: !!R.holed, water, toPin: Math.hypot(PIN.u - R.end.u, PIN.v - R.end.v) } });
     S.ends.push({ n: S.curN, u: R.end.u, v: R.end.v, lie: R.endLie, holed: !!R.holed, by: 'me' }); if (S.ends.length > 200) S.ends.shift();
-    if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* this turn's shot is struck */
+    if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* this turn's shot is struck */ S.lastBy = S.you; /* (MP_TAP_FF) */
     S.pend = { as, auto: !!S.autoNow, n: S.curN, sentNext: false }; S.autoNow = false; S.stats.shots++; S.launchAt = performance.now(); if (MP_FEEL) setTimeout(() => { BANNER.set(); STRIP.draw(); }, 0); else { BANNER.set(); STRIP.draw(); CHAT.flushHeld(); } /* MP_FEEL: the launch frame does nothing extra; held bubbles come a beat later (CHAT.tick) */ log('shot', S.curN, 'end', R.end.u.toFixed(3), R.end.v.toFixed(3), R.endLie);
   };
   function flightMs(R) { try { const gp = R.gnd && R.gnd.pts, T = gp && gp.length ? gp[gp.length - 1].t : 0; return Math.min(60000, Math.round(((R.dur || 0) + T / (R.putt ? 2.7 : 1.25)) * 1000)); } catch (e) { return 0; } } /* MP_GONE_NEXT: the air time plus the roll, as updateFlight plays them */
@@ -7805,7 +7830,7 @@ if (MULTI) try { MPX = (() => {
     placeBall(); G.lastSwing = { pts: unpackPts(d.lsw && d.lsw.pts), curveDeg: d.lsw ? d.lsw.curveDeg : d.sw.curveDeg, q: d.lsw ? d.lsw.q : 1, wob: d.lsw && d.lsw.wob || { rms: 0, word: 'smooth' } };
     if (d.tb && d.mode !== 'putt' && !(MP_REPLAY_FAST && tbHeld(d.tb))) { const k = { dir: G.dir, D: G.D, Feff: G.Feff, h: G.height, c: G.curve, s: G.spinX }; G.dir = { ...d.tb.dir }; G.D = d.tb.D; G.Feff = d.tb.Feff; G.height = d.tb.h; if (d.tb.c != null) { G.curve = d.tb.c; G.spinX = d.tb.s; } planCache = { key: '' }; tableCache = { key: '' }; planShot(); G.dir = k.dir; G.D = k.D; G.Feff = k.Feff; G.height = k.h; G.curve = k.c; G.spinX = k.s; } /* (an old phone's table has no c, s: as before) */ /* (MP_REPLAY_FAST: unless this phone holds that very table) */
     planCache = { key: '' }; G.aimT = d.aimT || 0; G.aimGoal = 0; G.view = 'swing';
-    S.replaying = { n: m.n, auto: !!m.auto, from: m.from }; if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* (MP_AIM_TAG_LIVE: struck) */
+    S.replaying = { n: m.n, auto: !!m.auto, from: m.from }; S.lastBy = m.by || m.from; /* (MP_TAP_FF) */ if (MP_AIM_TAG_LIVE) S.hitN = S.curN; /* (MP_AIM_TAG_LIVE: struck) */
     REPLAY_FL = d.fl && Number.isFinite(d.fl.sp) ? d.fl : null; try { seeded(d.seed, () => _launch(d.sw)); } finally { REPLAY_FL = null; } /* (an older phone's shot has no fl: replayed as before) */ S.stats.replays++;
     const R = G.shot, c = d.chk; if (R) { S.ends.push({ n: m.n, u: R.end.u, v: R.end.v, lie: R.endLie, holed: !!R.holed, by: 'replay' }); if (S.ends.length > 200) S.ends.shift(); }
     if (R && c) { const e = Math.hypot(R.end.u - c.u, R.end.v - c.v); S.lastMiss = e; if (e > 1e-6) { S.stats.mismatch++; log('replay mismatch', e); } else log('replay ok', m.n, R.end.u.toFixed(3), R.end.v.toFixed(3)); }
@@ -8028,9 +8053,10 @@ if (MULTI) try { MPX = (() => {
   function gate(e) {
     if (!S.inRound) return; const t = e.target, inMP = t.closest && t.closest(OK_ALWAYS);
     if (S.mine && S.compOpen && !inMP) { if (e.type === 'pointerdown') CHAT.close(); e.stopPropagation(); e.preventDefault(); return; } /* tapping away closes the composer (the draft stays) and isn't a swing */
-    if (!S.mine && !inMP) { if (MP_FLY_FF_ALL && FLY_FF && FLY.on && e.type === 'pointerdown') G.ff = true; /* MP_FLY_FF_ALL: a watcher can hold to fast-forward the fly-over too (still no touch on the course) */ e.stopPropagation(); if (e.type !== 'pointerdown') e.preventDefault(); return; }
+    if (!S.mine && !inMP) { if (MP_TAP_FF && e.type === 'pointerdown' && S.lastBy === S.you && G.view === 'swing' && G.aimGoal === 0 && camFF()) send({ t: 'camff' }); /* MP_TAP_FF (Neil 11-27: 'whoever shot it, if they skip, everyone else should see the skip too'): the player who just hit can tap to fast-forward the camera's glide on to the next ball (their turn over or not), and everyone's glide is fast-forwarded with theirs; nobody else's tap does it (still no touch on the course) */ if (MP_FLY_FF_ALL && FLY_FF && FLY.on && e.type === 'pointerdown') G.ff = true; /* MP_FLY_FF_ALL: a watcher can hold to fast-forward the fly-over too (still no touch on the course) */ e.stopPropagation(); if (e.type !== 'pointerdown') e.preventDefault(); return; }
     if (S.mine && e.type === 'pointerdown' && !inMP) { const now = performance.now(); if (now - S.actT > K.ACT_MS) { S.actT = now; if (MP_FEEL) setTimeout(() => send({ t: 'act' }), 0); else send({ t: 'act' }); } } } /* MP_FEEL: not even a socket write inside the touch handler */
   for (const ty of ['pointerdown', 'click', 'wheel']) window.addEventListener(ty, gate, { capture: true, passive: false });
+  if (MP_TAP_FF) window.__mpCamFF = () => { if (S.inRound && S.lastBy === S.you) send({ t: 'camff' }); }; /* (the canvas's own tap, on my turn) */
   for (const id of ['mpPanel', 'mpChatBtn']) { const x = el(id); if (x) x.addEventListener('pointerdown', e => e.stopPropagation()); } /* chat taps never fast-forward a flight */
   if (MP_EARLY_NEXT) $('#resBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.dataset.a !== 'next' || S.goN == null) return; const n = S.goN; S.goN = null; if (performance.now() - S.resAt < K.RES_MS - 150) { if (MP_SEND_NOW) send({ t: 'go', n }); else setTimeout(() => send({ t: 'go', n }), 0); } }, MP_SEND_NOW); /* (MP_SEND_NOW: capture, before the card's own handler) */ /* MP_EARLY_NEXT: the hitter's own tap on their card (Play on), not its timer: the others may move on too (the server relays it from the hitter only) */
   if (MP_FLY_SKIP_ALL) { const b = $('#flyUI .fskip'); if (b) b.addEventListener('click', () => { if (S.inRound && S.loaded && S.room && S.hole === S.room.hole && FLY.on) { const h = S.hole; S.flySkip = h; if (MP_SEND_NOW) send({ t: 'flyskip', hole: h }); else setTimeout(() => send({ t: 'flyskip', hole: h }), 0); } }, MP_SEND_NOW); } /* (MP_SEND_NOW: capture: before FLY's own listener starts the glide) */ /* MP_FLY_SKIP_ALL: my Skip goes to everyone (FLY's own listener does the local end(true)) */
