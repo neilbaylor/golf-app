@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v613'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v615'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1738,7 +1738,7 @@ function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m
   const C = { m, all, cols, sph, tid, n, far: opt.hideBeyond || 1e9, lead: null, vl: null, nv: 0, fm: null, fcut2: opt.farCut ? opt.farCut * opt.farCut : 0, crown: !!(opt.lod && opt.lod.userData.crown) };
   { const P = HS.cull[HS.cull.length - 1], L = P && (P.lead || P); /* a twin (an ink hull, a blossom cap): same instance centres as the mesh before it, so it shares that mesh's visible list (radius: the larger of the two, so it can only draw more, never less) */
     if (L && L.n === n && L.far === C.far && !!L.m.userData.tuft === !!m.userData.tuft) { let same = true; for (let i = 0; i < n * 4 && same; i += 4) same = sph[i] === L.sph[i] && sph[i + 1] === L.sph[i + 1] && sph[i + 2] === L.sph[i + 2] && tid[i >> 2] === L.tid[i >> 2];
-      if (same) { for (let i = 3; i < n * 4; i += 4) L.sph[i] = Math.max(L.sph[i], sph[i]); C.lead = L; } } }
+      if (same) { for (let i = 3; i < n * 4; i += 4) L.sph[i] = Math.max(L.sph[i], sph[i]); C.lead = L; L.cc = null; /* (CULL_CELLS: the lead's radii grew: its cells are made again) */ } } }
   if (opt.lod) { const f = new THREE.InstancedMesh(opt.lod, mat, n); f.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (cols) { f.setColorAt(0, new THREE.Color()); f.instanceColor.setUsage(THREE.DynamicDrawUsage); }
     f.count = 0; f.visible = false; if (opt.off) f.position.copy(opt.off); if (opt.ud) Object.assign(f.userData, opt.ud); C.fm = f; C.fpi = new Int32Array(n).fill(-1); } /* "far trees: simple": the same instances, far off, in a simpler mesh */
   if (TERRAIN_OCC) occInst(C, geo, opt.lod, o); /* TERRAIN_OCC */
@@ -1864,6 +1864,37 @@ function cullZoomOnly(same, save) { /* CULL_ZOOM: true when nothing but the zoom
   if (save) { for (let i = 12; i < 15; i++) _cz[i] = e[i]; for (let i = 0; i < 8; i++) _cz[16 + i] = v[i]; _czT = PLAN_TREE; _cz[25] = 1; return false; }
   if (same || !_cz[25] || _czT !== PLAN_TREE || G.view !== 'swing' || FLY.on || MENU.on) return false;
   for (let i = 12; i < 15; i++) if (_cz[i] !== e[i]) return false; for (let i = 3; i < 8; i++) if (_cz[16 + i] !== v[i]) return false; const bx = v[0] - _cz[16], by = v[1] - _cz[17], bz = v[2] - _cz[18]; return bx * bx + by * by + bz * bz <= 1e-4; } /* (the ball: within updateCull's own 1 cm) */
+/* CULL_CELLS (gp611, real-play fps): every frame the camera moves (the swing's pull, the flight, the glide back, the aim view), updateCull tested every instance of every
+   instanced group (trees, crowns, hulls, tufts, reeds: thousands on Augusta) against the view and its draw limit, one by one. Now each group's instances are also kept in
+   coarse ground cells (built once, from the same centres and radii); a cell wholly outside the view, or wholly past the group's draw limit, rejects its instances without
+   testing each one. Only provably hidden cells are skipped (each cell's sphere holds all its instances' spheres, with a margin), the rest are tested exactly as before, in
+   the same order, so the drawn list (and every instance buffer) is the same. See-through (GHOST_LINE) copies are still collected from skipped cells. false = as v611 */
+const CULL_CELLS = true;
+/* CULL_HOIST (gp611): the tree-in-the-way test (AIM_TREES) built its sight lines' end points afresh for every tree near the camera, every moving frame (two small arrays,
+   and in the aim view the target and its ground height looked up again per tree). They are the same for every tree in a pass, so they are made once per pass (the first
+   tree that needs them) and shared: the same points, tested in the same order. false = as v611 */
+const CULL_HOIST = true;
+/* EMPTY_SKIP (gp611): some instanced groups carry an ink-outline twin whose far (simple) mesh has an empty geometry (0 indices: far trees are drawn without the ink hull). three.js still ran its
+   per-draw set-up for it every frame (program, uniforms, state) before finding nothing to draw. Such a twin is now left out of the draw list; it never drew a pixel. false = as v611 */
+const EMPTY_SKIP = true;
+function geoEmpty(g) { const ix = g.index, p = g.attributes.position; return (ix ? ix.count === 0 : !p || p.count === 0) || g.drawRange.count === 0; } /* EMPTY_SKIP: what three.js itself returns early on */
+function cullCells(C) { /* CULL_CELLS: once per group (and again if a twin widened its radii): cells of ~CS units on the ground */
+  const n = C.n, S = C.sph, CS = 28, key = new Map(), of = new Int32Array(n); let k = 0;
+  for (let i = 0; i < n; i++) { const j = i * 4, q = Math.floor(S[j] / CS) + ',' + Math.floor(S[j + 2] / CS); let c = key.get(q); if (c === undefined) { c = k++; key.set(q, c); } of[i] = c; }
+  const cen = new Float64Array(k * 3), cnt = new Int32Array(k); for (let i = 0; i < n; i++) { const j = i * 4, c = of[i] * 3; cen[c] += S[j]; cen[c + 1] += S[j + 1]; cen[c + 2] += S[j + 2]; cnt[of[i]]++; }
+  for (let c = 0; c < k; c++) { cen[c * 3] /= cnt[c]; cen[c * 3 + 1] /= cnt[c]; cen[c * 3 + 2] /= cnt[c]; }
+  const R = new Float64Array(k), D = new Float64Array(k), rm = new Float64Array(k); /* R: sphere round all its instance spheres; D: farthest instance centre; rm: largest instance radius */
+  for (let i = 0; i < n; i++) { const j = i * 4, c = of[i], dx = S[j] - cen[c * 3], dy = S[j + 1] - cen[c * 3 + 1], dz = S[j + 2] - cen[c * 3 + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz), r = S[j + 3]; if (d + r > R[c]) R[c] = d + r; if (d > D[c]) D[c] = d; if (r > rm[c]) rm[c] = r; }
+  for (let c = 0; c < k; c++) { R[c] = R[c] * 1.001 + .05; D[c] = D[c] * 1.001 + .05; rm[c] = rm[c] * 1.001 + .05; } /* margins: rounding can only make a cell look bigger */
+  C.cc = { k, of, cen, R, D, rm, rej: new Uint8Array(k) }; return C.cc; }
+function cullCellsRej(C, cx, cy, cz, fm) { /* CULL_CELLS: this frame's rejected cells (1 = every instance in it fails the draw-limit or the view test) */
+  if (C.n < 48) return null; let cc = C.cc; /* (cullInst drops it when a twin widens the radii) */
+  if (!cc) cc = cullCells(C); const { k, cen, R, D, rm, rej } = cc, far = C.far < 1e9 ? C.far * fm : 0; let any = 0;
+  for (let c = 0; c < k; c++) { const x = cen[c * 3], y = cen[c * 3 + 1], z = cen[c * 3 + 2]; let r = 0;
+    if (far) { const dx = x - cx, dy = y - cy, dz = z - cz, d = Math.sqrt(dx * dx + dy * dy + dz * dz); if (d - D[c] > far + rm[c]) r = 1; }
+    if (!r) { _csp.center.set(x, y, z); _csp.radius = R[c]; if (!_cf.intersectsSphere(_csp)) r = 1; }
+    rej[c] = r; any |= r; }
+  return any ? rej : null; }
 function updateCull() {
   if (GROUND_LOD && HS && HS.ud && HS.ud.gtiles) { const cp = camera.position; for (const T of HS.ud.gtiles) { const d = cp.distanceTo(T.c) - T.r, far = d > GROUND_LOD + (GROUND_MORPH ? GROUND_MORPH.band : 0); if (T.coarse.visible !== far) { T.coarse.visible = far; T.fine.visible = !far; } if (GROUND_MORPH) T.m = far ? 0 : clamp((GROUND_LOD + GROUND_MORPH.band - d) / GROUND_MORPH.band, 0, 1); } } /* GROUND_LOD (GROUND_MORPH: the swap happens band yd further out, where the full tile is still exactly its twin's shape, and it eases into full detail by GROUND_LOD yd, the old swap distance) */
   { const fk = FLY_FAR > 1 && FLY.on ? FLY_FAR : 1; if (FADE_K.value !== fk) FADE_K.value = fk; } /* FLY_FAR: the shader fade too (the cards fade out by distance in the shader, under their draw limit) */
@@ -1877,15 +1908,15 @@ function updateCull() {
   const zoomOnly = CULL_ZOOM && cullZoomOnly(same, false); /* CULL_ZOOM */
   if (same) { if (!(TERRAIN_OCC && occTick())) return; } else if (TERRAIN_OCC && !zoomOnly) { OCC.st = 0; OCC.it = null; OCC.go = false; } /* (CULL_ZOOM: a zoom alone keeps the horizon) */ if (CULL_ZOOM && !zoomOnly) cullZoomOnly(same, true); /* CULL_ZOOM: a full pass: what it reads */ /* TERRAIN_OCC: a moving camera culls as before; once it holds still the horizon is built over a few frames, then the trees behind the ground drop out */
   if (!zoomOnly) { /* (CULL_ZOOM: a zoom alone keeps last frame's) */ // a tree in the way of the ball (or wrapped round the camera) steps aside
-    _blk.clear(); const cx0 = camera.position.x, cy0 = camera.position.y, cz0 = camera.position.z, bx = ball.position.x, by = ball.position.y, bz = ball.position.z, dx = bx - cx0, dz = bz - cz0, L2 = dx * dx + dz * dz || 1e-6;
+    let _cEL = null; /* CULL_HOIST: the sight lines' end points, made once a pass (first tree that needs them) */ _blk.clear(); const cx0 = camera.position.x, cy0 = camera.position.y, cz0 = camera.position.z, bx = ball.position.x, by = ball.position.y, bz = ball.position.z, dx = bx - cx0, dz = bz - cz0, L2 = dx * dx + dz * dz || 1e-6;
     const line = G.view !== 'aim' || G.aimT < .5, aimKeep = AIM_TREES_KEEP === true && !line; /* AIM_TREES_KEEP: the aim view hides no tree (only one the camera is really inside) */
     if (!MENU.on) for (let i = 0; i < TREES.length; i++) { const t = TREES[i], tx = t.u, tz = -t.v; if (Math.abs(tx - cx0) > 70 && Math.abs(tx - bx) > 70) continue;
       const top = (t.gy ?? (t.gy = groundHeight(t.u, t.v))) + t.h; /* cached ground under the trunk (as treeHit) */
       if (t !== PLAN_TREE && cy0 < top + 4 && Math.hypot(tx - cx0, tz - cz0) < (TREE_UNSTICK ? treeExt(t) : t.r) + 1.5 && (!aimKeep || crownAt(t, cx0, -cz0, cy0, 1.2))) { _blk.add(i); continue; }
       if (TREE_UNSTICK && t === PLAN_TREE && crownAt(t, cx0, -cz0, cy0, 1.2)) { _blk.add(i); continue; } /* TREE_UNSTICK: blob crowns reach past t.r (Hunt 2's 13: r 11, leaves out to 17.5), and from inside the tree you're about to hit you see nothing but leaves */ /* the camera is in (or brushing) its crown: it steps aside in every view (12's back bunker sat the camera inside a pine) */
       if (AIM_TREES && !MENU.on && G.view !== 'flight' && !aimKeep && !(FLY_NO_HIDE && FLY.on)) { /* AIM_TREES: any crown that really sits on the sight line to the ball (or, overhead, to the target) steps aside, by its true reach */
-        let hit = false; const tg = !line && !AIM_TREES_KEEP ? targetUV() : null; /* AIM_TREES_KEEP 'ball': the aim view tests only the line to the ball */
-        for (const e of tg ? [[bx, by, bz, 1], [tg.u, groundHeight(tg.u, tg.v), -tg.v, 0]] : [[bx, by, bz, 1]]) { if (hit) break; if (!e[3] && t === PLAN_TREE) continue; /* the tree you're about to hit stays, unless it hides the ball itself */
+        let hit = false; const EL = CULL_HOIST ? (_cEL || (_cEL = (() => { const tg = !line && !AIM_TREES_KEEP ? targetUV() : null; return tg ? [[bx, by, bz, 1], [tg.u, groundHeight(tg.u, tg.v), -tg.v, 0]] : [[bx, by, bz, 1]]; })())) : null; /* CULL_HOIST */ const tg = EL ? null : !line && !AIM_TREES_KEEP ? targetUV() : null; /* AIM_TREES_KEEP 'ball': the aim view tests only the line to the ball */
+        for (const e of EL || (tg ? [[bx, by, bz, 1], [tg.u, groundHeight(tg.u, tg.v), -tg.v, 0]] : [[bx, by, bz, 1]])) { if (hit) break; if (!e[3] && t === PLAN_TREE) continue; /* the tree you're about to hit stays, unless it hides the ball itself */
           const sx = e[0] - cx0, sz = e[2] - cz0, l2 = sx * sx + sz * sz || 1e-6, kk = clamp(((tx - cx0) * sx + (tz - cz0) * sz) / l2, 0, 1); if (Math.hypot(cx0 + sx * kk - tx, cz0 + sz * kk - tz) > treeExt(t) + .5) continue;
           for (let j = 1; j < 16; j++) { const f = j / 16; if (crownAt(t, cx0 + sx * f, -(cz0 + sz * f), cy0 + (e[1] - cy0) * f, .4)) { hit = true; break; } } }
         if (hit) { _blk.add(i); continue; } }
@@ -1909,7 +1940,9 @@ function updateCull() {
     const S = C.sph; let V, nv = 0;
     if (C.lead) { V = C.lead.vl; nv = C.lead.nv; } /* a twin: its lead (just before it) has tested the same centres this frame */
     else { V = C.vl || (C.vl = new Int32Array(C.n)); if (C.gq) C.gq.length = 0;
+      const RJ = CULL_CELLS ? cullCellsRej(C, cx, cy, cz, FLY_FAR > 1 && FLY.on ? FLY_FAR : 1) : null, CO = RJ && C.cc.of; /* CULL_CELLS */
       for (let i = 0; i < C.n; i++) {
+        if (RJ && RJ[CO[i]]) { if (_gho.size && C.crown && C.tid[i] >= 0 && !(_blk.size && _blk.has(C.tid[i])) && _gho.has(C.tid[i])) (C.gq || (C.gq = [])).push(i); continue; } /* CULL_CELLS: a hidden cell (its see-through copies still kept) */
         { const j = i * 4, x = S[j], y = S[j + 1], z = S[j + 2], r = S[j + 3]; if (_blk.size && C.tid[i] >= 0 && _blk.has(C.tid[i])) continue; if (_gho.size && C.crown && C.tid[i] >= 0 && _gho.has(C.tid[i])) { (C.gq || (C.gq = [])).push(i); continue; } /* GHOST_LINE */ if (C.far < 1e9) { const dx = x - cx, dy = y - cy, dz = z - cz, fr = C.far * (FLY_FAR > 1 && FLY.on ? FLY_FAR : 1) + r, d2 = dx * dx + dy * dy + dz * dz; if (d2 > fr * fr) continue; if (FAR_GROW) { const B = Math.max(20, C.far * .2), d = Math.sqrt(d2), gs = C.gs || (C.gs = new Float32Array(C.n)); gs[i] = d <= fr - B ? 1 : smooth(fr, fr - B, d); } } _csp.center.set(x, y, z); _csp.radius = r; if (!_cf.intersectsSphere(_csp)) continue; if (occOn && C.os && occHid(C.os, j)) continue; }
         V[nv++] = i; }
       C.nv = nv; }
@@ -1920,12 +1953,12 @@ function updateCull() {
       const gsv = FAR_GROW && C.far < 1e9 ? (C.lead || C).gs : null, gk = gsv ? gsv[i] : 1; if (gk < 1) { pi[k] = -1; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = (e < 11 && e % 4 !== 3) ? A[s0 + e] * gk : A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } k++; continue; } /* FAR_GROW: near its draw limit it's scaled down, so it grows in rather than popping */
       if (pi[k] !== i) { pi[k] = i; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } } k++;
     }
-    C.m.count = k; C.m.visible = k > 0;
+    C.m.count = k; C.m.visible = k > 0 && !(EMPTY_SKIP && geoEmpty(C.m.geometry)); /* EMPTY_SKIP */
     if (GHOST_LINE && C.crown && C.m.material !== inkMat && C.m.material !== inkMatI) { /* (inkMatI: INK_INST) */ const gq = (C.lead || C).gq, ng = gq ? gq.length : 0; if (ng || C.gm) { let gm = C.gm; if (GHOST_GROW ? ng && (!gm || ng > gm.cap) : !gm && ng) { if (gm) { gm.parent.remove(gm); gm.dispose(); } const cap = GHOST_GROW ? Math.max(64, ng) : 64; gm = C.gm = new THREE.InstancedMesh(C.m.geometry, GHOST_MAT, cap); gm.cap = cap; gm.frustumCulled = false; gm.renderOrder = 2; gm.instanceMatrix.setUsage(THREE.DynamicDrawUsage); C.m.parent.add(gm); }
       const n = Math.min(ng, gm.cap), gim = gm.instanceMatrix.array; for (let q = 0; q < n; q++) { const s0 = gq[q] * 16; for (let e = 0; e < 16; e++) gim[q * 16 + e] = A[s0 + e]; } gm.count = n; gm.visible = n > 0; if (n) gm.instanceMatrix.needsUpdate = true; } } /* GHOST_LINE: the see-through copies */
     if (ch) { C.m.instanceMatrix.updateRange.offset = 0; C.m.instanceMatrix.updateRange.count = k * 16; C.m.instanceMatrix.needsUpdate = true;
     if (ic) { C.m.instanceColor.updateRange.offset = 0; C.m.instanceColor.updateRange.count = k * 3; C.m.instanceColor.needsUpdate = true; } } /* nothing moved slot-wise: no upload */
-    if (F) { F.count = kf; F.visible = kf > 0;
+    if (F) { F.count = kf; F.visible = kf > 0 && !(EMPTY_SKIP && geoEmpty(F.geometry)); /* EMPTY_SKIP */
       if (chf) { F.instanceMatrix.updateRange.offset = 0; F.instanceMatrix.updateRange.count = kf * 16; F.instanceMatrix.needsUpdate = true; if (fic) { F.instanceColor.updateRange.offset = 0; F.instanceColor.updateRange.count = kf * 3; F.instanceColor.needsUpdate = true; } } }
   }
 }
@@ -2784,7 +2817,25 @@ function buildShadow(widthFn) {
   trShadow.geometry.attributes.position.needsUpdate = true;
 }
 const _t = new THREE.Vector3(), _n1 = new THREE.Vector3(), _n2 = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+/* TUBE_FAST (gp611): the aim line's tube (and its ink copy) is rebuilt every frame the camera moves. Both meshes share the same frame at each sample, and the ring's
+   cosines and sines are the same every time: they are now worked out once (the same expressions, so the same numbers) and both meshes are written in one pass. false = as v611 */
+const TUBE_FAST = true; let TUBE_CS = null;
+function buildTubeF(pts, radiusFn, dashes) { /* TUBE_FAST */
+  const A = tracer.geometry.attributes, B = tracerInk.geometry.attributes, PA = A.position.array, UA = A.uv.array, PB = B.position.array, UB = B.uv.array, NR = TR.rad;
+  if (!TUBE_CS || TUBE_CS.n !== NR) { const c = new Float64Array(NR + 1), sn = new Float64Array(NR + 1); for (let k = 0; k <= NR; k++) { const an = k / TR.rad * Math.PI * 2; c[k] = Math.cos(an); sn[k] = Math.sin(an); } TUBE_CS = { n: NR, c, sn }; }
+  const CC = TUBE_CS.c, SS = TUBE_CS.sn; let pi = 0, ui = 0;
+  for (let s = 0; s <= TR.segs; s++) {
+    const a = pts[Math.max(0, s - 1)], b = pts[Math.min(TR.segs, s + 1)]; _t.subVectors(b, a).normalize();
+    _n1.crossVectors(_t, _up); if (_n1.lengthSq() < 1e-6) _n1.set(1, 0, 0); _n1.normalize(); _n2.crossVectors(_n1, _t).normalize();
+    const r0 = radiusFn(trT[s], s), r1 = r0 + Math.max(.035, r0 * trInk), p = pts[s], u = trT[s] * dashes;
+    for (let k = 0; k <= NR; k++) { const ca = CC[k], sa = SS[k], c0 = ca * r0, s0 = sa * r0, c1 = ca * r1, s1 = sa * r1;
+      PA[pi] = p.x + _n1.x * c0 + _n2.x * s0; PB[pi++] = p.x + _n1.x * c1 + _n2.x * s1; PA[pi] = p.y + _n1.y * c0 + _n2.y * s0; PB[pi++] = p.y + _n1.y * c1 + _n2.y * s1; PA[pi] = p.z + _n1.z * c0 + _n2.z * s0; PB[pi++] = p.z + _n1.z * c1 + _n2.z * s1;
+      UA[ui] = UB[ui] = u; ui++; UA[ui] = UB[ui] = k / TR.rad; ui++; }
+  }
+  A.position.needsUpdate = true; A.uv.needsUpdate = true; B.position.needsUpdate = true; B.uv.needsUpdate = true;
+}
 function buildTube(pts, radiusFn, dashes) {
+  if (TUBE_FAST && tracer.geometry.attributes.position.array.length === tracerInk.geometry.attributes.position.array.length && tracer.geometry.attributes.uv.array.length === tracerInk.geometry.attributes.uv.array.length) return buildTubeF(pts, radiusFn, dashes); /* TUBE_FAST */
   for (const [mesh, extra] of [[tracer, 0], [tracerInk, 1]]) {
     const P = mesh.geometry.attributes.position.array, UV = mesh.geometry.attributes.uv.array; let pi = 0, ui = 0;
     for (let s = 0; s <= TR.segs; s++) {
@@ -4413,6 +4464,11 @@ function trailReset() { trailPts = []; trailAlpha = 1; trailFading = false; trai
 function trailPush(x, y, ph) { const r = RECT.app; trailPts.push({ x: (x - r.left) * PR, y: (y - r.top) * PR, ph }); }
 function trailFade() { trailFading = true; }
 let trailDirty = false;
+/* TRAIL_FAST (gp611): while the swing trail fades (every frame for a second or so after the strike) it was redrawn with the trail's highest and lowest points and its
+   downswing points worked out again from scratch, several times a frame. They only change when a point is added, so they are kept per trail (same numbers, same points). false = as v611 */
+const TRAIL_FAST = true;
+function trailDer() { const c = trail._d; if (c && c.p === trailPts && c.n === trailPts.length) return c; let hi = Infinity, lo = -Infinity; const dn = []; /* TRAIL_FAST: Math.min/max pairwise = the same as over the whole list */
+  for (const p of trailPts) { hi = Math.min(hi, p.y); lo = Math.max(lo, p.y); if (p.ph === 'down') dn.push(p); } return (trail._d = { p: trailPts, n: trailPts.length, hi, lo, dn }); }
 function drawTrail(dt) {
   const live = trailAlpha > 0 && trailPts.length > 1; if (live !== trail._live) { trail.style.visibility = live ? 'visible' : 'hidden'; trail._live = live; }
   if (!trailDirty && !live) return;
@@ -4421,25 +4477,26 @@ function drawTrail(dt) {
   trailDirty = was;
   const K = trail._k; if (K && K[0] === trailPts && K[1] === trailPts.length && K[2] === trailAlpha && K[3] === trailLabel && K[4] === trailSub) return; /* the canvas already shows exactly this (e.g. the 2.8 s label hold): no redraw */
   trail._k = [trailPts, trailPts.length, trailAlpha, trailLabel, trailSub];
+  const TD = TRAIL_FAST ? trailDer() : null; /* TRAIL_FAST */
   tctx.clearRect(0, 0, trail.width, trail.height);
   if (trailAlpha <= 0 || trailPts.length < 2) return;
   tctx.globalAlpha = trailAlpha; tctx.lineCap = tctx.lineJoin = 'round';
   const seg = ph => { tctx.beginPath(); let started = false; trailPts.forEach(p => { if (p.ph !== ph) return; started ? tctx.lineTo(p.x, p.y) : tctx.moveTo(p.x, p.y); started = true; }); };
   seg('back'); tctx.setLineDash([5 * PR, 5 * PR]); tctx.strokeStyle = 'rgba(255,250,240,.9)'; tctx.lineWidth = 2.2 * PR; tctx.stroke(); tctx.setLineDash([]);
   if (trailLabel) { // straight guide from the start point, so the drift reads at a glance
-    const p0 = trailPts[0], hi = Math.min(...trailPts.map(p => p.y)), lo = Math.max(...trailPts.map(p => p.y));
+    const p0 = trailPts[0], hi = TD ? TD.hi : Math.min(...trailPts.map(p => p.y)), lo = TD ? TD.lo : Math.max(...trailPts.map(p => p.y));
     tctx.beginPath(); tctx.moveTo(p0.x, hi - 30 * PR); tctx.lineTo(p0.x, lo + 10 * PR); tctx.setLineDash([3 * PR, 6 * PR]); tctx.strokeStyle = 'rgba(255,250,240,.75)'; tctx.lineWidth = 2 * PR; tctx.stroke(); tctx.setLineDash([]);
   }
   seg('down'); tctx.strokeStyle = INK; tctx.lineWidth = 7.5 * PR; tctx.stroke();
-  if (trailLabel) { const dn = trailPts.filter(p => p.ph === 'down'); tctx.lineWidth = 3.8 * PR; for (let i = 1; i < dn.length; i++) { tctx.beginPath(); tctx.moveTo(dn[i - 1].x, dn[i - 1].y); tctx.lineTo(dn[i].x, dn[i].y); tctx.strokeStyle = wobCol(Math.max(dn[i].w || 0, dn[i - 1].w || 0)); tctx.stroke(); } }
+  if (trailLabel) { const dn = TD ? TD.dn : trailPts.filter(p => p.ph === 'down'); tctx.lineWidth = 3.8 * PR; for (let i = 1; i < dn.length; i++) { tctx.beginPath(); tctx.moveTo(dn[i - 1].x, dn[i - 1].y); tctx.lineTo(dn[i].x, dn[i].y); tctx.strokeStyle = wobCol(Math.max(dn[i].w || 0, dn[i - 1].w || 0)); tctx.stroke(); } }
   else { tctx.strokeStyle = SUN; tctx.lineWidth = 3.8 * PR; tctx.stroke(); }
   if (trailLabel) {
-    const down = trailPts.filter(p => p.ph === 'down'), e = down[down.length - 1] || trailPts[trailPts.length - 1], a = down[Math.max(0, down.length - 4)] || e;
+    const down = TD ? TD.dn : trailPts.filter(p => p.ph === 'down'), e = down[down.length - 1] || trailPts[trailPts.length - 1], a = down[Math.max(0, down.length - 4)] || e;
     const ang = Math.atan2(e.y - a.y, e.x - a.x); tctx.beginPath(); tctx.moveTo(e.x + Math.cos(ang) * 12 * PR, e.y + Math.sin(ang) * 12 * PR);
     tctx.lineTo(e.x + Math.cos(ang + 2.4) * 10 * PR, e.y + Math.sin(ang + 2.4) * 10 * PR); tctx.lineTo(e.x + Math.cos(ang - 2.4) * 10 * PR, e.y + Math.sin(ang - 2.4) * 10 * PR); tctx.closePath();
     tctx.fillStyle = SUN; tctx.strokeStyle = INK; tctx.lineWidth = 2.5 * PR; tctx.fill(); tctx.stroke();
     tctx.font = `${17 * PR}px "Luckiest Guy", "Arial Rounded MT Bold", sans-serif`; tctx.textAlign = 'center'; tctx.lineJoin = 'round';
-    const lx = clamp(e.x, 60 * PR, trail.width - 60 * PR), ly = Math.min(...trailPts.map(p => p.y)) - 42 * PR;
+    const lx = clamp(e.x, 60 * PR, trail.width - 60 * PR), ly = (TD ? TD.hi : Math.min(...trailPts.map(p => p.y))) - 42 * PR;
     tctx.lineWidth = 6 * PR; tctx.strokeStyle = INK; tctx.strokeText(trailLabel, lx, ly); tctx.fillStyle = trailLabel === 'STRAIGHT' ? MINT : '#fff'; tctx.fillText(trailLabel, lx, ly);
     if (trailSub) { tctx.font = `${12 * PR}px "Luckiest Guy", "Arial Rounded MT Bold", sans-serif`; tctx.lineWidth = 4.5 * PR; tctx.strokeText(trailSub, lx, ly + 17 * PR); tctx.fillStyle = trailSub.endsWith('SMOOTH') ? MINT : wobCol(trailSub.endsWith('WOBBLY') ? 2 : 3); tctx.fillText(trailSub, lx, ly + 17 * PR); }
   }
@@ -4457,7 +4514,10 @@ function morphSVG(el, html) { const T = morphSVG.t || (morphSVG.t = document.cre
     const oc = o.childNodes, nc = n.childNodes; for (let i = 0; i < nc.length; i++) patch(oc[i], nc[i]); };
   const oc = el.childNodes, nc = T.childNodes; for (let i = 0; i < nc.length; i++) patch(oc[i], nc[i]); return true; }
 const KNOB_FAST = true; /* perf548: the knob's markup changes on most frames (a swing, and the idle sway and blinks), and KNOB_MORPH parsed all of it off-screen each time to find the one or two values that moved (~1 ms of a frame's script on this desktop). Now the markup is split into its tags' quoted attribute values and the rest (its skeleton: the same elements, attribute names and text); while the skeleton is the one on screen, only the values that differ are written onto the live attributes: the same writes KNOB_MORPH makes, the same DOM. Another skeleton, or markup with '&' or '<!', goes the KNOB_MORPH way as before. false = as v548 */
-const KF = { el: null, skel: null, nodes: null, first: null, n: 0 }, KF_TAG = /<(\/?)([^\s\/>!]+)([^>]*)>/g, KF_ATT = /([^\s="]+)\s*=\s*"([^"]*)"/g, KF_SAFE = /^[^"=]*$/;
+/* KF_LAST (gp611): KNOB_FAST compared each new value with the live attribute (a DOM read per value, ~80 a frame). Only renderDial writes the knob, so the values it wrote last time are
+   what's on screen: they are compared in script instead and only the ones that differ are written, as before. false = as v611 */
+const KF_LAST = true;
+const KF = { el: null, skel: null, nodes: null, first: null, n: 0, vals: null }, KF_TAG = /<(\/?)([^\s\/>!]+)([^>]*)>/g, KF_ATT = /([^\s="]+)\s*=\s*"([^"]*)"/g, KF_SAFE = /^[^"=]*$/;
 function kfTok(html) { if (html.indexOf('&') >= 0 || html.indexOf('<!') >= 0) return null; let skel = '', last = 0; const vals = [], at = [], names = []; /* KNOB_FAST: (skeleton, values in document order, [element index, attribute name] per value) */
   KF_TAG.lastIndex = 0; for (let m; (m = KF_TAG.exec(html));) { skel += html.slice(last, m.index); last = KF_TAG.lastIndex; if (m[1]) { skel += m[0]; continue; } const ei = names.length; names.push(m[2].toLowerCase()); skel += '<' + m[2];
     const a = m[3]; let la = 0; KF_ATT.lastIndex = 0; for (let q; (q = KF_ATT.exec(a));) { const gap = a.slice(la, q.index); if (!KF_SAFE.test(gap)) return null; skel += gap + q[1] + '=""'; la = KF_ATT.lastIndex; vals.push(q[2]); at.push(ei, q[1]); } if (!KF_SAFE.test(a.slice(la))) return null; skel += a.slice(la) + '>'; }
@@ -4465,14 +4525,26 @@ function kfTok(html) { if (html.indexOf('&') >= 0 || html.indexOf('<!') >= 0) re
 function kfBind(el, T) { KF.el = el; KF.skel = null; KF.nodes = null; if (!T) return; /* KNOB_FAST: after a full update, each value's live attribute (checked: the element's name, the attribute there, its value) */
   const E = el.getElementsByTagName('*'); if (E.length !== T.names.length) return; for (let i = 0; i < E.length; i++) if (E[i].nodeName.toLowerCase() !== T.names[i]) return;
   const nodes = [], seen = new Set(); for (let i = 0; i < T.vals.length; i++) { const nd = E[T.at[2 * i]].getAttributeNode(T.at[2 * i + 1]); if (!nd || nd.value !== T.vals[i] || seen.has(nd)) return; seen.add(nd); nodes.push(nd); }
-  KF.skel = T.skel; KF.nodes = nodes; KF.first = el.firstChild; KF.n = el.childNodes.length; }
-function kfPatch(el, T) { if (!T || KF.el !== el || !KF.nodes || KF.skel !== T.skel || el.firstChild !== KF.first || el.childNodes.length !== KF.n) return false; const N = KF.nodes, V = T.vals; for (let i = 0; i < V.length; i++) if (N[i].value !== V[i]) N[i].value = V[i]; return true; } /* KNOB_FAST: the same skeleton: changed values only */
+  KF.skel = T.skel; KF.nodes = nodes; KF.first = el.firstChild; KF.n = el.childNodes.length; KF.vals = T.vals; } /* (KF_LAST: the values now on screen, checked above) */
+function kfPatch(el, T) { if (!T || KF.el !== el || !KF.nodes || KF.skel !== T.skel || el.firstChild !== KF.first || el.childNodes.length !== KF.n) return false; const N = KF.nodes, V = T.vals; if (KF_LAST && KF.vals && KF.vals.length === V.length) { const L = KF.vals; for (let i = 0; i < V.length; i++) if (L[i] !== V[i]) N[i].value = V[i]; } else for (let i = 0; i < V.length; i++) if (N[i].value !== V[i]) N[i].value = V[i]; KF.vals = V; return true; } /* KNOB_FAST: the same skeleton: changed values only */
 const DIAL_CHEV_KEEP = true; /* perf3: the dial's idle chevrons are three kept <path>s whose d/opacity change, not markup re-parsed every step (same drawing). false = rebuilt with innerHTML, as before */
 const DC = { knob: null, chev: null, attrs: new Map() };
 function setA(el, k, v) { let m = DC.attrs.get(el); if (!m) DC.attrs.set(el, m = {}); if (m[k] !== v) { el.setAttribute(k, v); m[k] = v; } }
 function badgeOut(ps) { /* TGT_BADGE.out (Neil 11-24, placement c): the badge sits outside the rim, beyond the cup, its inner edge out units past the track's outer edge whatever its angle; above amax degrees it slides back along the rim (clear of the shot-type tab on top of the dial) */
   const a = clamp(pAng(ps), TGT_BADGE.amin || 0, TGT_BADGE.amax || 360), r = a * Math.PI / 180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r)), ex = c * 11 + 13.4; /* the badge's half-extent along the radius: a pill (46 x 24, round ends, plus its ink) */
   return pt(a, RA + 5 + TGT_BADGE.out + ex); }
+/* DIAL_HIDE (gp611, real-play fps): from the strike until the next address the swing dial is slid off the bottom of the screen (#bottom translateY(135%) under
+   flying / previewing / resulting), but renderDial still rebuilt the knob's drawing and wrote the meters every frame (and the page restyled them). Once that slide has
+   finished and the dial sits wholly below the screen (checked once, by its box; any new slide of #bottom ends it), and the swing is idle, only the dial's clock and springs
+   run on (the same steps, so it comes back exactly where it would have been) and nothing is written. Every write is "make it match the state", so the first frame it can
+   be seen again draws the same dial as v611. false = as v611 */
+const DIAL_HIDE = true; const DH = { h: false, b: $('#bottom'), run: 0 };
+if (DIAL_HIDE && DH.b) { const B = DH.b, on = e => { if (e.target === B) DH.run++; }, off = e => { if (e.target === B) DH.run = Math.max(0, DH.run - 1); }; B.addEventListener('transitionrun', on); B.addEventListener('transitionend', off); B.addEventListener('transitioncancel', off); } /* DIAL_HIDE: #bottom's own slides, counted from their events (no per-frame style flush) */
+function dialHidden() { /* DIAL_HIDE */
+  const c = app.classList; if (!(c.contains('flying') || c.contains('previewing') || c.contains('resulting'))) { DH.h = false; return false; }
+  if (!DH.b || DH.run > 0) { DH.h = false; return false; } /* sliding (either way): drawn as before */
+  if (DH.h) return true;
+  const r = dial.getBoundingClientRect(), A = app.getBoundingClientRect(); DH.h = r.height > 0 && r.top >= A.bottom + 48; return DH.h; } /* (+48 px: room for anything the knob draws above its box) */
 function renderDial(dt, t) {
   if (SW.phase === 'release' || SW.phase === 'idle') {
     const a = -320 * SW.vis - 16 * SW.visV; SW.visV += a * dt; SW.vis += SW.visV * dt;
@@ -4481,6 +4553,10 @@ function renderDial(dt, t) {
   }
   const prevVis = SW._pv ?? SW.vis; SW.vel = (SW.vis - prevVis) / Math.max(dt, .001) * .1 * 10; SW._pv = SW.vis;
   const ps = pStar();
+  if (DIAL_HIDE && SW.phase === 'idle' && dialHidden()) { /* DIAL_HIDE: the dial is parked off screen: its clock and springs run on exactly as below, nothing is drawn */
+    SW.pShow = Math.max(0, SW.pShow - dt * 1.5); SW.qShow = Math.max(0, SW.qShow - dt * 1.5);
+    if (G.moodT > 0) { G.moodT -= dt; if (G.moodT <= 0) G.mood = null; }
+    SW.head *= Math.pow(.02, dt); return; }
   // power fill
   if (SW.phase === 'back') { advanceMeter(performance.now()); SW.pShow = clamp(SW.vis, 0, P_MAX); }
   else if (SW.phase === 'down' || (SW.phase === 'release' && SW.rel < 1.2)) SW.pShow = SW.max;
@@ -4715,9 +4791,24 @@ const comet = new THREE.Mesh(ribbonGeo(), new THREE.MeshBasicMaterial({ color: 0
 const cometInk = new THREE.Mesh(ribbonGeo(), new THREE.MeshBasicMaterial({ color: INK, alphaMap: cometAlpha, transparent: true, depthWrite: false, side: THREE.BackSide }));
 comet.frustumCulled = cometInk.frustumCulled = false; cometInk.userData.ink = true; comet.renderOrder = 7; cometInk.renderOrder = 6; comet.visible = cometInk.visible = false; scene.add(comet, cometInk);
 const cPts = Array.from({ length: RB.segs + 1 }, () => new THREE.Vector3());
+/* COMET_FAST (gp611): the flying ball's comet tail and its ink copy are rebuilt every frame of a flight; like TUBE_FAST, the shared frame at each sample and the ring's
+   cosines/sines are now worked out once (the same expressions) and both meshes written in one pass, with no per-frame arrays. false = as v611 */
+const COMET_FAST = true; let COMET_CS = null;
 function updateComet(S, tHead) {
   const tail = Math.max(0, tHead - .16 * S.tEnd);
   for (let s = 0; s <= RB.segs; s++) { const q = S.P(lerp(tail, tHead, s / RB.segs)); cPts[s].set(q.u, q.y, -q.v); }
+  if (COMET_FAST && comet.geometry.attributes.position.array.length === cometInk.geometry.attributes.position.array.length) { /* COMET_FAST */
+    const PA = comet.geometry.attributes.position.array, PB = cometInk.geometry.attributes.position.array, NR = RB.rad;
+    if (!COMET_CS || COMET_CS.n !== NR) { const c = new Float64Array(NR + 1), sn = new Float64Array(NR + 1); for (let j = 0; j <= NR; j++) { const an = j / RB.rad * Math.PI * 2; c[j] = Math.cos(an); sn[j] = Math.sin(an); } COMET_CS = { n: NR, c, sn }; }
+    const CC = COMET_CS.c, SS = COMET_CS.sn; let i = 0;
+    for (let s = 0; s <= RB.segs; s++) {
+      const a = cPts[Math.max(0, s - 1)], b = cPts[Math.min(RB.segs, s + 1)]; _t.subVectors(b, a); if (_t.lengthSq() < 1e-8) _t.set(0, 0, -1); _t.normalize();
+      _n1.crossVectors(_t, _up); if (_n1.lengthSq() < 1e-6) _n1.set(1, 0, 0); _n1.normalize(); _n2.crossVectors(_n1, _t).normalize();
+      const f = s / RB.segs, dc = camera.position.distanceTo(cPts[s]), w = dc * .0042 * (.15 + .85 * Math.pow(f, 1.3)), m = Math.min(w, .35), r0 = m + 0, r1 = m + (m * .45 + dc * .0006), p = cPts[s];
+      for (let j = 0; j <= NR; j++) { const ca = CC[j], sa = SS[j], c0 = ca * r0, s0 = sa * r0, c1 = ca * r1, s1 = sa * r1;
+        PA[i] = p.x + _n1.x * c0 + _n2.x * s0; PB[i++] = p.x + _n1.x * c1 + _n2.x * s1; PA[i] = p.y + _n1.y * c0 + _n2.y * s0; PB[i++] = p.y + _n1.y * c1 + _n2.y * s1; PA[i] = p.z + _n1.z * c0 + _n2.z * s0; PB[i++] = p.z + _n1.z * c1 + _n2.z * s1; }
+    }
+    comet.geometry.attributes.position.needsUpdate = true; cometInk.geometry.attributes.position.needsUpdate = true; return; }
   for (const [mesh, extra] of [[comet, 0], [cometInk, 1]]) {
     const P = mesh.geometry.attributes.position.array; let i = 0;
     for (let s = 0; s <= RB.segs; s++) {
@@ -5794,12 +5885,23 @@ function drawTrTop() {
     ttx.stroke();
   }
 }
+/* TRACER_CAM (gp611, real-play fps): the aim line was worked out afresh every frame the camera moved (the glide back after a shot, the result card's and the green's
+   camera moves, the aim view's pans): the shot's path re-sampled, every sample's ground height looked up again, the bend into the bullseye, the tree and water checks,
+   the dashed straight line rebuilt. None of that depends on the camera. When nothing but the camera has moved since the last full pass (the same plan object, unchanged and
+   complete, the same aim, ball, target, club mode and curve), those results are kept and only the camera-dependent parts are redone as before: the tube's on-screen width,
+   the ground shadow's width, which samples a canopy hides, the X marker's size. Same numbers, same buffers. false = as v611 */
+const TRACER_CAM = true; const TC = { k: null };
+/* TT_FLAT (gp611): which aim-line samples a canopy hides (redone every frame the camera moves) built a small array per tree blob and walked them with destructuring, ~100 KB of
+   garbage a frame in the aim view. The same spheres now go into one reused flat list, read by index in the same order with the same arithmetic. false = as v611 */
+const TT_FLAT = true; const TTF = [];
+function trCamKey(p) { if (!p || p.lz) return null; const tg = targetUV(); return [p, p.track, p.f, p.f && p.f.pts, (p.track || p.f.pts).length, p.tree, p.bendRef, G.aimT, G.mode, G.ball.u, G.ball.v, G.dir.u, G.dir.v, G.D, totalCurve(), tg.u, tg.v, h2wHeld(), HS, CID, G.club]; } /* TRACER_CAM: what the camera-free part reads */
+function trKeyEq(a, b) { if (!b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
 function updateTracer() {
   if (CJ.g) { tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = false; return; } /* CADDIE_SLICE: no line until the caddie's pick is final */
   if (G.view === 'flight') return;
   if (FLY.on && !FLY.landing) { trShadow.visible = false; return; } /* the drone fly-over shows the hole, not the shot */
-  const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
-  if (G.mode === 'putt') { // how far it would roll if the green were flat and straight: it does NOT follow the break
+  const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; const trCamOnly = TRACER_CAM && !tracerDirty && lastAimT === G.aimT; /* TRACER_CAM: only the camera moved */ tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
+  if (G.mode === 'putt') { TC.k = null; /* TRACER_CAM: this path writes the samples */ // how far it would roll if the green were flat and straight: it does NOT follow the break
     const D = G.D, e = smoother(G.aimT);
     const t0 = TR_ATTACH && TR_ATTACH.putt ? Math.min(.3, BALL_R / Math.max(D, .01)) : BALL_SKIN === 'triple' ? Math.min(.3, BALL_R * 3 / Math.max(D, .01)) : 0; /* TR_ATTACH.putt: from the ball's edge */ /* BALL_SKIN: the putt line starts just past the ball, so the ball's own tracks show and lead into it */ for (let s = 0; s <= TR.segs; s++) { const t = t0 + (1 - t0) * s / TR.segs, u = G.ball.u + G.dir.u * D * t, v = G.ball.v + G.dir.v * D * t; trT[s] = t; trPts[s].set(u, groundHeight(u, v) + .035, -v); }
     TT.red = false; TT.wet = false; treeMk.userData.at = null; tracer.material.color.set(0xffffff); tracer.material.depthTest = tracerInk.material.depthTest = true; trInk = .5; if (tracer.material.map !== solidTex) { tracer.material.map = solidTex; tracer.material.needsUpdate = true; }
@@ -5808,6 +5910,8 @@ function updateTracer() {
     MINI.draw({ f: { pts: trPts.map(q => ({ x: q.x, z: q.z })) } }); return;
   }
   const e = smoother(G.aimT), eFlat = smoother(clamp((G.aimT - .1) / .8, 0, 1)), D = G.D, plan = planShot(), pts = plan.track || plan.f.pts, T = pts[pts.length - 1].t;
+  const trK = TRACER_CAM ? trCamKey(plan) : null, trSkip = !!(trCamOnly && trK && trKeyEq(trK, TC.k)); TC.k = trK; /* TRACER_CAM: the same plan, aim and ball as the last full pass: the samples, the bend, the tree and water checks stand */
+  if (!trSkip) {
   for (let s = 0; s <= TR.segs; s++) {
     // start right at the ball; bunch samples near it so the close end stays smooth from behind
     const u0 = s / TR.segs, t0 = TR_ATTACH ? TR_ATTACH.t0 : .004, t = lerp(t0 + (1 - t0) * Math.pow(u0, 1.7), u0, e); trT[s] = t;
@@ -5826,15 +5930,22 @@ function updateTracer() {
     tracer.material.color.set(hit || wet ? 0xff6a55 : 0xffffff); treeMk.userData.at = hit ? _hp : null;
     tracer.material.depthTest = tracerInk.material.depthTest = !hit; /* blocked: draw the red line over the canopy so you can see it run on through the tree */
   }
+  } /* (TRACER_CAM: !trSkip) */
   { // the overlay copy over the distance readout has no depth: mark the samples a canopy hides from the camera so it skips them too
     TT.occ.fill(0); if (!TT.red) { const c = camera.position; let x0 = c.x, x1 = c.x, z0 = c.z, z1 = c.z; for (const q of trPts) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); z0 = Math.min(z0, q.z); z1 = Math.max(z1, q.z); }
+      if (TT_FLAT) { const S = TTF; S.length = 0; /* TT_FLAT: the canopy spheres in one reused flat list, read by index (the same numbers in the same order) */ for (const t of TREES) { if (t.u < x0 - 9 || t.u > x1 + 9 || -t.v < z0 - 9 || -t.v > z1 + 9) continue; const gy = t.gy ?? (t.gy = groundHeight(t.u, t.v));
+          if (t.blobs) { const B = t.blobs; for (let j = 0; j < B.length; j++) { const b = B[j]; S.push(t.u + b[0], gy + b[1], -(t.v + b[2]), b[3]); } } else if (t.pine) S.push(t.u, gy + t.h * .45, -t.v, t.r * .6); }
+        const n = S.length; if (n) for (let s = 0; s <= TR.segs; s++) { const q = trPts[s], dx = q.x - c.x, dy = q.y - c.y, dz = q.z - c.z, L2 = dx * dx + dy * dy + dz * dz;
+          for (let m = 0; m < n; m += 4) { const sx = S[m], sy = S[m + 1], sz = S[m + 2], r = S[m + 3], k = ((sx - c.x) * dx + (sy - c.y) * dy + (sz - c.z) * dz) / L2; if (k <= 0 || k >= 1) continue;
+            const ex = c.x + dx * k - sx, ey = c.y + dy * k - sy, ez = c.z + dz * k - sz; if (ex * ex + ey * ey + ez * ez < r * r) { TT.occ[s] = 1; break; } } } }
+      else {
       const S = []; for (const t of TREES) { if (t.u < x0 - 9 || t.u > x1 + 9 || -t.v < z0 - 9 || -t.v > z1 + 9) continue; const gy = t.gy ?? (t.gy = groundHeight(t.u, t.v));
         if (t.blobs) for (const [bx, by, bv, br] of t.blobs) S.push([t.u + bx, gy + by, -(t.v + bv), br]); else if (t.pine) S.push([t.u, gy + t.h * .45, -t.v, t.r * .6]); }
       if (S.length) for (let s = 0; s <= TR.segs; s++) { const q = trPts[s], dx = q.x - c.x, dy = q.y - c.y, dz = q.z - c.z, L2 = dx * dx + dy * dy + dz * dz;
         for (const [sx, sy, sz, r] of S) { const k = ((sx - c.x) * dx + (sy - c.y) * dy + (sz - c.z) * dz) / L2; if (k <= 0 || k >= 1) continue;
-          const ex = c.x + dx * k - sx, ey = c.y + dy * k - sy, ez = c.z + dz * k - sz; if (ex * ex + ey * ey + ez * ez < r * r) { TT.occ[s] = 1; break; } } } }
+          const ex = c.x + dx * k - sx, ey = c.y + dy * k - sy, ez = c.z + dz * k - sz; if (ex * ex + ey * ey + ez * ez < r * r) { TT.occ[s] = 1; break; } } } } } /* (TT_FLAT off: as v611) */
   }
-  { // how far the middle of the path sits off the straight line, per unit of curve (keeps the CURVE handle under your finger)
+  if (!trSkip) { /* (TRACER_CAM) */ // how far the middle of the path sits off the straight line, per unit of curve (keeps the CURVE handle under your finger)
     const tg = targetUV(), m = trPts[TR.segs >> 1], r = right(G.dir), off = (m.x - (G.ball.u + tg.u) / 2) * r.u + (-m.z - (G.ball.v + tg.v) / 2) * r.v, c = totalCurve();
     if (Math.abs(c) > .12) G.bowPerC = clamp(-off / c, D * .02, D * .3);
   }
@@ -5845,7 +5956,7 @@ function updateTracer() {
   MINI.draw(plan);
   const tg = targetUV(); rings.position.set(tg.u, groundHeight(tg.u, tg.v), -tg.v);
   if (treeMk.userData.at) { treeMk.position.copy(treeMk.userData.at); treeMk.scale.setScalar(camera.position.distanceTo(treeMk.userData.at) * lerp(.075, .06, e)); }
-  const sp = straightRef.geometry.attributes.position; sp.setXYZ(0, G.ball.u, groundHeight(G.ball.u, G.ball.v) + .2, -G.ball.v); sp.setXYZ(1, tg.u, groundHeight(tg.u, tg.v) + .2, -tg.v); sp.needsUpdate = true; straightRef.computeLineDistances(); straightRef.geometry.computeBoundingSphere();
+  if (!trSkip) { const sp = straightRef.geometry.attributes.position; sp.setXYZ(0, G.ball.u, groundHeight(G.ball.u, G.ball.v) + .2, -G.ball.v); sp.setXYZ(1, tg.u, groundHeight(tg.u, tg.v) + .2, -tg.v); sp.needsUpdate = true; straightRef.computeLineDistances(); straightRef.geometry.computeBoundingSphere(); } /* (TRACER_CAM: the dashed straight line between the same two spots) */
   straightRef.visible = e > .6 && Math.abs(totalCurve()) > .05; straightRef.material.opacity = (e - .6) / .4 * .9;
 }
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _hp = new THREE.Vector3(), _hs = new THREE.Vector3();
@@ -7058,6 +7169,7 @@ const HOMESNAP = (() => {
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
 const TRACER_DRAWON = null; /* (Neil 11-28 03:11: 'shot line drawing looks weird, doesn't perform great: roll it back': back to TRACER_FADE's fade; was { ms: 420 }) */ /* (checked: started at a tee it draws a short stub from the ball and grows; in the fly-over flow it starts as the camera lands) */ /* Neil 11-27 ('try draw on'): after the fly-over lands, instead of the whole line fading in (TRACER_FADE), it draws itself out from the ball to the landing spot (fast at first, easing in at the end) and the landing rings come in over the last part. null = TRACER_FADE's fade, as v607 */
+const TRACER_FADE_CLEAN = true; /* Neil 11-28 (the fade 'still isn't perfect'; 'tweak the fade'): the shot line is a yellow tube with a dark ink tube behind it (its outline). Mid-fade both were see-through, so the dark ink showed through the yellow: the line came in dark and muddy, turning yellow only at the end. Now, while it fades, the yellow is drawn first and hides the ink behind it, so only the outline rim shows: the line fades in as itself. Once the fade ends the order is as before (same picture). false = as v613 */
 const TRACER_FADE = { ms: 450, lead: 0 }; /* (lead .15 tried in v606, Neil 11-27 23:56: 'remove that 150ms change') */ /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
 const TRF = { t0: 0 };
 function trDraw() { /* TRACER_DRAWON: the shot line draws itself out from the ball to where it lands; the rings come in as it arrives */
@@ -7066,6 +7178,7 @@ function trDraw() { /* TRACER_DRAWON: the shot line draws itself out from the ba
     for (const m of rings.children) { if (m.userData.op == null) m.userData.op = m.material.opacity; m.material.opacity = m.userData.op * rf; } if (top) top.style.opacity = '0'; return; }
   tracer.geometry.setDrawRange(0, Infinity); tracerInk.geometry.setDrawRange(0, Infinity); trShadow.geometry.setDrawRange(0, Infinity); for (const m of rings.children) if (m.userData.op != null) m.material.opacity = m.userData.op; if (top) top.style.opacity = ''; TRF.t0 = 0; } /* (at the end everything is drawn whole, exactly as before) */
 function trFade() { if (TRACER_DRAWON) return trDraw(); const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_FADE.ms), f = k * k * k * (k * (k * 6 - 15) + 10), top = document.getElementById('trTop');
+  if (TRACER_FADE_CLEAN) tracer.renderOrder = k < 1 ? 3 : 5; /* (ink is 4: yellow first, so the ink behind it fails the depth test) */
   tracer.material.opacity = .96 * f; tracerInk.material.opacity = .9 * f; trShadow.material.opacity = (trShadow.userData.op != null ? trShadow.userData.op : .25) * f;
   for (const m of rings.children) { if (m.userData.op == null) m.userData.op = m.material.opacity; m.material.opacity = m.userData.op * f; } if (top) top.style.opacity = k < 1 ? f.toFixed(3) : '';
   if (k >= 1) TRF.t0 = 0; } /* (at k = 1 every opacity is back to its own value exactly) */
