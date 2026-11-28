@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v611'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v613'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1580,10 +1580,10 @@ function detailTex() {
 }
 const DETAIL = detailTex(); SHARED.add(DETAIL);
 const MP_FACE_BIG = true; if (MP_FACE_BIG) document.documentElement.classList.add('mpFaceBig'); /* Neil 11-28: in the multiplayer waiting room each golfer's face fills more of their tile (about 63% of its height, was 54%; the open seats' + to match). false = as v607 */
-const COURSE_TINT = null && { /* (held off until Neil picks) */ /* Neil 11-28 (his photos of each course): each course gets its own sky and grass shades. sky: the gradient's 4 stops (top, middle, low, horizon), fog: the distance haze (matches the horizon), g: a multiply on the ground's green pixels only (sand, water, paths, bunkers untouched). null = every course as v607 (sky #8fc6ec..#f7eedb, haze #ece9dc) */
-  hunt: { sky: ['#6a90cc', '#a7bfdf', '#d9e1ea', '#eef0f0'], fog: 0xe9ecee, g: [.875, .955, 1.07] }, /* the lake morning: a cooler, deeper blue to a near-white haze; cooler emerald grass */
-  augusta: { sky: ['#2a76c8', '#5d9bd8', '#a7cbe9', '#eaf0f0'], fog: 0xe6eef2, g: [1, 1, .83] }, /* a bold saturated blue; lush, slightly yellow-green grass */
-  osler: { sky: ['#5f88b8', '#93b9d6', '#c9d5d6', '#ece8db'], fog: 0xebe8dd, g: [.967, .935, .89] } }; /* a softer blue to a warm haze over the hills; deeper, slightly olive grass */
+const COURSE_TINT = { /* (Neil 11-28 03:11: 'course colors fine; fix the hunt sky; more differentiation between the grass colours': Hunt's sky moved bluer (it read a bit purple), each grass tint pushed ~1.7x further from neutral) */ /* Neil 11-28 (his photos of each course): each course gets its own sky and grass shades. sky: the gradient's 4 stops (top, middle, low, horizon), fog: the distance haze (matches the horizon), g: a multiply on the ground's green pixels only (sand, water, paths, bunkers untouched). null = every course as v607 (sky #8fc6ec..#f7eedb, haze #ece9dc) */
+  hunt: { sky: ['#5a93d1', '#99c3e4', '#d2e4ee', '#edf2f2'], fog: 0xeaf0f1, g: [.79, .925, 1.12] }, /* the lake morning: a cooler, deeper blue to a near-white haze; cooler emerald grass */
+  augusta: { sky: ['#2a76c8', '#5d9bd8', '#a7cbe9', '#eaf0f0'], fog: 0xe6eef2, g: [1, 1.04, .72] }, /* a bold saturated blue; lush, slightly yellow-green grass */
+  osler: { sky: ['#5f88b8', '#93b9d6', '#c9d5d6', '#ece8db'], fog: 0xebe8dd, g: [.945, .89, .81] } }; /* a softer blue to a warm haze over the hills; deeper, slightly olive grass */
 const GMATS = [];
 const TINT = { cid: null, cur: null, apply(cid) { this.cid = cid; const t = COURSE_TINT && COURSE_TINT[cid]; SKY.draw(t ? t.sky : ['#8fc6ec', '#c9e2ef', '#ece9dc', '#f7eedb']); if (scene.fog) scene.fog.color.set(t ? t.fog : 0xece9dc);
   this.cur = new THREE.Vector3(...(t ? t.g : [1, 1, 1])); for (const m of GMATS) m.uniforms.gmul.value.copy(this.cur); } };
@@ -7057,7 +7057,7 @@ const HOMESNAP = (() => {
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
-const TRACER_DRAWON = { ms: 420 }; /* (checked: started at a tee it draws a short stub from the ball and grows; in the fly-over flow it starts as the camera lands) */ /* Neil 11-27 ('try draw on'): after the fly-over lands, instead of the whole line fading in (TRACER_FADE), it draws itself out from the ball to the landing spot (fast at first, easing in at the end) and the landing rings come in over the last part. null = TRACER_FADE's fade, as v607 */
+const TRACER_DRAWON = null; /* (Neil 11-28 03:11: 'shot line drawing looks weird, doesn't perform great: roll it back': back to TRACER_FADE's fade; was { ms: 420 }) */ /* (checked: started at a tee it draws a short stub from the ball and grows; in the fly-over flow it starts as the camera lands) */ /* Neil 11-27 ('try draw on'): after the fly-over lands, instead of the whole line fading in (TRACER_FADE), it draws itself out from the ball to the landing spot (fast at first, easing in at the end) and the landing rings come in over the last part. null = TRACER_FADE's fade, as v607 */
 const TRACER_FADE = { ms: 450, lead: 0 }; /* (lead .15 tried in v606, Neil 11-27 23:56: 'remove that 150ms change') */ /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
 const TRF = { t0: 0 };
 function trDraw() { /* TRACER_DRAWON: the shot line draws itself out from the ball to where it lands; the rings come in as it arrives */
