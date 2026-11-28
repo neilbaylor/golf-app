@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v606'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v608'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1098,7 +1098,7 @@ const maxAniso = renderer.capabilities.getMaxAnisotropy(); const ANISO_CAP = 4; 
 const SHARED = new WeakSet(); /* materials and textures every hole uses: never disposed with a hole (HOLESYS) */
 
 // sky
-(() => { const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#8fc6ec'); gr.addColorStop(.5, '#c9e2ef'); gr.addColorStop(.85, '#ece9dc'); gr.addColorStop(1, '#f7eedb'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); scene.background = new THREE.CanvasTexture(c); })();
+const SKY = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'); const draw = st => { const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, st[0]); gr.addColorStop(.5, st[1]); gr.addColorStop(.85, st[2]); gr.addColorStop(1, st[3]); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); }; draw(['#8fc6ec', '#c9e2ef', '#ece9dc', '#f7eedb']); const tex = new THREE.CanvasTexture(c); scene.background = tex; return { draw(st) { draw(st); tex.needsUpdate = true; } }; })(); /* (COURSE_TINT redraws it per course) */
 
 const gradMap = new THREE.DataTexture(new Uint8Array([95, 95, 95, 175, 175, 175, 255, 255, 255]), 3, 1, THREE.RGBFormat);
 gradMap.minFilter = gradMap.magFilter = THREE.NearestFilter; gradMap.generateMipmaps = false; gradMap.needsUpdate = true; SHARED.add(gradMap);
@@ -1480,7 +1480,8 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
     path(q.P); g.fillStyle = '#bdbab3'; g.fill(); const [u0, u1, v0, v1] = q.b;
     if (hb()) { const s = []; for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) s.push(x, Y(v1), x + (v1 - v0) * ppy, Y(v0)); yield* clipJob([[pxs(q.P)]], [{ s: Float64Array.from(s), col: 'rgba(29,42,26,.07)', lw: 2 }], lineSt()); } /* HATCH_BG: the same lines through the worker */
     else { g.save(); path(q.P); g.clip(); g.beginPath();
-    for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; g.stroke(); g.restore(); } sketch(q.P, 2.2, .6); if (S4) yield flushCv(cv); } /* BUILD_SLICE4: after each area */
+    if (S4 && OB_SPLIT2) { const xs = []; for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) xs.push(x); const n = Math.ceil(xs.length / OB_SPLIT2); g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; for (let k = 0; k < xs.length; k += n) { g.beginPath(); for (const x of xs.slice(k, k + n)) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.stroke(); if (k + n < xs.length) yield; } g.restore(); } /* OB_SPLIT2 */
+    else { for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; g.stroke(); g.restore(); } } sketch(q.P, 2.2, .6); if (S4) yield flushCv(cv); } /* BUILD_SLICE4: after each area */
   // the practice green (and the cart paths: out of bounds left of the main one)
   if (!AUGD) { path(PRACTICE); g.fillStyle = '#8fd255'; g.fill(); const pg = PRACTICE.map(([u, v]) => { const cx = -92, cy = 235; return [cx + (u - cx) * .9, cy + (v - cy) * .92]; });
     path(pg); g.fillStyle = '#a9ea6d'; g.fill(); sketch(PRACTICE, 2.2, .7); }
@@ -1576,21 +1577,29 @@ function detailTex() {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO_CAP ? Math.min(ANISO_CAP, maxAniso) : maxAniso; /* ANISO_CAP (Neil 11-22): the grass detail strokes at 4x too, like the ground map */ return t;
 }
 const DETAIL = detailTex(); SHARED.add(DETAIL);
+const MP_FACE_BIG = true; if (MP_FACE_BIG) document.documentElement.classList.add('mpFaceBig'); /* Neil 11-28: in the multiplayer waiting room each golfer's face fills more of their tile (about 63% of its height, was 54%; the open seats' + to match). false = as v607 */
+const COURSE_TINT = null && { /* (held off until Neil picks) */ /* Neil 11-28 (his photos of each course): each course gets its own sky and grass shades. sky: the gradient's 4 stops (top, middle, low, horizon), fog: the distance haze (matches the horizon), g: a multiply on the ground's green pixels only (sand, water, paths, bunkers untouched). null = every course as v607 (sky #8fc6ec..#f7eedb, haze #ece9dc) */
+  hunt: { sky: ['#6a90cc', '#a7bfdf', '#d9e1ea', '#eef0f0'], fog: 0xe9ecee, g: [.875, .955, 1.07] }, /* the lake morning: a cooler, deeper blue to a near-white haze; cooler emerald grass */
+  augusta: { sky: ['#2a76c8', '#5d9bd8', '#a7cbe9', '#eaf0f0'], fog: 0xe6eef2, g: [1, 1, .83] }, /* a bold saturated blue; lush, slightly yellow-green grass */
+  osler: { sky: ['#5f88b8', '#93b9d6', '#c9d5d6', '#ece8db'], fog: 0xebe8dd, g: [.967, .935, .89] } }; /* a softer blue to a warm haze over the hills; deeper, slightly olive grass */
+const GMATS = [];
+const TINT = { cid: null, cur: null, apply(cid) { this.cid = cid; const t = COURSE_TINT && COURSE_TINT[cid]; SKY.draw(t ? t.sky : ['#8fc6ec', '#c9e2ef', '#ece9dc', '#f7eedb']); if (scene.fog) scene.fog.color.set(t ? t.fog : 0xece9dc);
+  this.cur = new THREE.Vector3(...(t ? t.g : [1, 1, 1])); for (const m of GMATS) m.uniforms.gmul.value.copy(this.cur); } };
 function groundMat(map, scale) {
   const m = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { morph: { value: 1 }, map: { value: null }, detail: { value: null }, uvScale: { value: new THREE.Vector2(1, 1) }, gmap: { value: null }, gbox: { value: new THREE.Vector4(0, 0, 0, 0) } }]),
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { gmul: { value: new THREE.Vector3(1, 1, 1) }, morph: { value: 1 }, map: { value: null }, detail: { value: null }, uvScale: { value: new THREE.Vector2(1, 1) }, gmap: { value: null }, gbox: { value: new THREE.Vector4(0, 0, 0, 0) } }]),
     vertexShader: `uniform vec2 uvScale; uniform float morph; attribute float hc; varying vec2 vUv; varying vec2 vW; varying float vD;
       #include <fog_pars_vertex>
       void main(){ vUv=uv*uvScale; vec3 p0=position; if(morph<0.9999) p0.z=mix(hc,position.z,morph); vec4 wp=modelMatrix*vec4(p0,1.0); vW=wp.xz; vec4 mvPosition=viewMatrix*wp; vD=-mvPosition.z; gl_Position=projectionMatrix*mvPosition;
       #include <fog_vertex>
       }`,
-    fragmentShader: `uniform sampler2D map; uniform sampler2D detail; uniform sampler2D gmap; uniform vec4 gbox; varying vec2 vUv; varying vec2 vW; varying float vD;
+    fragmentShader: `uniform sampler2D map; uniform sampler2D detail; uniform sampler2D gmap; uniform vec4 gbox; uniform vec3 gmul; varying vec2 vUv; varying vec2 vW; varying float vD;
       #include <fog_pars_fragment>
-      void main(){ vec3 c; float ga=0.0; if(gbox.z>0.0){ vec2 gq=(vW-gbox.xy)/gbox.zw; if(gq.x>0.0&&gq.x<1.0&&gq.y>0.0&&gq.y<1.0){ vec4 gt=texture2D(gmap,vec2(gq.x,1.0-gq.y)); c=gt.rgb; ga=gt.a; } } if(ga<0.995){ vec3 m0=texture2D(map,vUv).rgb; c=ga>0.0?mix(m0,c,ga):m0; } float k=smoothstep(70.0,4.0,vD); if(k>0.002){ float d=texture2D(detail,vW*0.42).r; c*=mix(1.0,0.66+0.38*d,k); } gl_FragColor=vec4(c,1.0);
+      void main(){ vec3 c; float ga=0.0; if(gbox.z>0.0){ vec2 gq=(vW-gbox.xy)/gbox.zw; if(gq.x>0.0&&gq.x<1.0&&gq.y>0.0&&gq.y<1.0){ vec4 gt=texture2D(gmap,vec2(gq.x,1.0-gq.y)); c=gt.rgb; ga=gt.a; } } if(ga<0.995){ vec3 m0=texture2D(map,vUv).rgb; c=ga>0.0?mix(m0,c,ga):m0; } float k=smoothstep(70.0,4.0,vD); if(k>0.002){ float d=texture2D(detail,vW*0.42).r; c*=mix(1.0,0.66+0.38*d,k); } if(gmul!=vec3(1.0)){ float gw=smoothstep(0.02,0.12,c.g-max(c.r,c.b)); c=mix(c,c*gmul,gw); } gl_FragColor=vec4(c,1.0);
       #include <fog_fragment>
       }`, fog: true
   });
-  m.uniforms.map.value = map; m.uniforms.detail.value = DETAIL; m.uniforms.uvScale.value.set(scale, scale); if (scale === 1 && GREENTEX) { m.uniforms.gmap.value = GREENTEX.tex; m.uniforms.gbox.value.copy(GREENTEX.box); } return m;
+  GMATS.push(m); if (COURSE_TINT && TINT.cur) m.uniforms.gmul.value.copy(TINT.cur); m.uniforms.map.value = map; m.uniforms.detail.value = DETAIL; m.uniforms.uvScale.value.set(scale, scale); if (scale === 1 && GREENTEX) { m.uniforms.gmap.value = GREENTEX.tex; m.uniforms.gbox.value.copy(GREENTEX.box); } return m;
 }
 // the green + fringe get their own hi-res painting (the course map is only ~5.5 px/yd): ~21 px/yd, drawn over the course in the ground shader
 const GREEN_STYLE = 'BC'; // A stripes · B checkerboard + sticker rim · C crown glow, mower rings, stitched fringe ('' = off)
@@ -1826,6 +1835,7 @@ const HOME_PR = 1; /* Neil 11-23 (swiping the golfer picker choppy on a slow pho
 const OSL_HASH_FIX = true; /* see the room-link check near the end: #osler is OslerBrook, not a room (false = as v548) */
 const WAY_UNDER = 4; /* Neil 11-22: a round 4 or more under par says "Way under par!" (0 = always "Under par!", v546) */
 const GROUND_SKIRT = false; /* Neil 11-22: where a full-detail ground tile meets a half-detail one their edges don't quite match, and a hairline crack showed what's under the ground; each tile's inner edges now carry a short skirt hanging down (its own edge's colour and light), which closes the crack. Out of sight everywhere else (false = as v546) */
+const OB_SPLIT2 = 4; /* Neil 11-27 ('probably ok'): in a background build (the next hole while you play), the Hunt's out-of-bounds hatching (one stroke of faint parallel lines, 100-170 ms at 4x on Hunt 3 and 7) is drawn as this many strokes with a pause between: not pixel-identical, but the lines never touch, so about 1% of the area's pixels move by 1 shade in 255 (invisible). 0 = one stroke, as v606 */
 const GROUND_MORPH = { band: 20 }; /* Neil 11-25 ('in the Augusta 1 flyover, about 10-15% in, a bit of the fairway line shifts left; happens in the home screen background too'): that was a ground tile swapping from its half-detail twin to full detail (GROUND_LOD) as the camera came within 120 yd: the twin's flatter in-between heights put the painted fairway edge a touch elsewhere, so it jumped. Now the swap happens at 140 yd with the full tile shaped exactly like its twin (each vertex at the twin's height under it), and it eases into its own heights as the camera comes from 140 to 120 yd: no jump, and full detail from 120 yd in, as before (a few more full tiles drawn between 120 and 140 yd). null = as v594 */
 const GROUND_LOD = 120; /* option 4: course ground tiles whose nearest edge is beyond this many yd are drawn from a half-resolution twin (a quarter of the triangles). 0 = off, as v437 */
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
@@ -6829,7 +6839,7 @@ function frame(now) {
   if (ghostRing.visible && G.view !== 'flight') ghostRing.visible = false; if (ballMark.visible && G.view !== 'flight') ballMark.visible = false; /* the tower's ghost ring goes with the flight */
   flag.wave(t);
   for (const p of puffs) { if (!p.s.visible) continue; p.life += dt; const k = p.life / p.max; if (k >= 1) { p.s.visible = false; continue; } if (p.vel) { p.s.position.addScaledVector(p.vel, dt); p.vel.y -= 6 * dt; } p.s.scale.setScalar(p.size * (.4 + k * .9)); p.s.material.opacity = (1 - k) * p.op * smooth(p.s.scale.x * .6, p.s.scale.x * 2.2, camera.position.distanceTo(p.s.position)); }
-  TURF.update(dt); SZ.update(dt); CONFETTI.update(dt); CRITTERS.update(dt, t); if (G.view !== 'flight' && !(DROP_VIEW && G.drop)) WIND.update(dt); renderDial(dt, t); if (TRACER_FADE && TRF.t0) trFade(); /* the wind holds while the ball flies: its flight was set at the strike */ drawTrail(dt); drawStrikeDot(dt); AV.update(dt, t);
+  TURF.update(dt); SZ.update(dt); CONFETTI.update(dt); CRITTERS.update(dt, t); if (G.view !== 'flight' && !(DROP_VIEW && G.drop)) WIND.update(dt); renderDial(dt, t); if (TRACER_FADE && TRF.t0) trFade(); if (COURSE_TINT && TINT.cid !== CID) TINT.apply(CID); /* the wind holds while the ball flies: its flight was set at the strike */ drawTrail(dt); drawStrikeDot(dt); AV.update(dt, t);
   if (MPX) MPX.frame(dt, now); /* MP hook: watched aim, the turn queue, chat bubbles */
   { // slope arrows: while aiming the short game, and whenever the ball is on the green (a putt rolling, an approach that has landed on it, or resting there)
     let onG = G.lie === 'green';
@@ -7006,9 +7016,15 @@ const HOMESNAP = (() => {
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
-const TRACER_FADE = { ms: 450, lead: .15 }; /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
+const TRACER_DRAWON = null && { ms: 420 }; /* (held off until checked) */ /* Neil 11-27 ('try draw on'): after the fly-over lands, instead of the whole line fading in (TRACER_FADE), it draws itself out from the ball to the landing spot (fast at first, easing in at the end) and the landing rings come in over the last part. null = TRACER_FADE's fade, as v607 */
+const TRACER_FADE = { ms: 450, lead: 0 }; /* (lead .15 tried in v606, Neil 11-27 23:56: 'remove that 150ms change') */ /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
 const TRF = { t0: 0 };
-function trFade() { const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_FADE.ms), f = k * k * k * (k * (k * 6 - 15) + 10), top = document.getElementById('trTop');
+function trDraw() { /* TRACER_DRAWON: the shot line draws itself out from the ball to where it lands; the rings come in as it arrives */
+  const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_DRAWON.ms), f = 1 - Math.pow(1 - k, 3), n = Math.max(1, Math.ceil(f * TR.segs)), top = document.getElementById('trTop');
+  if (k < 1) { tracer.geometry.setDrawRange(0, n * 6 * TR.rad); tracerInk.geometry.setDrawRange(0, n * 6 * TR.rad); trShadow.geometry.setDrawRange(0, n * 6); const rf = Math.max(0, (f - .7) / .3);
+    for (const m of rings.children) { if (m.userData.op == null) m.userData.op = m.material.opacity; m.material.opacity = m.userData.op * rf; } if (top) top.style.opacity = '0'; return; }
+  tracer.geometry.setDrawRange(0, Infinity); tracerInk.geometry.setDrawRange(0, Infinity); trShadow.geometry.setDrawRange(0, Infinity); for (const m of rings.children) if (m.userData.op != null) m.material.opacity = m.userData.op; if (top) top.style.opacity = ''; TRF.t0 = 0; } /* (at the end everything is drawn whole, exactly as before) */
+function trFade() { if (TRACER_DRAWON) return trDraw(); const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_FADE.ms), f = k * k * k * (k * (k * 6 - 15) + 10), top = document.getElementById('trTop');
   tracer.material.opacity = .96 * f; tracerInk.material.opacity = .9 * f; trShadow.material.opacity = (trShadow.userData.op != null ? trShadow.userData.op : .25) * f;
   for (const m of rings.children) { if (m.userData.op == null) m.userData.op = m.material.opacity; m.material.opacity = m.userData.op * f; } if (top) top.style.opacity = k < 1 ? f.toFixed(3) : '';
   if (k >= 1) TRF.t0 = 0; } /* (at k = 1 every opacity is back to its own value exactly) */
