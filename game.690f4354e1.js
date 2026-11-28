@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v610'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v612'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1104,6 +1104,8 @@ const gradMap = new THREE.DataTexture(new Uint8Array([95, 95, 95, 175, 175, 175,
 gradMap.minFilter = gradMap.magFilter = THREE.NearestFilter; gradMap.generateMipmaps = false; gradMap.needsUpdate = true; SHARED.add(gradMap);
 const toon = (c, o = {}) => new THREE.MeshToonMaterial(Object.assign({ color: c, gradientMap: gradMap }, o));
 const inkMat = new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide }); SHARED.add(inkMat);
+const INK_INST = true; /* pf591 (Neil: "let's look into" the material re-keyed every frame): the one ink material was drawn both by instanced meshes (tree, bush and hill hulls) and by plain meshes (the ball, the flagpole, bridges), and three r128 keeps one current shader per material, so every frame it switched twice (instanced <-> plain), each time rebuilding the shader's parameter list and cache key (getParameters + getProgramCacheKey) and a fresh uniform list. The instanced hulls now get their own twin of it (same colour, same side, same everything), so each material keeps one shader: the same two shaders as before, no new shader, same draw order, same pixels. false = as v591 */
+const inkMatI = INK_INST ? new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide }) : inkMat; SHARED.add(inkMatI); const inkFor = (mat, inst) => inst && mat === inkMat ? inkMatI : mat; /* INK_INST: the instanced twin */
 // grass tufts: anti-aliased cut-out edges and a fade with distance, so far-off ink strokes don't sparkle
 function tuftMat(map) {
   const m = new THREE.MeshBasicMaterial({ map, alphaTest: .5, side: THREE.DoubleSide, alphaToCoverage: true });
@@ -1727,6 +1729,7 @@ function* buildOuterG(ck) { /* the land round the painted map (per hole). BUILD_
    instances inside the view are packed to the front and drawn. What you can see is drawn exactly as before. ---- */
 let CULL = []; /* the hole on screen's (each hole scene has its own: HS.cull) */ const _cf = new THREE.Frustum(), _cmx = new THREE.Matrix4(), _csp = new THREE.Sphere(), _ck = new Float64Array(17).fill(NaN); let _cPT = null; const _cb = new THREE.Vector3(1e9, 0, 0), _blk = new Set();
 function cullInst(geo, mat, items, opt = {}) { // items: { p: Vector3 (world), m: Matrix4, c?: Color, r: radius }
+  mat = inkFor(mat, true); /* INK_INST */
   const n = items.length, m = new THREE.InstancedMesh(geo, mat, n), o = opt.off || { x: 0, y: 0, z: 0 };
   const all = new Float32Array(n * 16), cols = items.length && items[0].c ? new Float32Array(n * 3) : null, sph = new Float32Array(n * 4), tid = new Int32Array(n).fill(-1);
   items.forEach((it, i) => { it.m.toArray(all, i * 16); m.setMatrixAt(i, it.m); if (cols) { it.c.toArray(cols, i * 3); m.setColorAt(i, it.c); } sph[i * 4] = it.p.x + o.x; sph[i * 4 + 1] = it.p.y + o.y; sph[i * 4 + 2] = it.p.z + o.z; sph[i * 4 + 3] = it.r; if (it.tid != null) tid[i] = it.tid; });
@@ -1755,7 +1758,7 @@ OCC.K = Math.ceil(Math.log(4000 / OCC.R0) / OCC.LR) + 1;
 const _om = new THREE.Matrix4(), _ov = new THREE.Vector3();
 const occPA = (x, y) => y >= 0 ? (x >= 0 ? y / (x + y) : 1 - x / (y - x)) : (x < 0 ? 2 - y / (-x - y) : 3 + x / (x - y)); /* a pseudo-angle (0..4, monotonic in bearing): bins without trig */
 function occInst(C, geo, lod, off) { /* the instances' bounding spheres in the hole, kept on the lead (a twin and the far mesh widen them) */
-  const L = C.lead || C, mt = C.m.material, ok = !C.m.userData.tuft && !mt.transparent && mt.depthTest && mt.depthFunc === THREE.LessEqualDepth && ((mt.isMeshToonMaterial && mt.onBeforeCompile === THREE.Material.prototype.onBeforeCompile) || mt === inkMat);
+  const L = C.lead || C, mt = C.m.material, ok = !C.m.userData.tuft && !mt.transparent && mt.depthTest && mt.depthFunc === THREE.LessEqualDepth && ((mt.isMeshToonMaterial && mt.onBeforeCompile === THREE.Material.prototype.onBeforeCompile) || mt === inkMat || mt === inkMatI); /* (inkMatI: INK_INST) */
   C.oo = [off.x, off.y, off.z]; L.occOK = L.occOK !== false && ok; if (!L.occOK) { L.os = null; return; } const S = L.os || (L.os = new Float32Array(L.n * 4));
   for (const g of lod ? [geo, lod] : [geo]) { if (!g.boundingSphere) g.computeBoundingSphere(); const gs = g.boundingSphere;
     for (let i = 0; i < C.n; i++) { _om.fromArray(C.all, i * 16); _ov.copy(gs.center).applyMatrix4(_om); const x = _ov.x + off.x, y = _ov.y + off.y, z = _ov.z + off.z, r = gs.radius * _om.getMaxScaleOnAxis(), j = i * 4;
@@ -1854,6 +1857,13 @@ const FADE_K = { value: 1 }; /* FLY_FAR: the ground cover's shader distance fade
 const GHOST_LINE = { near: 45 }; const _gho = new Set(); const GHOST_MAT = new THREE.MeshBasicMaterial({ color: 0x2f6b28, transparent: true, opacity: .28, depthWrite: false }); SHARED.add(GHOST_MAT); /* Neil (11-20, design option 4B): deep in the trees the yellow tracer was cut off by crowns. Any crown within 45 yd of the ball that covers the tracer (in the swing view or the aim view) is drawn see-through: a faint green ghost with no ink outline, so the line reads through it and you still see where the tree is. Trunks stay; the tree you're about to hit stays solid (so you can see why the line is red). null = as v474 */
 const GHOST_GROW = true; /* PR #19 (bug hunt): a ghost crown mesh grows to fit (it had 64 slots, and ghosted crowns past the 64th weren't drawn at all); the shared geometry and material stay, only the instance buffer is remade. false = fixed 64, as v496 */
 const FLY_NO_HIDE = true; /* the same report: during the hole's fly-over no tree steps aside for the line to the ball on the tee (the drone isn't looking at it; on its way back trees ahead of it were vanishing and reappearing). Only a crown the camera is actually inside still steps aside. false = as v435 */
+const CULL_ZOOM = true; /* pf591 (Neil, tablet: low frame rate pulling back on the club): the backswing's push-in (the view narrows a little as you pull) changed the projection every frame (and turned the camera a hair, keeping the ball framed), and updateCull took that as a moving camera: it threw away TERRAIN_OCC's horizon (so every tree hidden behind the ground was drawn again for the whole pull, ~20% of the Hunt 1 tee frame) and redid the trees-in-the-way and see-through-crown tests for every tree each frame. Neither depends on the zoom or on which way the camera faces, only on where it is (and the ball, the tracer, the view), and those stay put through the pull. Now such a frame redoes just the on-screen test, with the horizon and the steps-aside / see-through trees kept (a tree turning into view where the horizon wasn't worked out is simply drawn, as before). The trees that drop out are wholly behind the ground: the same picture. false = as v591 */
+const _cz = new Float64Array(26); let _czT = null;
+function cullZoomOnly(same, save) { /* CULL_ZOOM: true when nothing but the zoom and the way the camera faces changed since the last full pass (its own copy of what that pass read: where the camera is, the ball, the tree you'll hit, the tracer key, the view); save = a full pass is running: remember them */
+  const e = camera.matrixWorld.elements, b = ball.position, v = [b.x, b.y, b.z, updateCull.gk || 0, G.view === 'swing' ? 1 : G.view === 'aim' ? 2 : 3, G.aimT, FLY.on ? 1 : 0, MENU.on ? 1 : 0];
+  if (save) { for (let i = 12; i < 15; i++) _cz[i] = e[i]; for (let i = 0; i < 8; i++) _cz[16 + i] = v[i]; _czT = PLAN_TREE; _cz[25] = 1; return false; }
+  if (same || !_cz[25] || _czT !== PLAN_TREE || G.view !== 'swing' || FLY.on || MENU.on) return false;
+  for (let i = 12; i < 15; i++) if (_cz[i] !== e[i]) return false; for (let i = 3; i < 8; i++) if (_cz[16 + i] !== v[i]) return false; const bx = v[0] - _cz[16], by = v[1] - _cz[17], bz = v[2] - _cz[18]; return bx * bx + by * by + bz * bz <= 1e-4; } /* (the ball: within updateCull's own 1 cm) */
 function updateCull() {
   if (GROUND_LOD && HS && HS.ud && HS.ud.gtiles) { const cp = camera.position; for (const T of HS.ud.gtiles) { const d = cp.distanceTo(T.c) - T.r, far = d > GROUND_LOD + (GROUND_MORPH ? GROUND_MORPH.band : 0); if (T.coarse.visible !== far) { T.coarse.visible = far; T.fine.visible = !far; } if (GROUND_MORPH) T.m = far ? 0 : clamp((GROUND_LOD + GROUND_MORPH.band - d) / GROUND_MORPH.band, 0, 1); } } /* GROUND_LOD (GROUND_MORPH: the swap happens band yd further out, where the full tile is still exactly its twin's shape, and it eases into full detail by GROUND_LOD yd, the old swap distance) */
   { const fk = FLY_FAR > 1 && FLY.on ? FLY_FAR : 1; if (FADE_K.value !== fk) FADE_K.value = fk; } /* FLY_FAR: the shader fade too (the cards fade out by distance in the shader, under their draw limit) */
@@ -1864,8 +1874,9 @@ function updateCull() {
   if (_cPT !== PLAN_TREE) { same = false; _cPT = PLAN_TREE; }
   if (GHOST_LINE) { const a = trPts[TR.segs], b = trPts[TR.segs >> 1], k = a.x + a.y * 3.1 + a.z * 7.3 + b.x * 11.7 + b.y * 13.9 + b.z * 17.3 + (tracer.visible ? 1e6 : 0) + (G.view === 'aim' ? 2e6 : 0); if (updateCull.gk !== k) { same = false; updateCull.gk = k; } } /* GHOST_LINE: the tracer moved */
   if (FAR_CROWN === 'fly' && updateCull.fly !== FLY.on) { same = false; updateCull.fly = FLY.on; } /* FAR_CROWN: the crowns' mesh changes as the fly-over starts and ends */
-  if (same) { if (!(TERRAIN_OCC && occTick())) return; } else if (TERRAIN_OCC) { OCC.st = 0; OCC.it = null; OCC.go = false; } /* TERRAIN_OCC: a moving camera culls as before; once it holds still the horizon is built over a few frames, then the trees behind the ground drop out */
-  { // a tree in the way of the ball (or wrapped round the camera) steps aside
+  const zoomOnly = CULL_ZOOM && cullZoomOnly(same, false); /* CULL_ZOOM */
+  if (same) { if (!(TERRAIN_OCC && occTick())) return; } else if (TERRAIN_OCC && !zoomOnly) { OCC.st = 0; OCC.it = null; OCC.go = false; } /* (CULL_ZOOM: a zoom alone keeps the horizon) */ if (CULL_ZOOM && !zoomOnly) cullZoomOnly(same, true); /* CULL_ZOOM: a full pass: what it reads */ /* TERRAIN_OCC: a moving camera culls as before; once it holds still the horizon is built over a few frames, then the trees behind the ground drop out */
+  if (!zoomOnly) { /* (CULL_ZOOM: a zoom alone keeps last frame's) */ // a tree in the way of the ball (or wrapped round the camera) steps aside
     _blk.clear(); const cx0 = camera.position.x, cy0 = camera.position.y, cz0 = camera.position.z, bx = ball.position.x, by = ball.position.y, bz = ball.position.z, dx = bx - cx0, dz = bz - cz0, L2 = dx * dx + dz * dz || 1e-6;
     const line = G.view !== 'aim' || G.aimT < .5, aimKeep = AIM_TREES_KEEP === true && !line; /* AIM_TREES_KEEP: the aim view hides no tree (only one the camera is really inside) */
     if (!MENU.on) for (let i = 0; i < TREES.length; i++) { const t = TREES[i], tx = t.u, tz = -t.v; if (Math.abs(tx - cx0) > 70 && Math.abs(tx - bx) > 70) continue;
@@ -1881,7 +1892,7 @@ function updateCull() {
       if (!line || (FLY_NO_HIDE && FLY.on)) continue; /* FLY_NO_HIDE: the drone isn't looking at the ball */
       const k = clamp(((tx - cx0) * dx + (tz - cz0) * dz) / L2, 0, 1), qx = cx0 + dx * k - tx, qz = cz0 + dz * k - tz, segY = cy0 + (by - cy0) * k;
       if (Math.hypot(qx, qz) < t.r + .8 && segY < top + .5 && t !== PLAN_TREE) _blk.add(i); } } /* never hide the tree you're about to hit */
-  _gho.clear(); if (GHOST_LINE && !MENU.on && !FLY.on && (G.view === 'swing' || G.view === 'aim') && tracer.visible) { /* GHOST_LINE: crowns near the ball that cover the yellow tracer go see-through */
+  if (!zoomOnly) _gho.clear(); if (!zoomOnly && GHOST_LINE && !MENU.on && !FLY.on && (G.view === 'swing' || G.view === 'aim') && tracer.visible) { /* (CULL_ZOOM: a zoom alone keeps last frame's) */ /* GHOST_LINE: crowns near the ball that cover the yellow tracer go see-through */
     const cx0 = camera.position.x, cy0 = camera.position.y, cz0 = camera.position.z, bx = ball.position.x, bz = ball.position.z, N = GHOST_LINE.near, segs = TR.segs, st = Math.max(1, segs >> 4);
     for (let i = 0; i < TREES.length; i++) { const t = TREES[i], tx = t.u, tz = -t.v; if (_blk.has(i) || t === PLAN_TREE || Math.abs(tx - bx) > N || Math.abs(tz - bz) > N) continue; const ext = treeExt(t); let hit = false;
       for (let q = st; q <= segs && !hit; q += st) { const P = trPts[q], sx = P.x - cx0, sz = P.z - cz0, l2 = sx * sx + sz * sz || 1e-6, kk = clamp(((tx - cx0) * sx + (tz - cz0) * sz) / l2, 0, 1); if (Math.hypot(cx0 + sx * kk - tx, cz0 + sz * kk - tz) > ext + .5) continue;
@@ -1910,7 +1921,7 @@ function updateCull() {
       if (pi[k] !== i) { pi[k] = i; ch = true; const s0 = i * 16, d0 = k * 16; for (let e = 0; e < 16; e++) im[d0 + e] = A[s0 + e]; if (ic) { const s1 = i * 3, d1 = k * 3; ic[d1] = Cc[s1]; ic[d1 + 1] = Cc[s1 + 1]; ic[d1 + 2] = Cc[s1 + 2]; } } k++;
     }
     C.m.count = k; C.m.visible = k > 0;
-    if (GHOST_LINE && C.crown && C.m.material !== inkMat) { const gq = (C.lead || C).gq, ng = gq ? gq.length : 0; if (ng || C.gm) { let gm = C.gm; if (GHOST_GROW ? ng && (!gm || ng > gm.cap) : !gm && ng) { if (gm) { gm.parent.remove(gm); gm.dispose(); } const cap = GHOST_GROW ? Math.max(64, ng) : 64; gm = C.gm = new THREE.InstancedMesh(C.m.geometry, GHOST_MAT, cap); gm.cap = cap; gm.frustumCulled = false; gm.renderOrder = 2; gm.instanceMatrix.setUsage(THREE.DynamicDrawUsage); C.m.parent.add(gm); }
+    if (GHOST_LINE && C.crown && C.m.material !== inkMat && C.m.material !== inkMatI) { /* (inkMatI: INK_INST) */ const gq = (C.lead || C).gq, ng = gq ? gq.length : 0; if (ng || C.gm) { let gm = C.gm; if (GHOST_GROW ? ng && (!gm || ng > gm.cap) : !gm && ng) { if (gm) { gm.parent.remove(gm); gm.dispose(); } const cap = GHOST_GROW ? Math.max(64, ng) : 64; gm = C.gm = new THREE.InstancedMesh(C.m.geometry, GHOST_MAT, cap); gm.cap = cap; gm.frustumCulled = false; gm.renderOrder = 2; gm.instanceMatrix.setUsage(THREE.DynamicDrawUsage); C.m.parent.add(gm); }
       const n = Math.min(ng, gm.cap), gim = gm.instanceMatrix.array; for (let q = 0; q < n; q++) { const s0 = gq[q] * 16; for (let e = 0; e < 16; e++) gim[q * 16 + e] = A[s0 + e]; } gm.count = n; gm.visible = n > 0; if (n) gm.instanceMatrix.needsUpdate = true; } } /* GHOST_LINE: the see-through copies */
     if (ch) { C.m.instanceMatrix.updateRange.offset = 0; C.m.instanceMatrix.updateRange.count = k * 16; C.m.instanceMatrix.needsUpdate = true;
     if (ic) { C.m.instanceColor.updateRange.offset = 0; C.m.instanceColor.updateRange.count = k * 3; C.m.instanceColor.needsUpdate = true; } } /* nothing moved slot-wise: no upload */
@@ -2342,7 +2353,7 @@ function* buildSceneryG() { /* BUILD_CHUNK2: yields between its parts and throug
   } else if (!NO_DOMES || (AUG_DOMES && AUGD && AUGD.course === 'augusta')) { /* (AUG_DOMES: Augusta's come back, every other one) */
   for (let i = 0; i < 16; i++) { const a = R() * Math.PI * 2, r = 110 + R() * 140; let d = 420 + R() * 380; while (!clearOf(HB.cx + Math.cos(a) * d, HB.cz + Math.sin(a) * d, r)) d += 15; if (Math.cos(a) * d - r < 60 && false) continue; if (!AUGD && Math.cos(a) * d > 40) continue; hills.push({ p: new THREE.Vector3(HB.cx + Math.cos(a) * d, HB.y, HB.cz + Math.sin(a) * d), s: new THREE.Vector3(r, r * (.22 + R() * .18), r), c: cols[i % 4], ink: true }); }
   if (NO_DOMES && AUG_DOMES) for (let i = hills.length - 1; i >= 0; i--) if (i % 2) hills.splice(i, 1); if (NO_DOMES && AUG_DOMES) for (const h of hills) { h.s.y *= AUG_DOMES_K.h; h.s.x *= AUG_DOMES_K.r; h.s.z *= AUG_DOMES_K.r; } /* (AUG_DOMES_K: low, gentle rises, not hills) */ /* AUG_DOMES: the same domes as before NO_DOMES, every other one (8 of 16) */
-  const hm = new THREE.InstancedMesh(geo, toon(0xffffff), hills.length), inked = hills.filter(h => h.ink), ho = new THREE.InstancedMesh(geo, inkMat, inked.length);
+  const hm = new THREE.InstancedMesh(geo, toon(0xffffff), hills.length), inked = hills.filter(h => h.ink), ho = new THREE.InstancedMesh(geo, inkFor(inkMat, true), inked.length); /* (inkFor: INK_INST) */
   const M4 = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), C0 = new THREE.Color(), S0 = new THREE.Vector3();
   hills.forEach((h, i) => { hm.setMatrixAt(i, M4.compose(h.p, Q0, h.s)); hm.setColorAt(i, C0.set(h.c)); });
   inked.forEach((h, i) => ho.setMatrixAt(i, M4.compose(h.p, Q0, S0.set(h.s.x + 2.5, h.s.y + 2.5, h.s.z + 2.5))));
@@ -4907,7 +4918,7 @@ function updateFlight(dt) {
     setDist(HUD_PIN_DIST ? Math.hypot(pos.x - PIN.u, -pos.z - PIN.v) : Math.hypot(pos.x - S.B.u, -pos.z - S.B.v), _bic);
     if (S.callPending && S.rollT >= T - 1 * 1.25) { S.callPending = false; if (!S.holed) callLie(S, S.endLie, S.end); } /* just before it stops: where it ended up, not where it landed */
     if (S.rollT >= T && S.phase !== 'done') { S.phase = 'done'; setTimeout(finishShot, 650); }
-    if (CARD_PREBUILD && S.holed && S.phase === 'done') cardPreStep(S); /* CARD_PREBUILD: the hole card, a piece a frame, while finishShot's 650 ms run */
+    if (CARD_PREBUILD && S.holed && S.phase === 'done') cardPreStep(S); else if (CARD_SHOT && !S.holed && S.phase === 'done') cardShotStep(S); /* CARD_SHOT: the shot card, the same way */ /* CARD_PREBUILD: the hole card, a piece a frame, while finishShot's 650 ms run */
   }
   if (S.phase !== 'air') { const cm = comet.material, ci = cometInk.material; cm.opacity = ci.opacity = Math.max(0, (cm.opacity ?? 1) - dt * 2.2); cm.transparent = ci.transparent = true; if (cm.opacity <= 0) comet.visible = cometInk.visible = false; }
   else { comet.material.opacity = cometInk.material.opacity = 1; }
@@ -4973,7 +4984,21 @@ function cardPreStep(S) { const P = CARDPRE, r = $('#result'); if (P.S !== S) { 
     if (P.k === 2) { c.insertAdjacentHTML('beforeend', P.card.slice(P.cut)); P.at.card = [c.firstElementChild, c.lastElementChild]; P.k = 3; return; } /* the stat boxes */
     if (P.k === 3) { b.innerHTML = P.btns; P.at.btns = [b.firstElementChild, b.lastElementChild]; P.k = 4; } /* the buttons */
   } catch (e) { P.k = 9; console.error(e); } }
-function cardPut(el, html, k) { const P = CARDPRE, a = P.at[k]; if (CARD_PREBUILD && P.S === G.shot && P[k] === html && a && el.firstElementChild === a[0] && el.lastElementChild === a[1]) return; el.innerHTML = html; } /* CARD_PREBUILD: already there (the same string, the same nodes): leave it */
+const CARD_SHOT = true; /* pf591 (Neil, iPhone: "frame rate always seems to drop just before a modal pops up ... like post shot modal"): the shot card's ~40 new elements (the stat boxes, the tempo bar, the swing sketch's strokes, the button) were made as it showed, so the frame it appeared in also worked out all their styles and layout (+16 ms style, +10 ms layout on that frame at 4x CPU) and the card's drop started one heavy frame late. Like CARD_PREBUILD's hole card, the same markup is now put in, a piece a frame, during the 650 ms between the ball stopping and finishShot, inside the card while it is still hidden and laid out off-screen; finishShot finds the very same markup there and only shows it, at the same moment, with the same drop. Anything different (a gimme, a pick-up, a holed ball, a changed swing) and finishShot writes it as before. false = as v591 */
+function cardShotStep(S) { const P = CARDPRE, r = $('#result'); if (P.S !== S) { P.S = S; P.k = 0; P.card = P.btns = P.grid = P.svg = null; P.at = {}; } if (P.k > 3 || !r.hidden) return; /* CARD_SHOT: only into a hidden card */
+  try {
+    if (P.k === 0) { /* the strings, as finishShot will make them for a ball that's not in (no gimme, no pick-up) */
+      const ob = S.endLie === 'ob' && S.lieLand !== 'water', water = S.endLie === 'water' || S.lieLand === 'water' || ob, endU = S.end.u, endV = S.end.v, toPin = Math.hypot(PIN.u - endU, PIN.v - endV), total = Math.hypot(endU - S.B.u, endV - S.B.v), lie = water ? 'water' : S.endLie;
+      const holed = lie === 'green' && toPin < .06, gimme = !holed && !water && lie === 'green' && toPin * 3 < 4.5 && !(TUT_PLAY && CID === 'tut' && G.stroke < 4), pickup = MAX_TRIPLE && !(TUT_PLAY && CID === 'tut') && !holed && !gimme && G.stroke + (water ? 1 : 0) >= HOLE.par + 2;
+      if (holed || gimme || pickup) { P.k = 9; return; } /* it ends the hole: finishShot writes that card as before */
+      const sw = G.lastSwing; P.card = ''; P.grid = resGridHtml(S, lie, water, toPin, total, false); P.svg = sw && sw.pts.length >= 2 ? swingSvgHtml(sw) : null;
+      P.btns = resBtnsHtml(water ? [['Replay +1', 'penalty', false], ['Take a drop +1', 'drop', true]] : [['Play on ›', 'next', 'hide']]); P.k = 1; } /* (and on: the strings are quick, so the stat boxes go in this same frame) */
+    const c = $('#resCard'), g = $('#resGrid'), v = $('#resSwingSvg'), b = $('#resBtns');
+    if (P.k === 1) { r.classList.add('pre'); r.classList.remove('final'); r.classList.remove('round'); if (c.firstChild) c.innerHTML = ''; P.at.card = [null, null]; g.innerHTML = P.grid; P.at.grid = [g.firstElementChild, g.lastElementChild]; P.k = 2; return; } /* the stat boxes */
+    if (P.k === 2) { if (P.svg != null) { v.innerHTML = P.svg; P.at.svg = [v.firstElementChild, v.lastElementChild]; } P.k = 3; return; } /* the swing sketch */
+    if (P.k === 3) { b.innerHTML = P.btns; P.at.btns = [b.firstElementChild, b.lastElementChild]; P.k = 4; } /* the button(s) */
+  } catch (e) { P.k = 9; console.error(e); } }
+function cardPut(el, html, k) { const P = CARDPRE, a = P.at[k]; if ((CARD_PREBUILD || CARD_SHOT) && P.S === G.shot && P[k] === html && a && el.firstElementChild === a[0] && el.lastElementChild === a[1]) return; el.innerHTML = html; } /* CARD_PREBUILD: already there (the same string, the same nodes): leave it */
 function cardPreEnd() { $('#result').classList.remove('pre'); CARDPRE.S = null; CARDPRE.at = {}; }
 function finishShot() {
   const S = G.shot; const ob = S.endLie === 'ob' && S.lieLand !== 'water', water = S.endLie === 'water' || S.lieLand === 'water' || ob; // out of bounds plays as a hazard, just like water: replay, or drop where it crossed (+1)
@@ -4993,20 +5018,14 @@ function finishShot() {
   $('#result').classList.toggle('final', holed); $('#result').classList.remove('round'); cardPut($('#resCard'), holed ? holeCard(G.log) : '', 'card'); /* (CARD_PREBUILD: same as innerHTML =) */
   $('#resWord').textContent = word;
   $('#resSub').textContent = holed ? `${ACE ? (SCORE[1 - HOLE.par] || '').replace('!', '').toLowerCase().replace(/^./, c => c.toUpperCase()) + ' · ' : ''}${COURSES.find(c => c.id === MENU.course)?.name || ((OSLER_DEV && CID === 'osler') || CID === 'tut' ? COURSE_NAME : 'Toronto Hunt')} · Hole ${HOLE.n} · Par ${HOLE.par}` : `Shot ${G.stroke} · ${S.putt ? 'Putt' : (['chip', 'pitch', 'flop', 'sand'].includes(G.mode) ? '' : S.shape + ' · ') + club().name + (G.mode !== 'full' ? ' ' + MODES[G.mode].name : '')}` + (S.lieLoss >= 1 ? ` · lie cost ${S.lieLoss} yds` : '');
-  const pinTxt = lie === 'green' ? `${Math.round(toPin * 3)} ft` : `${Math.round(toPin)} yds`;
-  const stats = [['Carry', Math.round(S.carry), S.pinHigh], ['Roll', S.roll < -.5 ? `${Math.round(S.roll)} ↩` : Math.round(S.roll), S.roll < -.5], ['Total', Math.round(total), false], ['To pin', water ? '—' : pinTxt, lie === 'green'], ['Spin rpm', (Math.round(S.spin / 10) * 10).toLocaleString(), false], ['Apex', `${Math.round(S.apex * 3)} ft`, false]];
-  // tempo meter: where the downswing landed against the perfect window (log scale, quick on the left)
-  const lq = Math.log(TEMPO / S.ratio), span = 1.1, pos = v => clamp((v + span) / (2 * span), 0, 1) * 100;
-  const tempoCell = `<div class="st wide${S.tq === 'perfect' ? ' good' : ''}" title="Tempo ${S.ratio.toFixed(1)}:1, aim ${TEMPO}:1"><small>Quick</small><div class="tbar"><i style="left:${pos(-PERFECT)}%;right:${100 - pos(PERFECT)}%"></i><u style="left:${pos(lq)}%"></u></div><small>Slow</small></div>`;
-  if (S.putt) { stats.length = 0; stats.push(['Rolled', `${Math.round(S.roll * 3)} ft`, false], ['To cup', holed ? 'In!' : `${(toPin * 3).toFixed(toPin * 3 < 10 ? 1 : 0)} ft`, holed]); }
-  $('#resGrid').innerHTML = stats.map(([k, v, good]) => `<div class="st${good ? ' good' : ''}"><small>${k}</small><b>${v}</b></div>`).join('') + tempoCell;
+  cardPut($('#resGrid'), resGridHtml(S, lie, water, toPin, total, holed), 'grid'); /* (CARD_SHOT: the same markup as before, from resGridHtml; cardPut: same as innerHTML =) */
   drawSwingSketch(S);
   const btns = [];
   if (water && !pickup) { btns.push(['Replay +1', 'penalty', false]); btns.push(['Take a drop +1', 'drop', true]); }
   else if (holed) { btns.push(['Quit', 'quit', 'quit']); btns.push(HOLE_N < NINE.last(CID) ? ['Next hole ›', 'nexthole', true] : ROUND.holes.length ? ['Finish round', 'finish', true] : ['Play again', 'restart', true]); } /* last hole of a one-hole round: straight to another go */
   else btns.push(['Play on ›', 'next', 'hide']); /* no mulligans; and no button: a tap anywhere carries on (the hidden button keeps the auto-advance working) */
-  cardPut($('#resBtns'), btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}"${go === 'hide' ? ' hidden' : ''}>${l}</button>`).join(''), 'btns'); /* (CARD_PREBUILD: same as innerHTML =) */
-  if (CARD_PREBUILD) cardPreEnd(); /* CARD_PREBUILD: out of its invisible pre-layout as it shows (same moment: the drop animation starts here, as before) */
+  cardPut($('#resBtns'), resBtnsHtml(btns), 'btns'); /* (CARD_PREBUILD: same as innerHTML =) */
+  if (CARD_PREBUILD || CARD_SHOT) cardPreEnd(); /* (CARD_SHOT too) */ /* CARD_PREBUILD: out of its invisible pre-layout as it shows (same moment: the drop animation starts here, as before) */
   $('#result').hidden = false; app.classList.add('resulting'); sfx('pop');
   clearTimeout(G.resTO); if (!holed && !water) G.resTO = setTimeout(() => { const r = $('#result'), go = r.querySelector('#resBtns .btn.go'); if (!r.hidden && go) go.click(); }, 2750); // carry on by itself
   G.view = 'result'; app.classList.remove('flying');
@@ -5019,6 +5038,15 @@ function finishShot() {
   // putts, and short-game shots (chip / pitch / flop / bunker) that FINISH on the green, don't stop for a result card: straight on to the next shot (holing out still shows the score)
   if (!water && !holed && (S.putt || (lie === 'green' && ['chip', 'pitch', 'flop', 'sand'].includes(G.prev && G.prev.mode)))) { clearTimeout(G.resTO); const go = $('#resBtns .btn.go'); if (go) go.click(); }
 }
+const resBtnsHtml = btns => btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}"${go === 'hide' ? ' hidden' : ''}>${l}</button>`).join(''); /* finishShot's buttons (moved out unchanged: CARD_SHOT) */
+function resGridHtml(S, lie, water, toPin, total, holed) { /* finishShot's stat boxes, moved out unchanged so CARD_SHOT can build the very same markup early */
+  const pinTxt = lie === 'green' ? `${Math.round(toPin * 3)} ft` : `${Math.round(toPin)} yds`;
+  const stats = [['Carry', Math.round(S.carry), S.pinHigh], ['Roll', S.roll < -.5 ? `${Math.round(S.roll)} ↩` : Math.round(S.roll), S.roll < -.5], ['Total', Math.round(total), false], ['To pin', water ? '—' : pinTxt, lie === 'green'], ['Spin rpm', (Math.round(S.spin / 10) * 10).toLocaleString(), false], ['Apex', `${Math.round(S.apex * 3)} ft`, false]];
+  // tempo meter: where the downswing landed against the perfect window (log scale, quick on the left)
+  const lq = Math.log(TEMPO / S.ratio), span = 1.1, pos = v => clamp((v + span) / (2 * span), 0, 1) * 100;
+  const tempoCell = `<div class="st wide${S.tq === 'perfect' ? ' good' : ''}" title="Tempo ${S.ratio.toFixed(1)}:1, aim ${TEMPO}:1"><small>Quick</small><div class="tbar"><i style="left:${pos(-PERFECT)}%;right:${100 - pos(PERFECT)}%"></i><u style="left:${pos(lq)}%"></u></div><small>Slow</small></div>`;
+  if (S.putt) { stats.length = 0; stats.push(['Rolled', `${Math.round(S.roll * 3)} ft`, false], ['To cup', holed ? 'In!' : `${(toPin * 3).toFixed(toPin * 3 < 10 ? 1 : 0)} ft`, holed]); }
+  return stats.map(([k, v, good]) => `<div class="st${good ? ' good' : ''}"><small>${k}</small><b>${v}</b></div>`).join('') + tempoCell; }
 function drawSwingSketch(S) {
   const sw = G.lastSwing, svg = $('#resSwingSvg'), deg = sw ? sw.curveDeg : 0, kind = pathKind(deg);
   $('#resPath').textContent = (Math.abs(deg) < 1.6 ? (sw && sw.wob.word === 'smooth' ? 'Pure' : 'Straight') : `${Math.round(Math.abs(deg))}° ${kind.split(' · ')[0]}`);
@@ -5026,12 +5054,15 @@ function drawSwingSketch(S) {
   if (sw) $('#resPath').textContent += ' · ' + sw.wob.word;
   if (kind) $('#resPath').textContent += ' → ' + kind.split(' · ')[1];
   if (!sw || sw.pts.length < 2) { svg.innerHTML = ''; return; }
+  cardPut(svg, swingSvgHtml(sw), 'svg'); /* (CARD_SHOT: the same markup as before, from swingSvgHtml; cardPut: same as innerHTML =) */
+}
+function swingSvgHtml(sw) { /* drawSwingSketch's path sketch, moved out unchanged so CARD_SHOT can build the very same markup early */
   const p0 = sw.pts[0], ys = sw.pts.map(p => p.y), lo = Math.max(...ys), hi = Math.min(...ys, p0.y);
   const k = 88 / Math.max(1, lo - hi), X = p => clamp(40 + (p.x - p0.x) * k * 2, 4, 76), Y = p => 14 + (p.y - hi) * k; // sideways drawn ×2 so wobble reads
   const line = ph => sw.pts.filter(p => p.ph === ph).map((p, i) => `${i ? 'L' : 'M'}${X(p).toFixed(1)} ${Y(p).toFixed(1)}`).join(' ');
   const down = sw.pts.filter(p => p.ph === 'down'), e = down[down.length - 1] || sw.pts[sw.pts.length - 1], a = down[Math.max(0, down.length - 4)] || e;
   const ang = Math.atan2(Y(e) - Y(a), X(e) - X(a)) * 180 / Math.PI;
-  svg.innerHTML = `<line x1="40" y1="4" x2="40" y2="108" stroke="${INK}" stroke-width="1.5" stroke-dasharray="2 4" opacity=".28"/>
+  return `<line x1="40" y1="4" x2="40" y2="108" stroke="${INK}" stroke-width="1.5" stroke-dasharray="2 4" opacity=".28"/>
     <path d="${line('back')}" fill="none" stroke="${INK}" stroke-width="4" stroke-dasharray="5 6" stroke-linecap="round" opacity=".5"/>
     <path d="${line('down')}" fill="none" stroke="${INK}" stroke-width="12.5" stroke-linecap="round" stroke-linejoin="round"/>
     ${down.slice(1).map((p, i) => `<line x1="${X(down[i]).toFixed(1)}" y1="${Y(down[i]).toFixed(1)}" x2="${X(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="${wobCol(Math.max(p.w || 0, down[i].w || 0))}" stroke-width="7.4" stroke-linecap="round"/>`).join('')}
@@ -6028,9 +6059,19 @@ const SND = (() => {
   function noise(c) { /* 2 s of white noise per context, made once; each burst starts at a random point in it */
     let b = NZ.get(c); if (b) return b;
     const n = c.sampleRate * 2 | 0; b = c.createBuffer(1, n, c.sampleRate); const d = b.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = R() * 2 - 1;
-    NZ.set(c, b); return b;
+    if (SND_NOISE_EARLY && NZP.done && sd === NZP.sd0 && NZP.at[n] != null) { d.set(NZP.vals.subarray(0, n)); sd = NZP.at[n]; } /* SND_NOISE_EARLY: the very same samples, drawn ahead; the generator left where this loop would leave it */
+    else for (let i = 0; i < n; i++) d[i] = R() * 2 - 1;
+    NZP.vals = null; NZ.set(c, b); return b;
   }
+  const SND_NOISE_EARLY = true; /* pf591 (Neil, tablet: low frame rate pulling back on the club): the sound wakes on the first touch in a round, usually the first pull on the dial, and making its 2 s of noise there (~96,000 random numbers) cost 14-74 ms inside that touch at 4x CPU. The same numbers, from the same generator in the same order, are now drawn ahead in small idle-time pieces (2 s at 44.1 and 48 kHz) and copied in at the first touch; the generator is then set where drawing them there would have left it, so every later sound is the same too. Anything else (another sample rate, the generator used meanwhile) draws them there as before. false = as v591 */
+  const NZP = { sd0: 0, s: 0, i: 0, vals: null, at: {}, done: false };
+  function noisePrep() { /* SND_NOISE_EARLY: 16,000 a slice, the exact R() steps */
+    if (ac || NZP.done || !SOUND || !on) return; if (!NZP.vals || NZP.sd0 !== sd) { NZP.vals = new Float32Array(96000); NZP.i = 0; NZP.s = sd; NZP.sd0 = sd; NZP.at = {}; }
+    let s = NZP.s; const v = NZP.vals, end = Math.min(96000, NZP.i + 16000);
+    for (let i = NZP.i; i < end; i++) { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; v[i] = s / 4294967296 * 2 - 1; if (i === 88199) NZP.at[88200] = s; }
+    NZP.s = s; NZP.i = end; if (end === 96000) { NZP.at[96000] = s; NZP.done = true; } else nzIdle(); }
+  const nzIdle = () => { if (window.requestIdleCallback) requestIdleCallback(noisePrep, { timeout: 1500 }); else setTimeout(noisePrep, 60); };
+  if (SND_NOISE_EARLY) setTimeout(nzIdle, 3000); /* (after the boot's own work) */
   function env(p, t, a, at, dec) { a = Math.max(a, 2e-4); p.setValueAtTime(0, t); p.linearRampToValueAtTime(a, t + at); p.exponentialRampToValueAtTime(1e-4, t + at + dec); }
   /* a sine (or other) partial: f -> f1 over its life, attack at, decay dec (to -80 dB) */
   function tone(c, o, t, f, f1, a, at, dec, type) {
@@ -7016,7 +7057,7 @@ const HOMESNAP = (() => {
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
-const TRACER_DRAWON = { ms: 420 }; /* (checked: started at a tee it draws a short stub from the ball and grows; in the fly-over flow it starts as the camera lands) */ /* Neil 11-27 ('try draw on'): after the fly-over lands, instead of the whole line fading in (TRACER_FADE), it draws itself out from the ball to the landing spot (fast at first, easing in at the end) and the landing rings come in over the last part. null = TRACER_FADE's fade, as v607 */
+const TRACER_DRAWON = null; /* (Neil 11-28 03:11: 'shot line drawing looks weird, doesn't perform great: roll it back': back to TRACER_FADE's fade; was { ms: 420 }) */ /* (checked: started at a tee it draws a short stub from the ball and grows; in the fly-over flow it starts as the camera lands) */ /* Neil 11-27 ('try draw on'): after the fly-over lands, instead of the whole line fading in (TRACER_FADE), it draws itself out from the ball to the landing spot (fast at first, easing in at the end) and the landing rings come in over the last part. null = TRACER_FADE's fade, as v607 */
 const TRACER_FADE = { ms: 450, lead: 0 }; /* (lead .15 tried in v606, Neil 11-27 23:56: 'remove that 150ms change') */ /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
 const TRF = { t0: 0 };
 function trDraw() { /* TRACER_DRAWON: the shot line draws itself out from the ball to where it lands; the rings come in as it arrives */
