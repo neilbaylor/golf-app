@@ -91,6 +91,7 @@ const MP = (() => {
   const NEXT_HOLD = true;   /* mplag (MP_EARLY_NEXT on the phones): a 'next' sent while its result card is still up says how long (hold, ms, at most HOLD_MAX); the next golfer's idle / away clock starts when the card goes, as it did when 'next' came after the card.
     ROLLBACK: false -> the clock starts at the 'next' (an early one would start it up to 2.75 s before the turn shows). An old phone sends no hold: as before */
   const FLY_FF_ALL = true; /* the fly-over's fast-forward relayed (on / off, this hole). ROLLBACK: false -> not relayed */
+  const CAMFF_ALL = true; /* see 'camff' (false = not relayed) */
   const FLY_SKIP_ALL = true; /* Neil (11-16): a Skip on the hole's fly-over on any phone skips it for everyone: its 'flyskip' (for this hole) is relayed once per hole to the others; a second press anywhere is dropped. ROLLBACK: false -> not relayed (each phone's own fly-over) */
   const MP_GONE_NEXT = true; /* mp575: the shooter's phone gone (socket closed) or put away ('vis' off: locked, app switched) with their ball in the air: the others got the whole flight and
     result card, then waited NEXT_WAIT (45 s) for a report that can't come. Now the shot's own result (the fallback, as after 45 s) is used once the flight (the shot's dur, else FLY_EST) and its card
@@ -261,7 +262,7 @@ const MP = (() => {
   const HONOUR = true; /* Neil (11-20): on the tee, whoever had the lowest score on the last hole goes first; a tie goes back a hole at a time; all tied (and hole 1): seat (joining) order. ROLLBACK: false -> seat order on every tee */
   const honourCmp = (R, a, b) => { for (let h = R.hole - 1; h >= 1; h--) { const x = a.scores[h - 1], y = b.scores[h - 1], d = (x && x.s || 99) - (y && y.s || 99); if (d) return d; } return a.seat - b.seat; };
   function nextTurn(R) {
-    const live = R.players.filter(p => p.ball && !p.ball.done && !p.out); R.shot = null; R.autoFor = null; R.away = null; clearT(R, 'pf'); clearT(R, 'away');
+    const live = R.players.filter(p => p.ball && !p.ball.done && !p.out); if (CAMFF_ALL) R.prevBy = R.shot ? R.shot.by : R.prevBy; R.shot = null; R.autoFor = null; R.away = null; clearT(R, 'pf'); clearT(R, 'away');
     if (!live.length) return endHole(R);
     const tee = live.filter(p => p.ball.stroke === 1 && p.ball.lie === 'tee' && !p.ball.left); if (HONOUR && tee.length > 1) tee.sort((a, b) => honourCmp(R, a, b));
     const pick = tee.length ? tee[0] : live.slice().sort((a, b) => (b.ball.toPin - a.ball.toPin) || (a.seat - b.seat))[0]; /* tee shots in seat order, then farthest from the hole */
@@ -350,6 +351,7 @@ const MP = (() => {
       case 'act': return act(R, p, m);
       case 'vis': if (MP_GONE_NEXT) { const h = m.on === false; if (h !== !!p.hid) { p.hid = h; if (p.goneAt == null || h) p.goneAt = now(); if (R.phase === 'play' && R.tstate === 'flight' && R.shot && R.shot.by === p.id) timers(R); } } return; /* MP_GONE_NEXT: this phone was put away (on:false) or is back */
       case 'flyff': if (FLY_FF_ALL && R.phase === 'play' && m.hole === R.hole) broadcast(R, { t: 'flyff', hole: R.hole, from: p.id, on: !!m.on }, p); return; /* FLY_FF_ALL (Neil 11-18): holding fast-forward on the hole's fly-over: everyone's runs at 3x */
+      case 'camff': if (CAMFF_ALL && R.phase === 'play' && (R.prevBy === p.id || R.shot && R.shot.by === p.id)) broadcast(R, { t: 'camff', from: p.id }, p); return; /* CAMFF_ALL (Neil 11-27): the player who just hit skipped the camera's glide to the next ball: everyone's skips with it */
       case 'flyskip': if (FLY_SKIP_ALL && R.phase === 'play' && m.hole === R.hole && R.flyskip !== R.hole) { R.flyskip = R.hole; broadcast(R, { t: 'flyskip', hole: R.hole, from: p.id }, p); } return; /* FLY_SKIP_ALL: once per hole */
       case 'go': if (NEXT_HOLD && R.go && R.go.by === p.id && m.n === R.go.n) { R.go = null; broadcast(R, { t: 'go', n: m.n, from: p.id }, p); if (R.phase === 'play' && R.tstate === 'aim' && R.idle && R.idle.start > now()) { R.idle.start = now(); timers(R); } } return; /* NEXT_HOLD: the hitter tapped their result card away early (only that phone, once): the others may move on after 1.7 s, and the next golfer's clock starts now, as when that tap sent 'next' */
       case 'playfor': return playFor(R, p, m);
