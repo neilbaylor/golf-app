@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v605'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v607'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1480,7 +1480,8 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
     path(q.P); g.fillStyle = '#bdbab3'; g.fill(); const [u0, u1, v0, v1] = q.b;
     if (hb()) { const s = []; for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) s.push(x, Y(v1), x + (v1 - v0) * ppy, Y(v0)); yield* clipJob([[pxs(q.P)]], [{ s: Float64Array.from(s), col: 'rgba(29,42,26,.07)', lw: 2 }], lineSt()); } /* HATCH_BG: the same lines through the worker */
     else { g.save(); path(q.P); g.clip(); g.beginPath();
-    for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; g.stroke(); g.restore(); } sketch(q.P, 2.2, .6); if (S4) yield flushCv(cv); } /* BUILD_SLICE4: after each area */
+    if (S4 && OB_SPLIT2) { const xs = []; for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) xs.push(x); const n = Math.ceil(xs.length / OB_SPLIT2); g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; for (let k = 0; k < xs.length; k += n) { g.beginPath(); for (const x of xs.slice(k, k + n)) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.stroke(); if (k + n < xs.length) yield; } g.restore(); } /* OB_SPLIT2 */
+    else { for (let x = X(u0) - (v1 - v0) * ppy; x < X(u1); x += 7) { g.moveTo(x, Y(v1)); g.lineTo(x + (v1 - v0) * ppy, Y(v0)); } g.strokeStyle = 'rgba(29,42,26,.07)'; g.lineWidth = 2; g.stroke(); g.restore(); } } sketch(q.P, 2.2, .6); if (S4) yield flushCv(cv); } /* BUILD_SLICE4: after each area */
   // the practice green (and the cart paths: out of bounds left of the main one)
   if (!AUGD) { path(PRACTICE); g.fillStyle = '#8fd255'; g.fill(); const pg = PRACTICE.map(([u, v]) => { const cx = -92, cy = 235; return [cx + (u - cx) * .9, cy + (v - cy) * .92]; });
     path(pg); g.fillStyle = '#a9ea6d'; g.fill(); sketch(PRACTICE, 2.2, .7); }
@@ -1826,6 +1827,7 @@ const HOME_PR = 1; /* Neil 11-23 (swiping the golfer picker choppy on a slow pho
 const OSL_HASH_FIX = true; /* see the room-link check near the end: #osler is OslerBrook, not a room (false = as v548) */
 const WAY_UNDER = 4; /* Neil 11-22: a round 4 or more under par says "Way under par!" (0 = always "Under par!", v546) */
 const GROUND_SKIRT = false; /* Neil 11-22: where a full-detail ground tile meets a half-detail one their edges don't quite match, and a hairline crack showed what's under the ground; each tile's inner edges now carry a short skirt hanging down (its own edge's colour and light), which closes the crack. Out of sight everywhere else (false = as v546) */
+const OB_SPLIT2 = 4; /* Neil 11-27 ('probably ok'): in a background build (the next hole while you play), the Hunt's out-of-bounds hatching (one stroke of faint parallel lines, 100-170 ms at 4x on Hunt 3 and 7) is drawn as this many strokes with a pause between: not pixel-identical, but the lines never touch, so about 1% of the area's pixels move by 1 shade in 255 (invisible). 0 = one stroke, as v606 */
 const GROUND_MORPH = { band: 20 }; /* Neil 11-25 ('in the Augusta 1 flyover, about 10-15% in, a bit of the fairway line shifts left; happens in the home screen background too'): that was a ground tile swapping from its half-detail twin to full detail (GROUND_LOD) as the camera came within 120 yd: the twin's flatter in-between heights put the painted fairway edge a touch elsewhere, so it jumped. Now the swap happens at 140 yd with the full tile shaped exactly like its twin (each vertex at the twin's height under it), and it eases into its own heights as the camera comes from 140 to 120 yd: no jump, and full detail from 120 yd in, as before (a few more full tiles drawn between 120 and 140 yd). null = as v594 */
 const GROUND_LOD = 120; /* option 4: course ground tiles whose nearest edge is beyond this many yd are drawn from a half-resolution twin (a quarter of the triangles). 0 = off, as v437 */
 const FAR_DEFAULT = true; /* far trees simple by default for everyone (Neil, 14 Nov: can't tell the difference); tapping the fps meter still turns it off. false = back to off unless chosen */
@@ -5756,7 +5758,7 @@ function drawTrTop() {
 function updateTracer() {
   if (CJ.g) { tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = false; return; } /* CADDIE_SLICE: no line until the caddie's pick is final */
   if (G.view === 'flight') return;
-  if (FLY.on) { trShadow.visible = false; return; } /* the drone fly-over shows the hole, not the shot */
+  if (FLY.on && !FLY.landing) { trShadow.visible = false; return; } /* the drone fly-over shows the hole, not the shot */
   const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
   if (G.mode === 'putt') { // how far it would roll if the green were flat and straight: it does NOT follow the break
     const D = G.D, e = smoother(G.aimT);
@@ -7006,7 +7008,7 @@ const HOMESNAP = (() => {
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
-const TRACER_FADE = { ms: 450 }; /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
+const TRACER_FADE = { ms: 450, lead: 0 }; /* (lead .15 tried in v606, Neil 11-27 23:56: 'remove that 150ms change') */ /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
 const TRF = { t0: 0 };
 function trFade() { const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_FADE.ms), f = k * k * k * (k * (k * 6 - 15) + 10), top = document.getElementById('trTop');
   tracer.material.opacity = .96 * f; tracerInk.material.opacity = .9 * f; trShadow.material.opacity = (trShadow.userData.op != null ? trShadow.userData.op : .25) * f;
@@ -7049,7 +7051,8 @@ const FLY = (() => {
       const d1 = _o.copy(look).sub(pos), L1 = d1.length(); d1.normalize(); const kr = smoother(Math.min(1, x / .9)); /* the camera turns evenly from where the drone looked to the shot line, done just before it lands */
       B.q.setFromUnitVectors(B.d0, d1); const qi = new THREE.Quaternion().slerp(B.q, kr); _l.copy(B.d0).applyQuaternion(qi).multiplyScalar(lerp(B.L0, L1, kr)).add(_p);
       pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, smoother(x));
-      if (!B.hud && T - B.t <= FLY_RETURN.hud) { B.hud = true; app.classList.remove('droning'); } /* the shot's controls come in over the last stretch, landing with the camera */
+      if (!B.hud && T - B.t <= FLY_RETURN.hud) { B.hud = true; app.classList.remove('droning'); }
+      if (TRACER_FADE && TRACER_FADE.lead && !B.tr && T - B.t <= TRACER_FADE.lead) { B.tr = true; tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; TRF.t0 = performance.now(); } /* (Neil 11-27: the line came in ~150 ms late: it now starts fading in this long before the camera lands) */ /* the shot's controls come in over the last stretch, landing with the camera */
       if (B.t >= T) { if (!B.hud) app.classList.remove('droning'); done(); } return; }
     if (S.back) { /* back to the tee on our own arc: rises a little, glides down into the shot view, zoom easing out on the way */
       const B = S.back; B.t += dt; const x = Math.min(1, B.t / B.dur), k = .5 - .5 * Math.cos(Math.PI * x), m = 1 - k; /* sine ease: gentler peak speed than smootherstep */
@@ -7073,10 +7076,10 @@ const FLY = (() => {
     if (!S || S.back) return; S.back = { dur: skip ? .9 : T_BACK, t: 0, pos: camera.position.clone(), look: camLook.clone(), fov: camera.fov, arc: Math.min(26, camera.position.distanceTo(ball.position) * .08), skip: !!skip, v: FLY_RETURN && skip && S.vel ? S.vel.clone() : new THREE.Vector3() };
     if (!FLY_RETURN) app.classList.remove('droning'); $('#flyUI').hidden = true; clearTimeout(settleTips.to); app.classList.add('settling');
   }
-  function done() { if (TRACER_FADE) TRF.t0 = performance.now(); if (FLY_SETTLE) FLY_CALM_AT = performance.now() + FLY_SETTLE_MS; S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
+  function done() { if (TRACER_FADE && !(S && S.back && S.back.tr)) TRF.t0 = performance.now(); if (FLY_SETTLE) FLY_CALM_AT = performance.now() + FLY_SETTLE_MS; S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
   function stop() { if (!S) return; S = null; after = null; app.classList.remove('droning', 'settling'); $('#flyUI').hidden = true; } /* quitting mid fly-over */
   $('#flyUI .fskip').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); end(true); });
-  return { start, step, end, stop, reset() { seen.clear(); }, get on() { return !!S; }, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
+  return { start, step, end, stop, reset() { seen.clear(); }, get on() { return !!S; }, get landing() { return !!(S && S.back && S.back.tr); } /* TRACER_FADE.lead: the shot line may show in the return's last moments */, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
 })(); window.__FLY = FLY; /* (tests: the fly-over's state) */
 /* ---- quitting back to the home screen (the end-of-hole card and the little Home button both ask first) ---- */
 const QUIT = (() => {
