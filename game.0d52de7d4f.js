@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v589'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v591'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -2531,6 +2531,10 @@ const CRITTERS = (() => {
   }
   return { update, hole() { place(); for (const q of sqs) q.u = 1e9; } }; /* a new hole: the flocks move over it, the squirrels find new trees */
 })();
+const CONFETTI_LEAN = true; /* cf585 (Neil: frame rate drops at the hole-out confetti): every frame rebuilt the matrix (Euler -> quaternion -> compose -> copy) of all 420 pieces for 5 s, even the ones not flying this time (a par flies 40: 380 at scale 0 every frame), the second pop's pieces still waiting in the cup, and pieces lying settled on the grass. Those matrices are the same as last frame, so they're skipped until they change (a waiting piece until it starts, a settled one until its fade starts); every piece is written on the first frame. The buffer the GPU draws is the same. false = as v585 */
+const HOLE_CALM = true; /* cf585: the next hole's background build (calm frames only) already waited out the roll and the card's camera move (~2.7 s from holed), then ran its slices (4.5 ms budget, single steps longer) under the confetti's last ~2.5 s. Now it also waits while the confetti is in the air (5 s from the pop). A tap on Next before it's done builds it under the loading pill exactly as before (that path ignores calm). false = as v585 */
+const CONFETTI_HOIST = true; /* cf585: per piece per frame the confetti worked out four exp()s that are the same for every piece that frame (now once a frame), the cos/sin of a sway direction fixed at the burst (now once at the burst), and the ground height under pieces still rising (only a falling piece can land: the test needs v.y < 0). Same numbers, same flight. false = as v585 */
+const CONFETTI_COUNT = true; /* cf585: draw and send to the GPU only the pieces that fly this time (par 40 ... ace 420) instead of all 420 every frame (the rest are at scale 0: nothing drawn). false = as v585 */
 const CONFETTI = (() => {
   // sticker-book confetti: inked paper shapes from one small atlas (a single draw call), lit like paper so they glint as they flip.
   // Two pops from the cup, then the pieces flutter down (low terminal speed, sway, slowing tumble) and settle flat on the grass.
@@ -2574,33 +2578,38 @@ const CONFETTI = (() => {
   function burst(x, y, z, n = 170) {
     cup.set(x, y, z); K = clamp(camera.position.distanceTo(cup) / 13, 1, 2); on = true; t = 0; m.visible = true;
     pop.position.set(x, y + .35 * K, z); pop.material.rotation = Math.random() * 6.28; pop.visible = true;
+    if (CONFETTI_COUNT) m.count = Math.min(N, n); for (const q of P) q.fz = 0; /* CONFETTI_COUNT: draw only the pieces that fly this time; CONFETTI_LEAN: every piece's matrix is written on the first frame */
     P.forEach((q, i) => { if (i >= n) { q.t0 = 99; q.land = -1; return; } /* CONFETTI_SCALE: only n pieces fly this time */ const second = i % 3 === 2, a = Math.random() * 6.283, c = Math.pow(Math.random(), .7) * (second ? .8 : .5), sp = (second ? R(4.6, 6.6) : R(6, 8.4)) * Math.sqrt(K);
       q.t0 = second ? R(.26, .34) : R(0, .05); q.p.set(x + Math.cos(a) * .08, y + .05, z + Math.sin(a) * .08); q.v.set(Math.cos(a) * Math.sin(c) * sp, Math.cos(c) * sp, Math.sin(a) * Math.sin(c) * sp);
       q.yaw = R(0, 6.28); q.ys = R(-3, 3); q.tum = R(0, 6.28); q.tw = R(9, 17) * SPINNY[q.sh] * (Math.random() < .5 ? -1 : 1); q.tw1 = R(2.5, 6) * SPINNY[q.sh] * Math.sign(q.tw);
-      q.sw = R(0, 6.28); q.sf = R(2.2, 4); q.sa = R(.18, .4) * K; q.sd = R(0, 6.28); q.term = R(.7, 1.35) * Math.sqrt(K) * (q.sh >= 5 ? 1.25 : 1); q.s = SIZE[q.sh] * R(.8, 1.15) * K; q.land = -1; q.fl = 0; }); }
+      q.sw = R(0, 6.28); q.sf = R(2.2, 4); q.sa = R(.18, .4) * K; q.sd = R(0, 6.28); if (CONFETTI_HOIST) { q.cd = Math.cos(q.sd); q.sn = Math.sin(q.sd); } /* CONFETTI_HOIST: its sway direction, once */ q.term = R(.7, 1.35) * Math.sqrt(K) * (q.sh >= 5 ? 1.25 : 1); q.s = SIZE[q.sh] * R(.8, 1.15) * K; q.land = -1; q.fl = 0; }); }
   function update(dt) { if (!on) return; dt = Math.min(dt, 1 / 20); t += dt; if (t > 5) { on = false; m.visible = false; pop.visible = false; return; }
     if (pop.visible) { const k = t / .38; if (k >= 1) pop.visible = false; else { pop.scale.setScalar((.5 + 1.6 * (1 - Math.pow(1 - k, 3))) * K); pop.material.opacity = k < .45 ? 1 : 1 - (k - .45) / .55; } }
+    const eU = Math.exp(-dt * 1.4), eD = Math.exp(-dt * 2.6), k6 = 1 - Math.exp(-dt * 6), k13 = 1 - Math.exp(-dt * 1.3); /* CONFETTI_HOIST: the same numbers for every piece this frame */
     for (let i = 0; i < N; i++) { const q = P[i]; let sc = 0;
+      if (CONFETTI_LEAN && t < q.fz) continue; /* CONFETTI_LEAN: this piece's matrix is the one already in the buffer (see below) */
       if (t >= q.t0) { const lt = t - q.t0;
         if (q.land < 0) {
-          q.v.y -= 9.8 * dt; const dh = Math.exp(-dt * (q.v.y > 0 ? 1.4 : 2.6)); q.v.x *= dh; q.v.z *= dh;
-          if (q.v.y < 0) q.v.y += (-q.term - q.v.y) * (1 - Math.exp(-dt * 6)); // paper: reaches a slow terminal speed quickly
+          q.v.y -= 9.8 * dt; const dh = CONFETTI_HOIST ? (q.v.y > 0 ? eU : eD) : Math.exp(-dt * (q.v.y > 0 ? 1.4 : 2.6)); q.v.x *= dh; q.v.z *= dh;
+          if (q.v.y < 0) q.v.y += (-q.term - q.v.y) * (CONFETTI_HOIST ? k6 : 1 - Math.exp(-dt * 6)); // paper: reaches a slow terminal speed quickly
           const fall = clamp(-q.v.y / q.term, 0, 1), sw = Math.sin(lt * q.sf + q.sw), swv = Math.cos(lt * q.sf + q.sw) * q.sa * q.sf * fall;
-          q.p.x += (q.v.x + Math.cos(q.sd) * swv) * dt; q.p.y += q.v.y * dt; q.p.z += (q.v.z + Math.sin(q.sd) * swv) * dt;
-          q.tw += (q.tw1 - q.tw) * (1 - Math.exp(-dt * 1.3)); q.tum += q.tw * dt; q.yaw += q.ys * dt;
-          const gy = groundHW(q.p.x, q.p.z) + .012 + (i % 9) * .0018;
-          if (q.p.y <= gy && q.v.y < 0) { q.p.y = gy; q.land = lt; q.fl = q.tum; }
+          q.p.x += (q.v.x + (CONFETTI_HOIST ? q.cd : Math.cos(q.sd)) * swv) * dt; q.p.y += q.v.y * dt; q.p.z += (q.v.z + (CONFETTI_HOIST ? q.sn : Math.sin(q.sd)) * swv) * dt;
+          q.tw += (q.tw1 - q.tw) * (CONFETTI_HOIST ? k13 : 1 - Math.exp(-dt * 1.3)); q.tum += q.tw * dt; q.yaw += q.ys * dt;
+          if (!CONFETTI_HOIST || q.v.y < 0) { const gy = groundHW(q.p.x, q.p.z) + .012 + (i % 9) * .0018; /* CONFETTI_HOIST: only a falling piece can land, so a rising one doesn't look up the ground */
+          if (q.p.y <= gy && q.v.y < 0) { q.p.y = gy; q.land = lt; q.fl = q.tum; } }
           E.set(q.tum, q.yaw, sw * .55 * fall);
         } else { // settle flat: ease the tumble to the nearest lying-flat angle
           const tgt = Math.round((q.fl + Math.PI / 2) / Math.PI) * Math.PI - Math.PI / 2, k = Math.min(1, (lt - q.land) / .14);
           E.set(q.fl + (tgt - q.fl) * k * (2 - k), q.yaw, 0);
+          if (CONFETTI_LEAN && k >= 1 && lt >= .08) q.fz = 3.7 + (i / N) * .9; /* settled flat and full size: the same matrix every frame until its fade starts */
         }
         const fade = 3.7 + (i / N) * .9; sc = q.s * (t < fade ? Math.min(1, lt / .08) : Math.max(0, 1 - (t - fade) / .35));
-      }
+      } else if (CONFETTI_LEAN) q.fz = q.t0; /* not out yet (or not flying this time: t0 99): scale 0 at a point that doesn't move until it starts */
       m.setMatrixAt(i, M4.compose(q.p, Q.setFromEuler(E), SC.set(sc, sc, sc)));
     }
+    if (CONFETTI_COUNT) m.instanceMatrix.updateRange.count = m.count * 16; /* (three resets the range after each upload) */
     m.instanceMatrix.needsUpdate = true; }
-  return { burst, update };
+  return { burst, update, get on() { return on; } };
 })();
 const FLAG_WIND = true; /* undo switch: false = the flag always flies the same way (along +x), rippling as before */
 const FLAG_ONCE = true; /* perf548: a new hole's flag (both faces, 512x320 each) was painted and sent to the GPU, then painted and sent again as soon as its crest image reported decoded, even when the crest was already loaded and drawn the first time (every hole after the first: two needless paints and uploads as Play starts, with nothing covering it). Now the second paint happens only if the crest or the number's font wasn't ready for the first; the flag is the same. false = as v548 */
@@ -4832,6 +4841,7 @@ function updateFlight(dt) {
     setDist(HUD_PIN_DIST ? Math.hypot(pos.x - PIN.u, -pos.z - PIN.v) : Math.hypot(pos.x - S.B.u, -pos.z - S.B.v), _bic);
     if (S.callPending && S.rollT >= T - 1 * 1.25) { S.callPending = false; if (!S.holed) callLie(S, S.endLie, S.end); } /* just before it stops: where it ended up, not where it landed */
     if (S.rollT >= T && S.phase !== 'done') { S.phase = 'done'; setTimeout(finishShot, 650); }
+    if (CARD_PREBUILD && S.holed && S.phase === 'done') cardPreStep(S); /* CARD_PREBUILD: the hole card, a piece a frame, while finishShot's 650 ms run */
   }
   if (S.phase !== 'air') { const cm = comet.material, ci = cometInk.material; cm.opacity = ci.opacity = Math.max(0, (cm.opacity ?? 1) - dt * 2.2); cm.transparent = ci.transparent = true; if (cm.opacity <= 0) comet.visible = cometInk.visible = false; }
   else { comet.material.opacity = cometInk.material.opacity = 1; }
@@ -4882,6 +4892,23 @@ function updateFlight(dt) {
   camera.position.copy(camFollow); camLook.copy(lookFollow); camera.lookAt(camLook);
   if (S.sz) SZ.shake(S, dt); /* PERFECT sizzle: a small impact shake on top of the settled view (v340) */
 }
+const CARD_PREBUILD = true; /* cf585 (Neil: the hole-out stutters): the end-of-hole card's ~45 new elements (the scorecard rows, the stat boxes, the buttons) were created as it showed, so the frame it appeared in also worked out all their styles and layout (+26 ms on that frame at 4x CPU, with the confetti at its peak). A holed ball's card is now built in the frames between the ball stopping and finishShot (650 ms), a piece a frame, inside the card while it is still hidden and laid out off-screen (moved far left, its drop animation held). finishShot then finds the very same HTML already there and only shows it, at the same moment, with the same drop. If anything differs (or it didn't finish in time) finishShot writes it as before. false = as v585 */
+const CARDPRE = { S: null, k: 0, at: {} };
+function cardPreStep(S) { const P = CARDPRE, r = $('#result'); if (P.S !== S) { P.S = S; P.k = 0; P.card = P.btns = null; P.at = {}; } if (P.k > 3 || !r.hidden) return; /* only into a hidden card */
+  try {
+    if (P.k === 0) { /* this frame: only the strings: finishShot's log entry for a holed ball (no gimme, no pick-up), its card and its buttons */
+      const ob = S.endLie === 'ob' && S.lieLand !== 'water', water = S.endLie === 'water' || S.lieLand === 'water' || ob, endU = S.end.u, endV = S.end.v, toPin = Math.hypot(PIN.u - endU, PIN.v - endV), total = Math.hypot(endU - S.B.u, endV - S.B.v), lie = water ? 'water' : S.endLie, rav = water && !ob && ravAt(endU, endV);
+      const e = { n: G.stroke, club: S.putt ? 'Putter' : club().name, mode: G.mode, putt: !!S.putt, carry: Math.round(S.carry), total: Math.round(total), lie: ob ? 'ob' : water ? (rav ? (endV > PIN.v ? 'bluff' : 'ravine') : 'water') : S.lieLand === 'trees' ? 'trees' : lie, pin: toPin, holed: !!S.holed, gimme: false };
+      P.card = holeCard((G.log || []).concat([e])); P.cut = P.card.indexOf('</ol>') + 5;
+      const btns = [['Quit', 'quit', 'quit'], HOLE_N < NINE.last(CID) ? ['Next hole ›', 'nexthole', true] : ROUND.holes.length ? ['Finish round', 'finish', true] : ['Play again', 'restart', true]];
+      P.btns = btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}"${go === 'hide' ? ' hidden' : ''}>${l}</button>`).join(''); P.k = 1; return; }
+    const c = $('#resCard'), b = $('#resBtns');
+    if (P.k === 1) { r.classList.add('pre'); r.classList.add('final'); r.classList.remove('round'); if (P.cut > 5) { c.innerHTML = P.card.slice(0, P.cut); P.k = 2; } else { c.innerHTML = P.card; P.at.card = [c.firstElementChild, c.lastElementChild]; P.k = 3; } return; } /* the scorecard rows */
+    if (P.k === 2) { c.insertAdjacentHTML('beforeend', P.card.slice(P.cut)); P.at.card = [c.firstElementChild, c.lastElementChild]; P.k = 3; return; } /* the stat boxes */
+    if (P.k === 3) { b.innerHTML = P.btns; P.at.btns = [b.firstElementChild, b.lastElementChild]; P.k = 4; } /* the buttons */
+  } catch (e) { P.k = 9; console.error(e); } }
+function cardPut(el, html, k) { const P = CARDPRE, a = P.at[k]; if (CARD_PREBUILD && P.S === G.shot && P[k] === html && a && el.firstElementChild === a[0] && el.lastElementChild === a[1]) return; el.innerHTML = html; } /* CARD_PREBUILD: already there (the same string, the same nodes): leave it */
+function cardPreEnd() { $('#result').classList.remove('pre'); CARDPRE.S = null; CARDPRE.at = {}; }
 function finishShot() {
   const S = G.shot; const ob = S.endLie === 'ob' && S.lieLand !== 'water', water = S.endLie === 'water' || S.lieLand === 'water' || ob; // out of bounds plays as a hazard, just like water: replay, or drop where it crossed (+1)
   const endU = S.end.u, endV = S.end.v; const toPin = Math.hypot(PIN.u - endU, PIN.v - endV);
@@ -4897,7 +4924,7 @@ function finishShot() {
     L.push({ n: pickup ? n0 : G.stroke - (gimme ? 1 : 0), club: S.putt ? 'Putter' : club().name, mode: G.mode, putt: !!S.putt, carry: Math.round(S.carry), total: Math.round(total), lie: ob ? 'ob' : water ? (rav ? (endV > PIN.v ? 'bluff' : 'ravine') : 'water') : S.lieLand === 'trees' ? 'trees' : lie, pin: toPin, holed: !!S.holed, gimme });
     if (gimme) L.push({ n: G.stroke, club: 'Putter', putt: true, gimme: true, conceded: true, lie: 'green', pin: 0, holed: true });
     if (pickup) { if (water) L[L.length - 1].pen = 1; L.push({ n: G.stroke, club: '', pickup: true, conceded: true, lie: lie, pin: toPin, holed: true }); } }
-  $('#result').classList.toggle('final', holed); $('#result').classList.remove('round'); $('#resCard').innerHTML = holed ? holeCard(G.log) : '';
+  $('#result').classList.toggle('final', holed); $('#result').classList.remove('round'); cardPut($('#resCard'), holed ? holeCard(G.log) : '', 'card'); /* (CARD_PREBUILD: same as innerHTML =) */
   $('#resWord').textContent = word;
   $('#resSub').textContent = holed ? `${ACE ? (SCORE[1 - HOLE.par] || '').replace('!', '').toLowerCase().replace(/^./, c => c.toUpperCase()) + ' · ' : ''}${COURSES.find(c => c.id === MENU.course)?.name || ((OSLER_DEV && CID === 'osler') || CID === 'tut' ? COURSE_NAME : 'Toronto Hunt')} · Hole ${HOLE.n} · Par ${HOLE.par}` : `Shot ${G.stroke} · ${S.putt ? 'Putt' : (['chip', 'pitch', 'flop', 'sand'].includes(G.mode) ? '' : S.shape + ' · ') + club().name + (G.mode !== 'full' ? ' ' + MODES[G.mode].name : '')}` + (S.lieLoss >= 1 ? ` · lie cost ${S.lieLoss} yds` : '');
   const pinTxt = lie === 'green' ? `${Math.round(toPin * 3)} ft` : `${Math.round(toPin)} yds`;
@@ -4912,7 +4939,8 @@ function finishShot() {
   if (water && !pickup) { btns.push(['Replay +1', 'penalty', false]); btns.push(['Take a drop +1', 'drop', true]); }
   else if (holed) { btns.push(['Quit', 'quit', 'quit']); btns.push(HOLE_N < NINE.last(CID) ? ['Next hole ›', 'nexthole', true] : ROUND.holes.length ? ['Finish round', 'finish', true] : ['Play again', 'restart', true]); } /* last hole of a one-hole round: straight to another go */
   else btns.push(['Play on ›', 'next', 'hide']); /* no mulligans; and no button: a tap anywhere carries on (the hidden button keeps the auto-advance working) */
-  $('#resBtns').innerHTML = btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}"${go === 'hide' ? ' hidden' : ''}>${l}</button>`).join('');
+  cardPut($('#resBtns'), btns.map(([l, a, go]) => `<button class="btn${go === 'quit' ? ' quit' : go ? ' go' : ''}" data-a="${a}"${go === 'hide' ? ' hidden' : ''}>${l}</button>`).join(''), 'btns'); /* (CARD_PREBUILD: same as innerHTML =) */
+  if (CARD_PREBUILD) cardPreEnd(); /* CARD_PREBUILD: out of its invisible pre-layout as it shows (same moment: the drop animation starts here, as before) */
   $('#result').hidden = false; app.classList.add('resulting'); sfx('pop');
   clearTimeout(G.resTO); if (!holed && !water) G.resTO = setTimeout(() => { const r = $('#result'), go = r.querySelector('#resBtns .btn.go'); if (!r.hidden && go) go.click(); }, 2750); // carry on by itself
   G.view = 'result'; app.classList.remove('flying');
@@ -6589,7 +6617,7 @@ const HOLESYS = (() => {
   function cancel() { if (want) { want = null; PILL.hide(); } }
   function forget(cid) { for (const HD of [...jobs.values()]) if (HD.cid === cid && HD !== cur && !(want && want.HD === HD)) drop(HD); ahead(); } /* prebuilt holes of a course built again (their pins: PINS.seed) */
   function calm(now) { /* nothing on screen is moving because of the player: no swing, flight, drone, camera move or finger down */
-    return !MENU.on && !INTRO.on && !FLY.on && now >= FLY_CALM_AT && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && !G.preview && Math.abs(G.aimT - G.aimGoal) < 1e-3 && !down && now - lastPtr > 400; }
+    return !MENU.on && !INTRO.on && !FLY.on && !(HOLE_CALM && CONFETTI.on) && now >= FLY_CALM_AT && G.view !== 'flight' && SW.phase === 'idle' && !G.camTween && !G.preview && Math.abs(G.aimT - G.aimGoal) < 1e-3 && !down && now - lastPtr > 400; }
   let warmUntil = 0;
   function prewarm(now) { /* HOLE_PREWARM (Neil 11-22, after Puffy's notes: prepare the likely next choice while the player is just looking): a prebuilt hole behind the home screen is drawn once, everything in it, into a 1-px corner, so the phone sets up its shaders and buffers then, and the switch to it only has to show it. Only when nobody has touched the screen for 1.5 s (or during the fly-over's own sky dip), one hole per frame, and a big one leaves the next frames free (took x 6, at most 250 ms) */
     if (!HOLE_PREWARM || !MENU.on || INTRO.on || want || down || now < warmUntil || (PREWARM_CALM && now < (INTRO.calm || 0)) || !(now - lastPtr > 1500 || (MENU.fade && !MENU.hold))) return false;
@@ -7088,6 +7116,7 @@ const INTRO_WRAP = true; /* perf548 (the hand-off again): as the faces set off, 
 const INTRO_RW = true; /* perf548 (Neil 11-22: the golfer board's first hydration still stuttered now and then): as the intro's faces set off for their home tiles, each face's measurements (its box, its tile's picture box, width and colour) were read between the previous face's style writes, so the browser restyled and re-laid out the whole page once per face (~150-250 ms of one frame at 4x CPU). Now all are measured first (the window's width too: reading it after a face's writes laid the page out again), then written: the same values, the same styles, one layout. false = as v548 */
 const HOME_EARLY = true; /* perf555 (proposal 1, Neil 11-23 'try all 3 and measure them'): the home screen's hydration under the intro (#boot.home: its whole restyle, 28-100 ms at 4x CPU) was applied in the same frame as the intro board's light sweep starts, so that sweep's first frame came late. Now the class goes on in the intro's covered opening beat (with INTRO_PRE's invisible paint, before the first square comes in), while the board is still empty; the background-build quiet time (HYD_QUIET) still starts at the sweep as before. On screen: the home title's letter hop and the picked golfer's bob start that much earlier, so they are at a different point of their loop when the intro hands over. false = as v555 */ const HYD_QUIET = 1200; /* Neil 11-22 (a touch of stutter as the intro hands over to the golfer picker): the background hole build holds off for 1.2 s from that hand-off (0 = it carries on, v519) */
 const INTRO_OSL_RING = true; /* Neil 11-22: OslerBrook's crest on the intro board sits on a paper circle like Augusta's (false = the bare turtle) */
+const MP_BANNER_LOW = true; /* Neil 11-24: the pink "HENRY IS AIMING" / "HENRY'S DRIVE" banner sat at the top-middle, in the way of the shot; now it sits just above the group/chat card at the bottom (phone layout). false = as v590 */
 const ACE_WORD = true; /* Neil 11-24: a hole-in-one said just 'EAGLE!' (or 'ALBATROSS!' on a par 4). Now the hole-out banner says HOLE IN ONE! and the score name leads the small line under it ('Eagle · Toronto Hunt · Hole 4 · Par 3'). The scorecard is unchanged. false = as v586 */
 const HANDOFF_LAND = false; /* OFF (Neil 11-24 16:51: 'not better... now i see a small bug sometimes where the faces disappear for a moment'). Neil 11-24 (a 'hitch' as the intro's faces hand over to the home tiles, even on a fast laptop: 'maybe the cards dont quite reach the destination'). Right: a face flies for .75 s (cubic-bezier(.6,0,.2,1)), but its live home tile was shown under it at 560 ms + 2 frames, when the face had only covered ~96% of the way (up to ~20 px short and a touch big on the far tiles), and then it faded out over 200 ms while still sliding in: a double image that snaps. Now the hand-off waits for the faces to land (760 ms), so the cross-fade is a pure dissolve in place. The intro ends ~0.2 s later. false = as v585 */
 const INTRO_PRE = true; /* Neil 11-21: see #intro.pre and INTRO.fill. false = as v488 */
@@ -7822,7 +7851,10 @@ if (MULTI) try { MPX = (() => {
   const BANNER = { set() { const b = el('mpBanner'); if (!b) return; const p = pl(S.turn), fl = G.view === 'flight' && G.shot;
     const struck = MP_AIM_TAG_LIVE && S.hitN === S.curN, show = S.inRound && p && !S.mine && !FLY.on && (fl || (!struck && (G.view === 'swing' || G.view === 'aim'))); /* MP_AIM_TAG_LIVE: after the shot lands, no "IS AIMING" for the hitter */
     b.hidden = !show; if (!show) return; const n = nm(p).toUpperCase();
-    b.textContent = fl ? `${n}'S ${G.shot.putt ? 'PUTT' : G.stroke === 1 && HOLE.par > 3 && G.club === 0 ? 'DRIVE' : 'SHOT'}` : `${n} IS AIMING`; } };
+    b.textContent = fl ? `${n}'S ${G.shot.putt ? 'PUTT' : G.stroke === 1 && HOLE.par > 3 && G.club === 0 ? 'DRIVE' : 'SHOT'}` : `${n} IS AIMING`; if (MP_BANNER_LOW) BANNER.low(); },
+    low() { /* MP_BANNER_LOW: sit 16 px above the group/chat card when it spans the bottom of the screen (phone layout); a side-docked card (desktop) keeps the old spot */ const b = el('mpBanner'), P = el('mpPanel'); if (!b || b.hidden || !P) return; const A = app.getBoundingClientRect(), r = P.getBoundingClientRect(), dock = r.height > 0 && r.bottom > A.bottom - 60 && r.width > A.width * .6;
+      if (dock) { b.style.top = 'auto'; b.style.bottom = Math.round(A.bottom - r.top + 16) + 'px'; } else { b.style.top = ''; b.style.bottom = ''; } } };
+  if (MP_BANNER_LOW) window.addEventListener('resize', () => BANNER.low());
 
   /* MP_SIDE_UP: the WATCHING column starts 14 px under the top HUD's right-hand column (lie / wind / style), whatever its height and the UI scale */
   function sayReach() { const sy = el('say'); if (!sy) return 0; const A = app.getBoundingClientRect(); /* MP_SIDE_LEFT: the bottom of the say bubble at its tallest (2 lines), wherever the HUD puts it (hasMode, UI scale) */
