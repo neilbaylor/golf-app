@@ -41,7 +41,7 @@ const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const HUNT_IMG = new Image(); HUNT_IMG.src = HUNT_LOGO; app.style.setProperty('--logo', `url("${HUNT_LOGO}")`); // used as a mask for the crest's shine
 let FLAG_ART = { img: HUNT_IMG, w: 214, oval: true }; /* what the flag carries: each course sets its own (the Hunt crest on a white sticker oval; a club logo straight on the yellow) */
-const BOOT = { on: true }, BUILD = 'v604'; /* which build is running: shown in the corner of the home screen */
+const BOOT = { on: true }, BUILD = 'v606'; /* which build is running: shown in the corner of the home screen */
 document.getElementById('ver').textContent = BUILD;
 const MULTI = true; let MPX = null; /* MP hook: multiplayer undo switch (false = no Multiplayer button and no MP code paths: single player exactly as before) and its handle */
 const HUD_HAND_BADGE = false; /* Neil (11-16 17:47): no RH/LH badge on the HUD golfer (tapping the golfer still switches hands). true = the badge, as before */ if (!HUD_HAND_BADGE) document.getElementById('app').classList.add('hp-off');
@@ -1322,6 +1322,7 @@ function fescueTile(g) { /* FESCUE: a 384-px square of fescue that repeats witho
 let S4_BG = true; /* BUILD_SLICE4: set by HOLESYS before each build step: true unless the hole is being waited for (under the pill or loader, where nobody sees a long step and fewer pauses finish sooner) */
 const BUILD_SLICE4 = true; /* perf548 (Neil 11-22, Puffy lessons: one-off work in slices under ~a frame): the background hole build (next hole while you line up a shot, other courses' first holes behind the home screen) still had single steps of 30-125 ms at 4x CPU (one OB area's hatching plus all the roads, a green's whole texture, the land round the map, a fescue patch, an Augusta fairway, the pine-straw mottling). Those runs of separate draws now pause between draws, so each frame's slice stays near the build's budget. Each painting decides as it starts: only a build in the background pauses more (one being waited for runs as before, so loads don't get longer). The same draws in the same order with the same random numbers: the same pictures. false = as v548 */
 const MAP_FILL_BANDS = 4; /* perf508: the map's first paint (its base green over the whole canvas, 2-7 million pixels) was one ~13-18 ms fill inside the build's first map slice (?prof 'courseSteps (1st slice)': 46 ms on OslerBrook 2, 24 on Augusta 12 on this desktop). Now the same fill in this many bands of whole rows, a slice each: the same pixels. 1 = in one go, as v508 */
+const ROUGH_SPLIT = true; /* bg579: Hunt 1's deep rough (two band fills, then 9,000 lines in one stroke inside the band) was one step (hunt:1 rebuilt behind the home screen: 133-185 ms at 4x CPU; now the stroke alone, 82-112, is its longest slice: the build's longest step, median of 3, 169 -> 111). In a background build the band fills are flushed first, the lines' path is built (the same random numbers, as a Path2D: the same segments) in the next slice and stroked in the one after: the same draws. false = as v579 */ const FWY_SPLIT = true; /* bg579: an Augusta / data-hole fairway (its stripes, 2,600 cut marks per 240x195 yds in one stroke, its inked edge) was one step (Augusta 10: 75-96 ms at 4x CPU; the stroke alone now 58-61). In a background build: stripes | the marks' path built (Path2D, the same numbers) | the stroke | the edge, each in its own slice. false = as v579 */ const CHECKER_RESET = true; /* bg579: a green's turned checkerboard (784 squares under one rotation: 52-121 ms at 4x CPU; its slices now 30-45) gets the pauses CHECKER_PAUSE tried, but each pause drops the rotation first (identity, flush, then the same translate + rotate again), so every square is drawn under the very same matrix. Background builds only. false = as v579 */ const ZIG_SPLIT = true; /* bg579: the rough's ink ticks (1,800 little Vs per 1536x2752 map, one stroke) and its 380 flowers were one step with the path's building (Augusta 4: 26-140 ms at 4x CPU; its slices now 12-22; with ROUGH_WORKER these layers are the worker's, so this only runs where it can't paint them: the boot, ?rw=0, no OffscreenCanvas). In a background build the ticks' path is built (Path2D, the same random numbers: the same segments) in one slice, stroked in the next, and the flowers follow 128 a slice: the same draws in the same order. false = as v579 */
 function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk && ++brkN % n === 0, S4 = BUILD_SLICE4 && chunk && S4_BG; /* (BUILD_SLICE4) */ /* BUILD_CHUNK2: a slice point inside a long run of separate draws */ /* yields between passes: HOLESYS paints a prebuilt hole's map over several frames */
   let needleP = null; /* one tile per painting */
   const cv = document.createElement('canvas'); cv.width = MAP.W; cv.height = MAP.H; const g = cv.getContext('2d', COURSE_CPU ? { willReadFrequently: true } : undefined); /* COURSE_CPU */
@@ -1381,17 +1382,18 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
     if (j.state === 1) { g.save(); g.globalCompositeOperation = 'copy'; g.drawImage(j.bm, 0, 0); g.restore(); j.drop(); }
     else for (let k = 0; k < 2; k++) { const s = L[k].s; g.beginPath(); for (let i = 0; i < s.length; i += 4) { g.moveTo(s[i], s[i + 1]); g.lineTo(s[i + 2], s[i + 3]); } g.strokeStyle = L[k].col; g.lineWidth = L[k].lw; g.stroke(); if (!k) yield flushCv(cv); } } }
   else { hatch(16000 * AK, 'rgba(25,75,25,.25)', 1.2); yield (chunk && flushCv(cv)); hatch(6000 * AK, 'rgba(180,225,110,.2)', 1); }
-  yield (chunk && flushCv(cv)); { g.beginPath(); for (let i = 0; i < 1800 * AK; i++) { const x = R() * MAP.W, y = R() * MAP.H; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke(); }
-  for (let i = 0; i < 380 * AK; i++) { g.fillStyle = R() < .5 ? 'rgba(255,250,240,.85)' : 'rgba(255,214,70,.9)'; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 1.3 + R(), 0, 7); g.fill(); }
+  yield (chunk && flushCv(cv)); if (ZIG_SPLIT && S4) { const p2 = new Path2D(); for (let i = 0; i < 1800 * AK; i++) { const x = R() * MAP.W, y = R() * MAP.H; p2.moveTo(x - 2.5, y - 3); p2.lineTo(x, y + 1); p2.lineTo(x + 2.5, y - 3); } yield; g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke(p2); yield flushCv(cv); } /* ZIG_SPLIT */ else { g.beginPath(); for (let i = 0; i < 1800 * AK; i++) { const x = R() * MAP.W, y = R() * MAP.H; g.moveTo(x - 2.5, y - 3); g.lineTo(x, y + 1); g.lineTo(x + 2.5, y - 3); } g.strokeStyle = 'rgba(29,42,26,.28)'; g.lineWidth = 1.1; g.stroke(); }
+  for (let i = 0; i < 380 * AK; i++) { g.fillStyle = R() < .5 ? 'rgba(255,250,240,.85)' : 'rgba(255,214,70,.9)'; g.beginPath(); g.arc(R() * MAP.W, R() * MAP.H, 1.3 + R(), 0, 7); g.fill(); if (ZIG_SPLIT && S4 && i % 128 === 127) yield flushCv(cv); } /* (ZIG_SPLIT) */
   } /* (ROUGH_WORKER: !RJD) */
   yield (chunk && flushCv(cv));
   // deep rough: darker, longer grass well off the fairway (the Hunt's; Augusta's second cut is short)
   if (!AUGD) { const HB = hb(); let DR = null; /* HATCH_BG */ g.save(); { const pts = []; for (let v = -40; v <= 390; v += 4) pts.push([pathU(v), v]); for (let v = 390; v >= -40; v -= 4) pts.push([bluffU(v), v]); path(pts); g.clip(); if (HB) DR = { c1: [pxs(pts)], c2: [] }; }
   { const band = (inset, col) => { for (const sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + inset), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); path(pts); g.fillStyle = col; g.fill(); } };
-    band(0, 'rgba(30,95,30,.28)'); band(1.6, 'rgba(30,95,30,.24)');
+    band(0, 'rgba(30,95,30,.28)'); band(1.6, 'rgba(30,95,30,.24)'); if (ROUGH_SPLIT && S4 && !HB) yield flushCv(cv); /* ROUGH_SPLIT */
     { g.save(); band(1.6, 'rgba(0,0,0,0)'); g.beginPath(); for (let sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + 1.6), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); } g.clip();
       if (HB) { for (let sd of [-1, 1]) { const pts = [[sd < 0 ? MAP.U0 : MAP.U1, 60]]; for (let v = 60; v <= 290; v += 2) pts.push([centerU(v) + sd * (deepB(v) + 1.6), v]); pts.push([sd < 0 ? MAP.U0 : MAP.U1, 290]); DR.c2.push(pxs(pts)); } /* HATCH_BG: the same lines, drawn below */
         const s = new Float64Array(9000 * 4); for (let i = 0, k = 0; i < 9000; i++, k += 4) { const x = R() * MAP.W, y = Y(60 + R() * 230), a = -1.15 + (R() - .5) * .5, l = 7 + R() * 8; s[k] = x; s[k + 1] = y; s[k + 2] = x + Math.cos(a) * l; s[k + 3] = y + Math.sin(a) * l; } DR.L = [{ s, col: 'rgba(20,60,20,.3)', lw: 1.3 }]; DR.st = lineSt(); }
+      else if (ROUGH_SPLIT && S4) { yield flushCv(cv); const p2 = new Path2D(); for (let i = 0; i < 9000; i++) { const x = R() * MAP.W, y = Y(60 + R() * 230), a = -1.15 + (R() - .5) * .5, l = 7 + R() * 8; p2.moveTo(x, y); p2.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } yield; g.strokeStyle = 'rgba(20,60,20,.3)'; g.lineWidth = 1.3; g.stroke(p2); } /* ROUGH_SPLIT: the same lines, stroked in a slice of their own */
       else { g.beginPath(); for (let i = 0; i < 9000; i++) { const x = R() * MAP.W, y = Y(60 + R() * 230), a = -1.15 + (R() - .5) * .5, l = 7 + R() * 8; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(20,60,20,.3)'; g.lineWidth = 1.3; g.stroke(); } g.restore(); } } g.restore(); if (DR) yield* clipJob([DR.c1, DR.c2], DR.L, DR.st); }
   yield (chunk && flushCv(cv));
   // FESCUE: tall fescue: golden-straw over green, broad wind-wave swaths across it, its tall edge's shadow on the mown grass and a hairy, inked rim
@@ -1470,6 +1472,7 @@ function* paintCourseSteps(chunk = false) { let brkN = 0; const brk = n => chunk
       g.save(); path(q.P); g.clip();
       for (let v = Math.floor(v0 / 7) * 7, k = Math.floor(v0 / 7); v < v1; v += 7, k++) { g.fillStyle = k % 2 ? '#a4d75a' : '#95cb4f'; g.fillRect(x0, Y(v + 7), w, 7 * ppy + 1); }
       if (hb()) { const N = Math.ceil(2600 * n), s = new Float64Array(N * 4); for (let i = 0, k = 0; i < 2600 * n; i++, k += 4) { const x = x0 + R() * w, y = Y(v0 + R() * (v1 - v0)), a = -1.05, l = 3 + R() * 4; s[k] = x; s[k + 1] = y; s[k + 2] = x + Math.cos(a) * l; s[k + 3] = y + Math.sin(a) * l; } const st = lineSt(); g.restore(); yield* clipJob([[pxs(q.P)]], [{ s, col: 'rgba(40,110,40,.18)', lw: 1 }], st); } /* HATCH_BG: the cut marks through the worker */
+      else if (FWY_SPLIT && S4) { yield flushCv(cv); const p2 = new Path2D(); for (let i = 0; i < 2600 * n; i++) { const x = x0 + R() * w, y = Y(v0 + R() * (v1 - v0)), a = -1.05, l = 3 + R() * 4; p2.moveTo(x, y); p2.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } yield; g.strokeStyle = 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke(p2); g.restore(); yield flushCv(cv); } /* FWY_SPLIT: stripes | marks' path | stroke | edge */
       else { g.beginPath(); for (let i = 0; i < 2600 * n; i++) { const x = x0 + R() * w, y = Y(v0 + R() * (v1 - v0)), a = -1.05, l = 3 + R() * 4; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); } g.strokeStyle = 'rgba(40,110,40,.18)'; g.lineWidth = 1; g.stroke();
       g.restore(); } sketch(q.P, 2.6, .8); yield (chunk && flushCv(cv)); } }
   yield (chunk && flushCv(cv));
@@ -1614,7 +1617,7 @@ function* greenTexG(ck) { if (!GREEN_STYLE) return null; const S4 = BUILD_SLICE4
   if (st.includes('C')) { const gg = g.createRadialGradient(X(gc[0]), Y(gc[1]), 0, X(gc[0]), Y(gc[1]), GREEN.ry * 1.3 * ppy); gg.addColorStop(0, '#bdf283'); gg.addColorStop(1, '#9bdd60'); g.fillStyle = gg; } else g.fillStyle = '#a9ea6d';
   g.fill(); g.save(); path(GR); g.clip(); if (S4) yield flushCv(cv); /* BUILD_SLICE4 */
   if (st.includes('A')) { g.translate(X(gc[0]), Y(gc[1])); g.rotate(-.6); const w = 2.3 * ppy; for (let k = -20; k < 20; k++) { g.fillStyle = k % 2 ? 'rgba(255,255,255,.11)' : 'rgba(40,120,40,.07)'; g.fillRect(k * w, -60 * ppy, w, 120 * ppy); } g.setTransform(1, 0, 0, 1, 0, 0); }
-  if (S4) yield flushCv(cv); /* BUILD_SLICE4 */ if (st.includes('B')) { g.translate(X(gc[0]), Y(gc[1])); g.rotate(.5); const w = 2.6 * ppy; for (let a = -14; a < 14; a++) { if (S4 && CHECKER_PAUSE && a > -14 && (a + 14) % 7 === 0) yield flushCv(cv); /* CHECKER_PAUSE */ for (let b = -14; b < 14; b++) { const t = ((a + b) % 2 + 2) % 2, u = (a % 2 + 2) % 2; g.fillStyle = t ? (u ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.06)') : (u ? 'rgba(40,120,40,.06)' : 'rgba(40,120,40,.02)'); g.fillRect(a * w, b * w, w, w); } } g.setTransform(1, 0, 0, 1, 0, 0); } /* (BUILD_SLICE4: no pause inside the turned checkerboard: one there moved two pixels by one level on OslerBrook 1's green; CHECKER_PAUSE tries it) */
+  if (S4) yield flushCv(cv); /* BUILD_SLICE4 */ if (st.includes('B')) { g.translate(X(gc[0]), Y(gc[1])); g.rotate(.5); const w = 2.6 * ppy; for (let a = -14; a < 14; a++) { if (S4 && CHECKER_PAUSE && a > -14 && (a + 14) % 7 === 0) yield flushCv(cv); /* CHECKER_PAUSE */ else if (S4 && CHECKER_RESET && a > -14 && (a + 14) % 7 === 0) { g.setTransform(1, 0, 0, 1, 0, 0); yield flushCv(cv); g.translate(X(gc[0]), Y(gc[1])); g.rotate(.5); } /* CHECKER_RESET */ for (let b = -14; b < 14; b++) { const t = ((a + b) % 2 + 2) % 2, u = (a % 2 + 2) % 2; g.fillStyle = t ? (u ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.06)') : (u ? 'rgba(40,120,40,.06)' : 'rgba(40,120,40,.02)'); g.fillRect(a * w, b * w, w, w); } } g.setTransform(1, 0, 0, 1, 0, 0); } /* (BUILD_SLICE4: no pause inside the turned checkerboard: one there moved two pixels by one level on OslerBrook 1's green; CHECKER_PAUSE tries it) */
   if (S4) yield flushCv(cv); /* BUILD_SLICE4 */ if (st.includes('C')) { for (let k = .1; k < 1; k += .085) { path(GRs(k)); g.strokeStyle = 'rgba(255,255,255,.13)'; g.lineWidth = .14 * ppy; g.stroke(); } }
   // fine grain so it never looks flat up close
   for (let i = 0; i < 2500; i++) { g.fillStyle = R() < .5 ? 'rgba(40,120,40,.06)' : 'rgba(255,255,255,.07)'; g.fillRect(R() * cv.width, R() * cv.height, .12 * ppy, .12 * ppy); if (ck && i % (S4 ? 250 : 625) === (S4 ? 249 : 624)) yield flushCv(cv); }
@@ -1943,7 +1946,10 @@ function opinePine(t, ti, tw, Rp, trunks, crowns, plates) { /* OPINE (osler2, Ne
     const tb = rc * .4; tuft((Rp() - .5) * rc * .3, h - tb * .75, (Rp() - .5) * rc * .3, tb, tb * .7, G[3]); }
   t.rh = Math.max(t.r * 1.6, ...t.blobs.map(b => Math.hypot(b[0], b[2]) + b[3])) + .3; /* its hit reach: the pads reach past the usual crown */ }
 /* ---- trees (instanced toon + ink hulls) ---- */
-function buildTrees() {
+const TREES_SLICE = true; /* bg579: a hole's trees (each one's trunk, crown lumps, limbs: matrices and ground heights) and their instanced meshes were one build step (Augusta 2/4/10: 40-107 ms at 4x CPU; its slices now ~13). In a background build (fresh, S4_BG) the same per-tree code runs TREES_SLICE_N trees a slice, then the meshes a kind at a time (crowns, cones, pine crowns, pads, limbs, trunks): the same random numbers in the same order, the same meshes. false = as v579 */ const TREES_SLICE_N = 40;
+function buildTrees() { const T = treesSetup(); TREES.forEach(T.one); const f = T.fin(false); while (!f.next().done); } /* (TREES_SLICE: the same steps, straight through) */
+function* buildTreesG() { const T = treesSetup(), n = TREES.length; for (let ti = 0; ti < n; ti++) { if (ti in TREES) T.one(TREES[ti], ti); if (ti % TREES_SLICE_N === TREES_SLICE_N - 1) yield; } yield; yield* T.fin(true); } /* TREES_SLICE */
+function treesSetup() {
   const blobGeo = new THREE.SphereGeometry(1, 11, 8); const p = blobGeo.attributes.position;
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = 1 + 0.09 * Math.sin(x * 5.1 + y * 3.3) + 0.07 * Math.sin(z * 6.7 - y * 4.1); p.setXYZ(i, x * n, y * n * 0.92, z * n); }
   blobGeo.computeVertexNormals();
@@ -1965,7 +1971,7 @@ function buildTrees() {
     for (let k = 0; k < 40 && got.length < n && pool.length; k++) { const o = pool[Math.floor(Ra() * pool.length)]; if (got.some(g => Math.hypot(g.u - o.t.u, g.v - o.t.v) < 45)) continue; o.t.bloom = pal[Math.floor(Ra() * pal.length)]; got.push(o.t); }
     TREES.accents = got.map(t => ({ u: t.u, v: t.v, c: t.bloom })); }
   if ((HUNT_OPINE || AUG_OPINE) && AUGD && !TREES._opine) { TREES._opine = true; opineTrees(AUGD, TREES); } /* HUNT_OPINE / AUG_OPINE: a few trees become Ontario pines (after the accent trees are picked, so those stay the same) */
-  TREES.forEach((t, ti) => {
+  const one = (t, ti) => {
     if (t.rSkip) for (let i = 0; i < t.rSkip; i++) R(); /* the draws of trees dropped before it (HUNT_OPEN) */
     const gy = t.bk ? (t.gy = lerp(AUGD.hAt(t.u, t.v), AUGD.hFar ?? AUGD.hAt(t.u, t.v), smooth(20, 380, Math.hypot(Math.max(MAP.U0 - t.u, 0, t.u - MAP.U1), Math.max(MAP.V0 - t.v, 0, t.v - MAP.V1)))) - .5) : groundHeight(t.u, t.v), tw = W(t.u, t.v, gy); /* AUG_BACKDROP: past the map the land is the outer rings' (the lidar eased to one level far off): a backdrop pine stands on that */
     if (t.bk) { /* AUG_BACKDROP: a backdrop pine, far behind a green: a loblolly's tall bare trunk and one wide, flat crown on top (a distant pine's umbrella), from its own random stream */
@@ -2024,7 +2030,8 @@ function buildTrees() {
       blobs.push({ p: tw.clone().setY(gy + t.h * .74), s: t.r * .9, r: R(), tid: ti, bl: t.bloom }); t.blobs = [[0, t.h * .74, 0, t.r * .9]]; // the hit-box uses the same blobs that are drawn
       const a0r = R() * 6.28, a0 = t.lobe ? t.lobe.a : a0r; for (let k = 0; k < 2; k++) { const ja = (R() - .5) * .8, jy = R(), js = R(), a = a0 + k * 3.14 + (t.lobe ? 0 : ja), bx = Math.cos(a) * t.r * .9, by = t.h * (.6 + (t.lobe ? (k ? .1 : .07) : jy * .14)), bz = Math.sin(a) * t.r * .9, bs = t.r * (t.lobe ? (k ? .6 : .74) : .6 + js * .14); /* t.lobe (HUNT_BIG9): the big lobe set square toward a.a, the small one opposite (the random draws still taken, so the hole's other trees draw as before) */ blobs.push({ p: tw.clone().add(new THREE.Vector3(bx, by, bz)), s: bs, r: R(), tid: ti, bl: t.bloom }); t.blobs.push([bx, by, -bz, bs]); } /* a broad, spreading crown */
     }
-  });
+  };
+  const fin = function* (sl) {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), col = new THREE.Color();
   const greens = ['#5a9a35', '#6aa83c', '#4c8a30', '#7cb446', '#55923a'];
   function inst(geo, mat, list, scaleFn, colorFn, off, lod) { if (!list.length) return; return cullInst(geo, mat, list.map((o, i) => { scaleFn(o, sc); return { p: o.p, m: new THREE.Matrix4().compose(o.p, o.q || q, sc), c: colorFn ? new THREE.Color(colorFn(o, i)) : null, r: Math.max(sc.x, sc.y, sc.z) * 1.25 + .5, tid: o.tid }; }), { off, lod }); }
@@ -2032,19 +2039,19 @@ function buildTrees() {
     gold: ['#eab83a', '#e0a92e', '#f0c856'], orange: ['#ec9a4c', '#e3893f', '#f2ae66'], lime: ['#a9cf48', '#9bc23c', '#b9da5c'] }; /* the Hunt's accent trees (TREE_ACCENTS) */
   inst(blobGeo, toon(0xffffff), blobs, (o, s) => s.setScalar(o.s), o => (o.bl && BLOOM[o.bl] ? BLOOM[o.bl] : greens)[Math.floor(o.r * (o.bl && BLOOM[o.bl] ? BLOOM[o.bl] : greens).length)], null, crownFar);
   inst(blobGeo, inkMat, blobs, (o, s) => s.setScalar(o.s + .3), null, null, crownFar);
-  inst(coneGeo, toon(0xffffff), cones, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), (o, i) => o.fir ? (i % 2 ? '#2d6331' : '#25552b') : i % 2 ? '#3d7f3a' : '#346f34'); /* fir: a darker, bluer green */
+  if (sl) yield; inst(coneGeo, toon(0xffffff), cones, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), (o, i) => o.fir ? (i % 2 ? '#2d6331' : '#25552b') : i % 2 ? '#3d7f3a' : '#346f34'); /* fir: a darker, bluer green */
   inst(coneGeo, inkMat, cones, (o, s) => s.set(o.s[0] + .3, o.s[1] + .45, o.s[2] + .3), null, new THREE.Vector3(0, -.2, 0));
-  const pineGreens = ['#3e7330', '#467d35', '#356628', '#4f8a3a']; /* the loblollies' crowns: a deeper, bluer green than the broadleaf trees */
+  if (sl) yield; const pineGreens = ['#3e7330', '#467d35', '#356628', '#4f8a3a']; /* the loblollies' crowns: a deeper, bluer green than the broadleaf trees */
   inst(blobGeo, toon(0xffffff), crowns, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || pineGreens[Math.floor(o.r * pineGreens.length)], null, crownFar);
   inst(blobGeo, inkMat, crowns, (o, s) => s.set(o.s[0] + .28, o.s[1] + .26, o.s[2] + .28), null, null, crownFar);
-  if (plates && plates.length) { const pG = opinePlateGeo(14, 6), pF = opinePlateGeo(9, 4); pF.userData.crown = true; /* OPINE_PADS: the Ontario pines' needle pads in their own scalloped mesh (near and far; two draws with the ink) */
+  if (sl) yield; if (plates && plates.length) { const pG = opinePlateGeo(14, 6), pF = opinePlateGeo(9, 4); pF.userData.crown = true; /* OPINE_PADS: the Ontario pines' needle pads in their own scalloped mesh (near and far; two draws with the ink) */
     inst(pG, toon(0xffffff), plates, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c, null, pF); inst(pG, inkMat, plates, (o, s) => s.set(o.s[0] + .28, o.s[1] + .22, o.s[2] + .28), null, null, pF); }
-  inst(trunkGeo, toon(0x8a5a35), branches, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), null, null, trunkFar);
+  if (sl) yield; inst(trunkGeo, toon(0x8a5a35), branches, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), null, null, trunkFar);
   inst(trunkGeo, inkMat, branches, (o, s) => s.set(o.s[0] * 1.6, o.s[1], o.s[2] * 1.6), null, null, inkNone);
-  if (trunks.some(o => o.c)) inst(trunkGeo, toon(0xffffff), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || '#8a5a35', null, trunkFar); /* OPINE: the Ontario pines' dark and orange-red bark (a colour per trunk; the rest the same brown) */
+  if (sl) yield; if (trunks.some(o => o.c)) inst(trunkGeo, toon(0xffffff), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), o => o.c || '#8a5a35', null, trunkFar); /* OPINE: the Ontario pines' dark and orange-red bark (a colour per trunk; the rest the same brown) */
   else inst(trunkGeo, toon(0x8a5a35), trunks, (o, s) => s.set(o.s[0], o.s[1], o.s[2]), null, null, trunkFar);
-  inst(trunkGeo, inkMat, trunks, (o, s) => s.set(o.s[0] * 1.45, o.s[1], o.s[2] * 1.45), null, null, inkNone);
-}
+  inst(trunkGeo, inkMat, trunks, (o, s) => s.set(o.s[0] * 1.45, o.s[1], o.s[2] * 1.45), null, null, inkNone); };
+  return { one, fin }; }
 /* ---- flowering bushes (azaleas, any course): a dark green mound under a cap of blossom, tinted per bush. Three instanced draws for all of them ---- */
 const BUSH_SLICE = true; /* perf573 (pass 3): the azalea blossom texture (430 trusses of five-petal flowers, ~50,000 canvas calls) is drawn once per session by the first hole with bushes (on a Hunt start that's Augusta 1, built behind the intro / home screen) inside that hole's bush step: one build step of 440-640 ms at 4x CPU (h/buildt2.js). In a prebuilt hole's build it's now drawn in 10 slices just before the bushes (bushTexG: buildBushes' own drawing code, the same random numbers and calls in the same order: the same texture); the page's own first hole is built straight through as before. false = as v574 */
 const BUSHTEX = {}; /* the azalea blossom + leaf textures, made by the first hole with bushes */
@@ -2061,7 +2068,10 @@ function* bushTexG() { /* BUSH_SLICE: the azalea blossom texture as buildBushes 
   for (let i = 0; i < 430; i++) { const tx = Rf() * 512, ty = Rf() * 256, n = 5 + Math.floor(Rf() * 5), spread = 9 + Rf() * 5, tone = .86 + Rf() * .14; /* one truss: a ball of flowers */
     for (let k = 0; k < n; k++) { const a = Rf() * 6.28, d = Math.sqrt(Rf()) * spread; flower(tx + Math.cos(a) * d, ty + Math.sin(a) * d * .8, 5.6 + Rf() * 2.6, Rf() * 6.28, tone * (.92 + Rf() * .08)); } if (i % 43 === 42) yield; }
   const ft = new THREE.CanvasTexture(fc); ft.anisotropy = 4; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; SHARED.add(ft); return ft; })(); BUSHTEX.f = made; }
-function buildBushes() { if (!BUSHES.length) return;
+const BUSH_LOOP = true; /* bg579: Hunt 9's ravine holds thousands of leafy bushes; their placement (ground heights round every lump, two matrices each) and their instanced meshes were one build step (hunt:9 behind Hunt 8: 115-155 ms at 4x CPU, 283 in a probe; the build's longest step, median of 3, 133 -> 87). In a background build (fresh, S4_BG) the same per-bush code now runs BUSH_LOOP_N bushes a slice, then the flowering mounds' meshes, then the leafy ones', each in a slice of its own: the same random numbers in the same order, the same meshes. false = as v579 */ const BUSH_LOOP_N = 150;
+function buildBushes() { const B = bushSetup(); if (!B) return; for (const b of BUSHES) B.one(b); B.done1(); B.done2(); B.done3(); } /* (BUSH_LOOP: the same steps, straight through) */
+function* buildBushesG() { const B = bushSetup(); if (!B) return; let k = 0; for (const b of BUSHES) { B.one(b); if (++k % BUSH_LOOP_N === 0) yield; } yield; B.done1(); yield; B.done2(); yield; B.done3(); } /* BUSH_LOOP */
+function bushSetup() { if (!BUSHES.length) return null;
   const mkDome = (DW, DH) => { /* AZALEA_FAR: the dome built at a given facet count (14 x 8 is the bush as always) */
   const dome = new THREE.SphereGeometry(1, DW, DH, 0, Math.PI * 2, 0, Math.PI * .6), pa = dome.attributes.position; /* a lumpy dome, cut low so it sits down into the ground */
   for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), n = 1 + .08 * Math.sin(x * 6.1 + z * 2.3) + .07 * Math.sin(z * 5.3 - x * 3.7) + .05 * Math.sin(y * 9); pa.setXYZ(i, x * n, y * n, z * n); } dome.computeVertexNormals();
@@ -2096,24 +2106,26 @@ function buildBushes() { if (!BUSHES.length) return;
   const lt = new THREE.CanvasTexture(lc); lt.wrapS = lt.wrapT = THREE.RepeatWrapping; SHARED.add(lt); return lt; })());
   const FLOWER = { pink: '#ff6fae', magenta: '#e83a8c', white: '#fff6fa', coral: '#ff7d6e', blush: '#ffb6d2', crimson: '#d3203f', gold: '#f4c531' }, /* gold: golden bell (forsythia) */ LEAF = ['#3c7030', '#447a34', '#35652b'];
   const Rb = rng(62), e = new THREE.Euler(), q = new THREE.Quaternion(), mound = [], cap = [], ink = [], lMound = [], lInk = [], LG = ['#4c8a30', '#55923a', '#5a9a35', '#4a8233', '#6aa83c', '#3f7a2e', '#62a03a']; /* lMound / lInk: leafy bushes (c 'leaf': Hunt 9's ravine), in the trees' mid crown greens with a few deeper ones (the scrub in Neil's photos) */
-  for (const b of BUSHES) { const lb = b.c === 'leaf', fl = new THREE.Color(FLOWER[b.c] || FLOWER.pink), lf = new THREE.Color(LEAF[Math.floor(Rb() * LEAF.length)]), a0 = Rb() * 6.28;
+  const one = b => { const lb = b.c === 'leaf', fl = new THREE.Color(FLOWER[b.c] || FLOWER.pink), lf = new THREE.Color(LEAF[Math.floor(Rb() * LEAF.length)]), a0 = Rb() * 6.28;
     if (lb) { const nl = b.r > 1.22 ? 3 : b.r > 1.05 ? 2 : 1; [[0, 0, 1, .86], [.66, a0, .66 + Rb() * .14, .8], [.6, a0 + 2.3 + Rb(), .58 + Rb() * .14, .76]].slice(0, nl).forEach(([d, a, k, vs]) => { /* a leafy bush: one to three lumps of a crown-like mesh, flat-shaded and inked like a crown */
         const u = b.u + Math.cos(a) * d * b.r, v = b.v + Math.sin(a) * d * b.r, r = b.r * k * (nl === 1 ? 1.12 : 1), g0 = groundHeight(u, v); let gm = g0; for (let j = 0; j < 4; j++) gm = Math.min(gm, groundHeight(u + Math.cos(j * 1.571) * r * .8, v + Math.sin(j * 1.571) * r * .8)); /* on a slope: let down toward its downhill edge, so it sits in the slope, not perched on it */
         const p = W(u, v, (g0 + gm) / 2 + r * vs * .42), rr = r * 1.2 + .4; e.set((Rb() - .5) * .2, Rb() * 6.28, (Rb() - .5) * .2); q.setFromEuler(e);
         lMound.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r, r * vs, r)), c: new THREE.Color(LG[Math.floor(Rb() * LG.length)]), r: rr }); lInk.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r + .17, r * vs + .16, r + .17)), r: rr }); });
-      continue; }
+      return; }
     /* each bush is a cluster of mounds: a main one and two smaller lobes, so the outline is lumpy and natural */
     [[0, 0, 1, .47 + Rb() * .1], [.55, a0, .62 + Rb() * .14, .42], [.5, a0 + 2.2 + Rb(), .55 + Rb() * .14, .38]] /* low and spreading: about 2½–3 ft tall */.forEach(([d, a, k, h]) => {
       const u = b.u + Math.cos(a) * d * b.r, v = b.v + Math.sin(a) * d * b.r, r = b.r * k, gy = groundHeight(u, v), p = W(u, v, gy - r * .12); e.set(0, Rb() * 6.28, 0); q.setFromEuler(e); const rr = r * 1.3 + .4;
       mound.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r, r * h, r)), c: lf, r: rr });
       cap.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r * 1.035, r * h * 1.04, r * 1.035)), c: fl, r: rr });
-      ink.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r + .14, r * h + .12, r + .14)), r: rr }); }); }
-  if (mound.length) { cullInst(domeI, toon(0xffffff, { map: lt }), mound, { lod: far && far.domeI }); cullInst(domeI, toon(0xffffff, { map: ft, alphaTest: .5 }), cap, { lod: far && far.domeI }); cullInst(dome, inkMat, ink, { lod: far && far.dome, farCut: AZ_INK_CUT }); }
+      ink.push({ p, m: new THREE.Matrix4().compose(p, q, new THREE.Vector3(r + .14, r * h + .12, r + .14)), r: rr }); }); };
+  const done1 = () => { if (mound.length) { cullInst(domeI, toon(0xffffff, { map: lt }), mound, { lod: far && far.domeI }); cullInst(domeI, toon(0xffffff, { map: ft, alphaTest: .5 }), cap, { lod: far && far.domeI }); cullInst(dome, inkMat, ink, { lod: far && far.dome, farCut: AZ_INK_CUT }); }};
+  const done2 = () => {
   if (lMound.length) { const lump = (w, h) => { const g = new THREE.SphereGeometry(1, w, h), p = g.attributes.position; /* a leafy bush's lump: the crowns' lumpy ball in fewer facets (there are thousands of them), kept for every hole */
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), n = 1 + .1 * Math.sin(x * 5.1 + y * 3.3) + .08 * Math.sin(z * 6.7 - y * 4.1); p.setXYZ(i, x * n, y * n * .92, z * n); } g.computeVertexNormals(); SHARED.add(g); return g; };
     const g = BUSHTEX.leaf || (BUSHTEX.leaf = lump(7, 5)) /* 56 tris */, gf = BUSH_FAR ? BUSHTEX.leafFar || (BUSHTEX.leafFar = lump(5, 4)) /* 30 tris */ : null;
-    cullInst(g, toon(0xffffff), lMound, { lod: gf }); cullInst(g, inkMat, lInk, { lod: gf }); }
-}
+    cullInst(g, toon(0xffffff), lMound, { lod: gf }); LG2 = [g, gf]; } };
+  const done3 = () => { if (LG2) cullInst(LG2[0], inkMat, lInk, { lod: LG2[1] }); }; let LG2 = null;
+  return { one, done1, done2, done3 }; }
 
 /* ---- Augusta's stone footbridges over Rae's Creek (Hogan Bridge on 12): scenery only, the creek under it plays as before.
    One lofted mesh: outer walls with dark round arches, low parapets, a turf deck that ramps down to the grass at both ends; one inverted hull for the ink ---- */
@@ -5744,7 +5756,7 @@ function drawTrTop() {
 function updateTracer() {
   if (CJ.g) { tracer.visible = tracerInk.visible = trShadow.visible = rings.visible = false; return; } /* CADDIE_SLICE: no line until the caddie's pick is final */
   if (G.view === 'flight') return;
-  if (FLY.on) { trShadow.visible = false; return; } /* the drone fly-over shows the hole, not the shot */
+  if (FLY.on && !FLY.landing) { trShadow.visible = false; return; } /* the drone fly-over shows the hole, not the shot */
   const camMoved = camera.position.distanceToSquared(lastTrCam) > 1e-4; if (!tracerDirty && lastAimT === G.aimT && !camMoved) return; tracerDirty = false; lastAimT = G.aimT; lastTrCam.copy(camera.position);
   if (G.mode === 'putt') { // how far it would roll if the green were flat and straight: it does NOT follow the break
     const D = G.D, e = smoother(G.aimT);
@@ -6603,7 +6615,7 @@ const HOLESYS = (() => {
     if (fresh && PREBUILD_OWN_HS) HS = null; if (fresh) { setCourse(HD.cid); HOLE_N = HD.i; HOLE = HOLES[HD.i - 1]; AUGD = BDH_CHUNK ? yield* holeAUGDg(CID, HOLE.n) : holeAUGD(CID, HOLE.n); yield; courseGeom(); yield; }
     HS = newHS(); holeMap(); if (ROUGH_WORKER) ROUGH.kick(); /* ROUGH_WORKER */ GREENTEX = BUILD_CHUNK3 ? yield* greenTexG(true) : greenTex(); if (TEX_FREE && GREENTEX) GREENTEX.tex.onUpdate = texFree; yield;
     yield* courseSteps(); yield;
-    if (BUILD_SLICE4 && S4_BG) yield* buildOuterG(true); else buildOuter(); yield; buildTrees(); yield; if (BUSH_SLICE && fresh && BUSHES.length && !BUSHTEX.f) { yield* bushTexG(); yield; } buildBushes(); yield; buildBridges(); buildLake(); buildFountain(); yield; if (BUILD_CHUNK2) yield* buildSceneryG(); else buildScenery(); yield; CUPMESH = buildCup(); yield;
+    if (BUILD_SLICE4 && S4_BG) yield* buildOuterG(true); else buildOuter(); yield; if (TREES_SLICE && fresh && S4_BG) yield* buildTreesG(); else buildTrees(); yield; if (BUSH_SLICE && fresh && BUSHES.length && !BUSHTEX.f) { yield* bushTexG(); yield; } if (BUSH_LOOP && fresh && S4_BG) yield* buildBushesG(); else buildBushes(); yield; buildBridges(); buildLake(); buildFountain(); yield; if (BUILD_CHUNK2) yield* buildSceneryG(); else buildScenery(); yield; CUPMESH = buildCup(); yield;
     HS.read = yield* READ.make(); yield; HS.mini = BUILD_CHUNK3 ? yield* MINI.makeG(4) : MINI.make(); AUGCAM = makeAugCam(); homePath = makeHomePath(); if (F3.warm) { yield; yield* caddieWarmG(); } /* CADDIE_FAST3: the caddie's tables for this hole */
     if (fresh) yield* upload(); }
   function* upload() { /* a prebuilt hole onto the GPU before it's shown: textures one at a time, then programs, then buffers (one 1-px draw) */
@@ -6994,7 +7006,7 @@ const HOMESNAP = (() => {
 /* ---- the drone fly-over that opens a hole (once per hole per visit; a replayed hole skips it): from a few hundred feet up behind the tee,
    down the line of the fairway, then a hover and a slow turn over the green with its slope arrows, easing in for a closer look ---- */
 function settleTips(ms) { app.classList.add('settling'); clearTimeout(settleTips.to); settleTips.to = setTimeout(() => app.classList.remove('settling'), ms); } /* no swing tips while the camera is still flying in */
-const TRACER_FADE = { ms: 450 }; /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
+const TRACER_FADE = { ms: 450, lead: .15 }; /* Neil 11-27 ('the fly back to the tee is very nice but the tracer comes up abruptly'): as the camera lands after the fly-over, the shot line (tube, ink, ground shadow, the overlay of its top), the landing rings fade in over this long instead of popping on. null = as v603 */
 const TRF = { t0: 0 };
 function trFade() { const k = Math.min(1, (performance.now() - TRF.t0) / TRACER_FADE.ms), f = k * k * k * (k * (k * 6 - 15) + 10), top = document.getElementById('trTop');
   tracer.material.opacity = .96 * f; tracerInk.material.opacity = .9 * f; trShadow.material.opacity = (trShadow.userData.op != null ? trShadow.userData.op : .25) * f;
@@ -7037,7 +7049,8 @@ const FLY = (() => {
       const d1 = _o.copy(look).sub(pos), L1 = d1.length(); d1.normalize(); const kr = smoother(Math.min(1, x / .9)); /* the camera turns evenly from where the drone looked to the shot line, done just before it lands */
       B.q.setFromUnitVectors(B.d0, d1); const qi = new THREE.Quaternion().slerp(B.q, kr); _l.copy(B.d0).applyQuaternion(qi).multiplyScalar(lerp(B.L0, L1, kr)).add(_p);
       pos.copy(_p); look.copy(_l); S.fov = lerp(B.fov, 52, smoother(x));
-      if (!B.hud && T - B.t <= FLY_RETURN.hud) { B.hud = true; app.classList.remove('droning'); } /* the shot's controls come in over the last stretch, landing with the camera */
+      if (!B.hud && T - B.t <= FLY_RETURN.hud) { B.hud = true; app.classList.remove('droning'); }
+      if (TRACER_FADE && TRACER_FADE.lead && !B.tr && T - B.t <= TRACER_FADE.lead) { B.tr = true; tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; TRF.t0 = performance.now(); } /* (Neil 11-27: the line came in ~150 ms late: it now starts fading in this long before the camera lands) */ /* the shot's controls come in over the last stretch, landing with the camera */
       if (B.t >= T) { if (!B.hud) app.classList.remove('droning'); done(); } return; }
     if (S.back) { /* back to the tee on our own arc: rises a little, glides down into the shot view, zoom easing out on the way */
       const B = S.back; B.t += dt; const x = Math.min(1, B.t / B.dur), k = .5 - .5 * Math.cos(Math.PI * x), m = 1 - k; /* sine ease: gentler peak speed than smootherstep */
@@ -7061,10 +7074,10 @@ const FLY = (() => {
     if (!S || S.back) return; S.back = { dur: skip ? .9 : T_BACK, t: 0, pos: camera.position.clone(), look: camLook.clone(), fov: camera.fov, arc: Math.min(26, camera.position.distanceTo(ball.position) * .08), skip: !!skip, v: FLY_RETURN && skip && S.vel ? S.vel.clone() : new THREE.Vector3() };
     if (!FLY_RETURN) app.classList.remove('droning'); $('#flyUI').hidden = true; clearTimeout(settleTips.to); app.classList.add('settling');
   }
-  function done() { if (TRACER_FADE) TRF.t0 = performance.now(); if (FLY_SETTLE) FLY_CALM_AT = performance.now() + FLY_SETTLE_MS; S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
+  function done() { if (TRACER_FADE && !(S && S.back && S.back.tr)) TRF.t0 = performance.now(); if (FLY_SETTLE) FLY_CALM_AT = performance.now() + FLY_SETTLE_MS; S = null; settleTips(250); tracer.visible = tracerInk.visible = rings.visible = true; tracerDirty = true; const f = after; after = null; if (f) setTimeout(f, 300); }
   function stop() { if (!S) return; S = null; after = null; app.classList.remove('droning', 'settling'); $('#flyUI').hidden = true; } /* quitting mid fly-over */
   $('#flyUI .fskip').addEventListener('click', e => { e.stopPropagation(); sfx('pop'); end(true); });
-  return { start, step, end, stop, reset() { seen.clear(); }, get on() { return !!S; }, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
+  return { start, step, end, stop, reset() { seen.clear(); }, get on() { return !!S; }, get landing() { return !!(S && S.back && S.back.tr); } /* TRACER_FADE.lead: the shot line may show in the return's last moments */, get green() { return !!S; } /* slope arrows on the green for the whole fly-over */, get fov() { return S ? S.fov : 52; } };
 })(); window.__FLY = FLY; /* (tests: the fly-over's state) */
 /* ---- quitting back to the home screen (the end-of-hole card and the little Home button both ask first) ---- */
 const QUIT = (() => {
